@@ -8,4 +8,18 @@ Biblioteca fotográfica personal, portátil y multiplataforma. Organiza, busca y
 - Hoja de ruta: [docs/roadmap.md](docs/roadmap.md)
 - Cómo se desarrolla: [docs/workflow.md](docs/workflow.md)
 
-Licencia: pendiente de confirmar (propuesta: GPL-3.0-or-later).
+## Desarrollo
+
+Requisitos: Rust estable, Node 22, pnpm 10 y las [dependencias de sistema de Tauri](https://v2.tauri.app/start/prerequisites/).
+
+```sh
+cd apps/desktop
+pnpm install
+pnpm tauri dev                        # aplicación de escritorio
+cargo run -p mnemos-cli -- init RUTA  # crea una biblioteca vacía
+cargo test --workspace                # pruebas del núcleo
+```
+
+## Licencia
+
+[GPL-3.0-or-later](LICENSE).
