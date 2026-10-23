@@ -3,6 +3,12 @@
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+  # proc-macro-error sin mantenimiento. Solo es una macro de compilación que
+  # llega por glib/gtk 0.18, que Tauri 2 usa en Linux. No tiene sustituto
+  # mientras Tauri no migre a GTK 4. Revisar en cada actualización de Tauri.
+  { id = "RUSTSEC-2024-0370", reason = "macro de compilación heredada de gtk-rs vía Tauri en Linux; sin alternativa" },
+]
 
 [licenses]
 version = 2
@@ -11,10 +17,13 @@ allow = [
   "ISC", "Zlib", "Unicode-3.0", "MPL-2.0", "CC0-1.0", "GPL-3.0-or-later", "LGPL-2.1-or-later",
 ]
 confidence-threshold = 0.9
+unused-allowed-license = "allow"
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Las dependencias internas del workspace usan solo `path`.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"

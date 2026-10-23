@@ -1,0 +1,27 @@
+[package]
+name = "mnemos-desktop"
+description = "Aplicación de escritorio de MNEMOS."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+# El sufijo `_lib` evita un conflicto de nombres con el binario en Windows:
+# https://github.com/rust-lang/cargo/issues/8519
+name = "mnemos_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+mnemos-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = [] }
+
+[lints]
+workspace = true

@@ -1,7 +1,7 @@
 # 001 · Stack y licencia
 
 - Fecha: 2026-10-23
-- Estado: **propuesta** (pendiente de confirmar por Paulo)
+- Estado: **aceptada** (2026-10-23)
 
 ## Contexto
 MNEMOS debe ejecutarse desde un disco externo en Windows, macOS y Linux, sin instalación y con poco consumo.
