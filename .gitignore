@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/target/
+
+# Node / Svelte
+node_modules/
+.svelte-kit/
+dist/
+build/
+
+# Tauri
+apps/desktop/src-tauri/gen/
+
+# Entorno y secretos
+.env
+.env.*
+
+# Bibliotecas locales de prueba (nunca se suben fotos reales)
+Biblioteca/
+*.db
+*.db-wal
+*.db-shm
+
+# Claude Code: ajustes personales
+.claude/settings.local.json
+
+# Sistema
+.DS_Store
+Thumbs.db
