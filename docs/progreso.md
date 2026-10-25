@@ -5,6 +5,7 @@
 ## Estado
 Fase **F1 Biblioteca y navegación**, en curso.
 - F0 cerrada el 2026-10-25 (PR #2).
+- Estilo visual decidido (decisión 003): cuadrícula estilo Galería y visor oscuro.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
