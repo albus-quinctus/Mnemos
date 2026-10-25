@@ -1,0 +1,12 @@
+[package]
+name = "mnemos-imaging"
+description = "Tratamiento de imágenes de MNEMOS: formatos, miniaturas, EXIF y recetas de edición."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
