@@ -13,7 +13,6 @@ Fase **F1 Biblioteca y navegación**, en curso.
 2. Probar con 10 000 fotos desde un HDD externo y medir tiempos de indexado.
 
 ## Pendientes / ideas aparcadas
-- Revisar e instalar las skills de `docs/skills.md`.
 - Crear `tests/fixtures/` con imágenes de ejemplo sin datos personales.
 - Decidir qué hacer con las fotos desaparecidas (hoy solo se cuentan).
 - Empaquetado portátil (ejecutables en la raíz del disco) y prueba en exFAT.

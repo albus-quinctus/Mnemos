@@ -14,10 +14,10 @@ Versión completa: documento "Workflow de desarrollo de MNEMOS". Esto es el resu
 | Paso | Qué | Herramienta | Salida |
 |---|---|---|---|
 | 1. Especificar | Qué y por qué, casos límite, criterios de aceptación | brainstorming | `docs/specs/NNN-*.md` |
-| 2. Planificar | Tareas de ≤1 h con archivos y pruebas | writing-plans | lista de tareas en la spec |
+| 2. Planificar | Tareas de ≤1 h con archivos y pruebas | writing-plans | `docs/planes/NNN-*.md` (o lista de tareas en la spec si es pequeña) |
 | 3. Implementar | Una tarea por sesión, rama `feat/NNN-*` | Claude Code + skills de stack | commits pequeños |
 | 4. Verificar | fmt, clippy, tests, `pnpm check` | CI | todo en verde |
-| 5. Revisar | Revisión del diff; seguridad si toca archivos o IPC | rust-review, differential-review | correcciones |
+| 5. Revisar | Revisión del diff; seguridad si toca archivos o IPC | differential-review | correcciones |
 | 6. Cerrar | Actualizar `docs/progreso.md`, PR, fusionar | `/clear` | estado al día |
 
 Si una tarea pasa de ~30 mensajes, estaba mal dividida: vuelve al paso 2.
