@@ -21,7 +21,8 @@ DISCO/
         ├── mnemos.db                 (SQLite, rutas relativas)
         ├── miniaturas/
         ├── ediciones/                (recetas JSON versionadas)
-        └── copias/
+        ├── copias/
+        └── tmp/                      (copias a medias durante la importación)
 ```
 
 ## Reglas
