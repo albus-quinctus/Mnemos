@@ -16,8 +16,8 @@ const DATA_SUBDIRS: &[&str] = &["miniaturas", "ediciones", "copias"];
 
 /// Biblioteca de MNEMOS abierta.
 pub struct Library {
-    root: PathBuf,
-    conn: Connection,
+    pub(crate) root: PathBuf,
+    pub(crate) conn: Connection,
 }
 
 /// Resumen de una biblioteca para mostrar al usuario.
