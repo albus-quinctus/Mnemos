@@ -1,33 +1,37 @@
 //! `mnemos`: herramienta de línea de órdenes para gestionar bibliotecas.
 
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::ExitCode;
 
-use mnemos_core::{Library, LibraryInfo};
+use mnemos_core::{FileError, ImportReport, IndexReport, Library, LibraryInfo, Result};
 
 const USAGE: &str = "Uso:
-  mnemos init <ruta>   Crea una biblioteca vacía en <ruta>
-  mnemos info <ruta>   Muestra el resumen de la biblioteca en <ruta>";
+  mnemos init <biblioteca>            Crea una biblioteca vacía
+  mnemos info <biblioteca>            Muestra el resumen de la biblioteca
+  mnemos index <biblioteca>           Registra las fotos que hay en Originales/
+  mnemos import <biblioteca> <origen> Copia las fotos de <origen> a la biblioteca";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
     let result = match args.as_slice() {
-        [cmd, path] if cmd == "init" => {
-            Library::create(&PathBuf::from(path)).and_then(|lib| lib.info())
-        }
-        [cmd, path] if cmd == "info" => {
-            Library::open(&PathBuf::from(path)).and_then(|lib| lib.info())
-        }
+        ["init", lib] => Library::create(Path::new(lib)).and_then(|lib| print_info(&lib.info()?)),
+        ["info", lib] => Library::open(Path::new(lib)).and_then(|lib| print_info(&lib.info()?)),
+        ["index", lib] => Library::open(Path::new(lib))
+            .and_then(|mut lib| lib.index())
+            .map(|r| print_index(&r)),
+        ["import", lib, source] => Library::open(Path::new(lib))
+            .and_then(|mut lib| lib.import_from(Path::new(source)))
+            .map(|r| print_import(&r)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
         }
     };
     match result {
-        Ok(info) => {
-            print_info(&info);
-            ExitCode::SUCCESS
-        }
+        Ok(true) => ExitCode::SUCCESS,
+        // La operación terminó, pero algunos archivos no se pudieron procesar.
+        Ok(false) => ExitCode::FAILURE,
         Err(err) => {
             eprintln!("Error: {err}");
             ExitCode::FAILURE
@@ -35,10 +39,36 @@ fn main() -> ExitCode {
     }
 }
 
-fn print_info(info: &LibraryInfo) {
+fn print_info(info: &LibraryInfo) -> Result<bool> {
     println!("Biblioteca: {}", info.root);
     println!("Esquema:    v{}", info.schema_version);
     println!("Fotos:      {}", info.photos);
     println!("Álbumes:    {}", info.albums);
     println!("Etiquetas:  {}", info.tags);
+    Ok(true)
+}
+
+fn print_index(r: &IndexReport) -> bool {
+    println!("Nuevas:        {}", r.added);
+    println!("Actualizadas:  {}", r.updated);
+    println!("Sin cambios:   {}", r.unchanged);
+    println!("Desaparecidas: {}", r.missing);
+    print_errors(&r.errors)
+}
+
+fn print_import(r: &ImportReport) -> bool {
+    println!("Copiadas:   {}", r.copied);
+    println!("Duplicadas: {}", r.duplicates);
+    print_errors(&r.errors)
+}
+
+/// Muestra los errores por archivo. Devuelve `true` si no hubo ninguno.
+fn print_errors(errors: &[FileError]) -> bool {
+    if !errors.is_empty() {
+        eprintln!("Errores:    {}", errors.len());
+        for e in errors {
+            eprintln!("  {}: {}", e.path, e.message);
+        }
+    }
+    errors.is_empty()
 }

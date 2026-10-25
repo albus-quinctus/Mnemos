@@ -21,6 +21,15 @@ pub enum Error {
     #[error("la ruta {0} está fuera de la biblioteca")]
     OutsideLibrary(PathBuf),
 
+    #[error("el nombre de {0} no es UTF-8 válido")]
+    NonUtf8Path(PathBuf),
+
+    #[error("la copia de {0} no coincide con el original; se ha descartado")]
+    CopyMismatch(PathBuf),
+
+    #[error("no se puede importar desde {0}: está dentro de la biblioteca")]
+    SourceInsideLibrary(PathBuf),
+
     #[error("la biblioteca usa el esquema {found}, más nuevo que el soportado ({supported})")]
     SchemaTooNew { found: u32, supported: u32 },
 }

@@ -15,9 +15,11 @@ Requisitos: Rust estable, Node 22, pnpm 10 y las [dependencias de sistema de Tau
 ```sh
 cd apps/desktop
 pnpm install
-pnpm tauri dev                        # aplicación de escritorio
-cargo run -p mnemos-cli -- init RUTA  # crea una biblioteca vacía
-cargo test --workspace                # pruebas del núcleo
+pnpm tauri dev                                      # aplicación de escritorio
+cargo run -p mnemos-cli -- init BIBLIOTECA           # crea una biblioteca vacía
+cargo run -p mnemos-cli -- import BIBLIOTECA ORIGEN  # copia fotos sin tocar el origen
+cargo run -p mnemos-cli -- index BIBLIOTECA          # registra lo que hay en Originales/
+cargo test --workspace                              # pruebas del núcleo
 ```
 
 ## Licencia
