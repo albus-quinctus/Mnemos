@@ -106,6 +106,6 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 10. [x] Visor: apertura con la miniatura, carga del original, flechas, precarga y tira de miniaturas.
 11. [x] Panel de detalles del visor.
 12. [x] Abrir o crear una biblioteca con el diálogo y recordar la última.
-13. [ ] Importar desde la aplicación con progreso y cancelación.
+13. [x] Importar desde la aplicación con progreso y cancelación.
 14. [ ] Miniaturas de HEIC y AVIF, si la decisión 004 se acepta.
 15. [ ] Prueba con 10 000 fotos sintéticas y medición de tiempos.

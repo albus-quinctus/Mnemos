@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { importacion, importarCarpeta } from "$lib/importacion/importacion.svelte";
   import Icono from "./Icono.svelte";
 </script>
 
@@ -8,7 +9,12 @@
     <!-- La búsqueda queda fuera de la spec 002. -->
     <input type="search" placeholder="Buscar en tus fotos (próximamente)" disabled />
   </label>
-  <button type="button" class="importar" disabled title="Próximamente">
+  <button
+    type="button"
+    class="importar"
+    onclick={importarCarpeta}
+    disabled={importacion.actual?.estado === "en_curso"}
+  >
     <Icono nombre="importar" />
     <span>Importar</span>
   </button>

@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -25,6 +26,16 @@ pub struct ImportReport {
     /// Fotos cuyo contenido ya estaba en la biblioteca o repetido en el origen.
     pub duplicates: u64,
     pub errors: Vec<FileError>,
+    /// Si se paró a petición del usuario. Lo ya copiado se conserva.
+    pub cancelled: bool,
+}
+
+/// Avance de una importación: cuántas imágenes hay en total y cuántas ya se
+/// han tratado.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Progreso {
+    pub total: u64,
+    pub procesadas: u64,
 }
 
 enum Outcome {
@@ -35,6 +46,18 @@ enum Outcome {
 impl Library {
     /// Copia las imágenes de `source` (y sus subcarpetas) a la biblioteca.
     pub fn import_from(&mut self, source: &Path) -> Result<ImportReport> {
+        self.import_from_with(source, &AtomicBool::new(false), |_, _| {})
+    }
+
+    /// Como `import_from`, pero informa tras cada archivo y se para si `cancelar`
+    /// se activa. Cada archivo se confirma por separado, así que una parada o un
+    /// corte deja la biblioteca coherente con lo ya copiado.
+    pub fn import_from_with(
+        &mut self,
+        source: &Path,
+        cancelar: &AtomicBool,
+        mut progreso: impl FnMut(Progreso, &ImportReport),
+    ) -> Result<ImportReport> {
         let source = source.canonicalize()?;
         let root = self.root.canonicalize()?;
         if source.starts_with(&root) {
@@ -44,34 +67,55 @@ impl Library {
         fs::create_dir_all(&tmp)?;
 
         let mut report = ImportReport::default();
+        let archivos = candidatos(&source, &root, &mut report);
+        let total = archivos.len() as u64;
         let mut imported = HashSet::new();
-        let tx = self.conn.transaction()?;
-        // Si la biblioteca está dentro del origen, no se recorre.
-        let walker = WalkDir::new(&source)
-            .follow_links(false)
-            .into_iter()
-            .filter_entry(|e| !is_hidden(e) && e.path() != root);
-        for entry in walker {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(err) => {
-                    let path = err.path().unwrap_or(&source).to_owned();
-                    report.errors.push(FileError::new(&path, err));
-                    continue;
-                }
-            };
-            if !entry.file_type().is_file() || !mnemos_imaging::is_supported_image(entry.path()) {
-                continue;
+        for (i, archivo) in archivos.iter().enumerate() {
+            if cancelar.load(Ordering::Relaxed) {
+                report.cancelled = true;
+                break;
             }
-            match import_file(&tx, &self.root, &tmp, entry.path(), &mut imported) {
+            match import_file(&self.conn, &self.root, &tmp, archivo, &mut imported) {
                 Ok(Outcome::Copied) => report.copied += 1,
                 Ok(Outcome::Duplicate) => report.duplicates += 1,
-                Err(err) => report.errors.push(FileError::new(entry.path(), err)),
+                Err(err) => report.errors.push(FileError::new(archivo, err)),
             }
+            progreso(
+                Progreso {
+                    total,
+                    procesadas: i as u64 + 1,
+                },
+                &report,
+            );
         }
-        tx.commit()?;
         Ok(report)
     }
+}
+
+/// Imágenes de `source` que pueden importarse. Los errores al recorrer se
+/// anotan en `report`. Si la biblioteca está dentro del origen, no se recorre.
+fn candidatos(source: &Path, root: &Path, report: &mut ImportReport) -> Vec<PathBuf> {
+    let walker = WalkDir::new(source)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| !is_hidden(e) && e.path() != root);
+    let mut archivos = Vec::new();
+    for entry in walker {
+        match entry {
+            Ok(entry)
+                if entry.file_type().is_file()
+                    && mnemos_imaging::is_supported_image(entry.path()) =>
+            {
+                archivos.push(entry.into_path());
+            }
+            Ok(_) => {}
+            Err(err) => {
+                let path = err.path().unwrap_or(source).to_owned();
+                report.errors.push(FileError::new(&path, err));
+            }
+        }
+    }
+    archivos
 }
 
 fn import_file(
@@ -279,6 +323,31 @@ mod tests {
 
         let report = lib.import_from(dir.path()).unwrap();
         assert_eq!(report.copied, 1);
+    }
+
+    #[test]
+    fn informa_del_avance_y_se_para_al_cancelar() {
+        let (_dir, mut lib, src) = setup();
+        write_png(&src.join("a.png"), 1, 1, b"a");
+        write_png(&src.join("b.png"), 1, 1, b"b");
+        write_png(&src.join("c.png"), 1, 1, b"c");
+        let cancelar = AtomicBool::new(false);
+        let mut avances = Vec::new();
+        let report = lib
+            .import_from_with(&src, &cancelar, |p, _| {
+                avances.push(p);
+                if p.procesadas == 1 {
+                    cancelar.store(true, Ordering::Relaxed);
+                }
+            })
+            .unwrap();
+
+        assert!(report.cancelled);
+        assert_eq!(report.copied, 1);
+        assert_eq!(avances.len(), 1);
+        assert_eq!(avances[0].total, 3);
+        // Lo ya copiado queda registrado.
+        assert_eq!(lib.info().unwrap().photos, 1);
     }
 
     #[test]

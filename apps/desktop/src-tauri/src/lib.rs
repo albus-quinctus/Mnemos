@@ -2,12 +2,15 @@ mod configuracion;
 mod media;
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
 use mnemos_core::{
-    Library, LibraryInfo, Month, PhotoDetails, ThumbnailQueue, TimelineCursor, TimelinePage,
+    ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso, ThumbnailQueue,
+    TimelineCursor, TimelinePage,
 };
+use serde::Serialize;
 use tauri::http::{Method, StatusCode, header};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -19,6 +22,10 @@ struct OpenLibrary(Mutex<Option<Library>>);
 /// biblioteca.
 #[derive(Default)]
 struct Thumbnails(Mutex<Option<Arc<ThumbnailQueue>>>);
+
+/// La importación en marcha, si la hay. Guarda la señal para pararla.
+#[derive(Default)]
+struct Importacion(Mutex<Option<Arc<AtomicBool>>>);
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|e| e.into_inner())
@@ -157,6 +164,122 @@ fn detalles(id: i64, estado: State<'_, OpenLibrary>) -> Result<Option<PhotoDetai
     with_library(&estado, |lib| lib.photo_details(id))
 }
 
+/// Lo que la interfaz recibe sobre una importación. `estado` puede ser
+/// `en_curso`, `terminada`, `cancelada` o `fallida`.
+#[derive(Serialize, Clone, Default)]
+struct EventoImportacion {
+    estado: &'static str,
+    total: u64,
+    procesadas: u64,
+    copiadas: u64,
+    duplicadas: u64,
+    errores: usize,
+    mensaje: Option<String>,
+}
+
+impl EventoImportacion {
+    fn en_curso(progreso: Progreso, parcial: &ImportReport) -> Self {
+        Self {
+            estado: "en_curso",
+            total: progreso.total,
+            procesadas: progreso.procesadas,
+            copiadas: parcial.copied,
+            duplicadas: parcial.duplicates,
+            errores: parcial.errors.len(),
+            mensaje: None,
+        }
+    }
+
+    fn final_de(informe: &ImportReport) -> Self {
+        Self {
+            estado: if informe.cancelled {
+                "cancelada"
+            } else {
+                "terminada"
+            },
+            copiadas: informe.copied,
+            duplicadas: informe.duplicates,
+            errores: informe.errors.len(),
+            ..Self::default()
+        }
+    }
+
+    fn fallida(mensaje: String) -> Self {
+        Self {
+            estado: "fallida",
+            mensaje: Some(mensaje),
+            ..Self::default()
+        }
+    }
+}
+
+/// Importa `origen` a la biblioteca de `root` desde una conexión propia, para
+/// no bloquear la biblioteca abierta mientras se copia.
+fn ejecutar_importacion(
+    app: &AppHandle,
+    root: &Path,
+    origen: &Path,
+    cancelar: &AtomicBool,
+) -> Result<ImportReport, String> {
+    let mut lib = Library::open(root).map_err(|e| e.to_string())?;
+    let informe = lib
+        .import_from_with(origen, cancelar, |progreso, parcial| {
+            let _ = app.emit(
+                "importacion",
+                EventoImportacion::en_curso(progreso, parcial),
+            );
+        })
+        .map_err(|e| e.to_string())?;
+    // Las fotos nuevas aún no tienen miniatura: se encolan.
+    let queue = lock(&app.state::<Thumbnails>().0).clone();
+    if let Some(queue) = queue {
+        match lib.pending_thumbnails() {
+            Ok(jobs) => queue.push(jobs),
+            Err(e) => eprintln!("no se pudieron encolar las miniaturas nuevas: {e}"),
+        }
+    }
+    Ok(informe)
+}
+
+/// Inicia la importación de `origen` en segundo plano. Los avances llegan como
+/// eventos `importacion`; solo puede haber una a la vez.
+#[tauri::command]
+fn importar(
+    origen: String,
+    app: AppHandle,
+    estado: State<'_, OpenLibrary>,
+    importacion: State<'_, Importacion>,
+) -> Result<(), String> {
+    let root = with_library(&estado, |lib| Ok(lib.root().to_path_buf()))?;
+    let cancelar = Arc::new(AtomicBool::new(false));
+    {
+        let mut activa = lock(&importacion.0);
+        if activa.is_some() {
+            return Err("ya hay una importación en marcha".to_owned());
+        }
+        *activa = Some(Arc::clone(&cancelar));
+    }
+    let emisor = app.clone();
+    std::thread::spawn(move || {
+        let resultado = ejecutar_importacion(&emisor, &root, Path::new(&origen), &cancelar);
+        let evento = match resultado {
+            Ok(informe) => EventoImportacion::final_de(&informe),
+            Err(mensaje) => EventoImportacion::fallida(mensaje),
+        };
+        let _ = emisor.emit("importacion", evento);
+        lock(&emisor.state::<Importacion>().0).take();
+    });
+    Ok(())
+}
+
+/// Pide parar la importación en marcha. Lo ya copiado se conserva.
+#[tauri::command]
+fn cancelar_importacion(importacion: State<'_, Importacion>) {
+    if let Some(cancelar) = lock(&importacion.0).as_ref() {
+        cancelar.store(true, Ordering::Relaxed);
+    }
+}
+
 /// Atiende `mnemos://localhost/miniatura/<id>` y `mnemos://localhost/foto/<id>`.
 fn serve(
     app: &AppHandle,
@@ -194,6 +317,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(OpenLibrary::default())
         .manage(Thumbnails::default())
+        .manage(Importacion::default())
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("mnemos", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -207,7 +331,9 @@ pub fn run() {
             meses,
             fotos,
             detalles,
-            priorizar_miniaturas
+            priorizar_miniaturas,
+            importar,
+            cancelar_importacion
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");
