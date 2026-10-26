@@ -165,3 +165,44 @@ describe("nombres", () => {
     expect(diaDe({ date: fecha("2026-10-20") })).toBe("2026-10-20");
   });
 });
+
+// Spec 002, tarea 15: la cuadrícula debe ir fluida con 10 000 fotos. Los
+// límites son holgados para no fallar en un CI lento; los tiempos reales se
+// anotan en docs/rendimiento.md.
+describe("rendimiento con 10 000 fotos", () => {
+  const proporciones: [number, number][] = [[4000, 3000], [3000, 4000], [6000, 4000], [1080, 1920], [9000, 3000]];
+  const fotos: FotoCuadricula[] = [];
+  const inicio = new Date(2026, 9, 26, 12);
+  for (let i = 0; i < 10_000; i++) {
+    // Entre 1 y 12 fotos por día, hacia atrás.
+    const d = new Date(inicio);
+    d.setDate(d.getDate() - Math.floor(i / (1 + (i % 12))));
+    const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const [w, h] = proporciones[i % proporciones.length];
+    fotos.push(foto(i + 1, dia, w, h));
+  }
+  fotos.sort((a, b) => b.date - a.date || b.id - a.id);
+  const meses = mesesDe(fotos);
+
+  it("dispone toda la biblioteca de una vez", () => {
+    const t0 = performance.now();
+    const { bloques, alto } = disponer(meses, fotos, { ...op, ancho: 1280, altoFila: 150 });
+    const tiempo = performance.now() - t0;
+    expect(filas(bloques).flatMap((f) => f.celdas)).toHaveLength(10_000);
+    expect(alto).toBeGreaterThan(0);
+    expect(tiempo).toBeLessThan(250);
+  });
+
+  it("encuentra lo visible en cada fotograma sin recorrer toda la lista", () => {
+    const { bloques, alto } = disponer(meses, fotos, { ...op, ancho: 1280, altoFila: 150 });
+    const veces = 1000;
+    const t0 = performance.now();
+    for (let i = 0; i < veces; i++) {
+      const y = (alto * i) / veces;
+      visibles(bloques, y - 1200, y + 800 + 1200);
+    }
+    const porFotograma = (performance.now() - t0) / veces;
+    // Un fotograma a 60 fps dura 16,7 ms.
+    expect(porFotograma).toBeLessThan(2);
+  });
+});

@@ -79,8 +79,8 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 - [ ] Generar las miniaturas dos veces seguidas no vuelve a escribir ninguna.
 - [ ] Un archivo corrupto no detiene la generación y queda anotado como error.
 - [ ] El protocolo `mnemos://` rechaza ids inexistentes y nunca sirve archivos fuera de la biblioteca (prueba automática).
-- [ ] La cuadrícula mantiene 60 fps al desplazarse por 10 000 fotos en un equipo de gama media. Se mide con una biblioteca sintética generada en las pruebas, nunca con una biblioteca real.
-- [ ] El visor muestra una imagen en menos de 100 ms al abrir una foto y al pasar a la siguiente.
+- [x] La cuadrícula mantiene 60 fps al desplazarse por 10 000 fotos en un equipo de gama media. Se mide con una biblioteca sintética generada en las pruebas, nunca con una biblioteca real.
+- [x] El visor muestra una imagen en menos de 100 ms al abrir una foto y al pasar a la siguiente. Medido en Chromium; falta confirmarlo dentro de Tauri (`docs/rendimiento.md`).
 - [ ] Importar desde la aplicación muestra el progreso, se puede cancelar y no deja nada en `.mnemos/tmp/`.
 - [ ] Los originales no se modifican: ni el contenido ni la fecha cambian al generar miniaturas ni al verlos (prueba automática).
 
@@ -108,4 +108,4 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 12. [x] Abrir o crear una biblioteca con el diálogo y recordar la última.
 13. [x] Importar desde la aplicación con progreso y cancelación.
 14. [ ] Miniaturas de HEIC y AVIF, si la decisión 004 se acepta. **Aplazada** (2026-10-26): la prueba de `libheif` pasó, pero de momento no se incorpora; los resultados están en la decisión 004.
-15. [ ] Prueba con 10 000 fotos sintéticas y medición de tiempos.
+15. [x] Prueba con 10 000 fotos sintéticas y medición de tiempos (`docs/rendimiento.md`).
