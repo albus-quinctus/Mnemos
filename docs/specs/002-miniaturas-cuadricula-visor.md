@@ -1,6 +1,6 @@
 # 002 · Miniaturas, cuadrícula y visor
 
-- Estado: en curso
+- Estado: hecha (salvo la tarea 14, aplazada)
 - Fase: F1
 
 ## Qué y por qué
@@ -74,15 +74,15 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 - Petición al protocolo con un id que no existe: respuesta 404, sin tocar el sistema de archivos.
 
 ## Criterios de aceptación
-- [ ] Indexar una carpeta de prueba con JPEG, PNG, TIFF y DNG genera una miniatura para cada uno en `.mnemos/miniaturas/v1/`, de 360 px de alto.
-- [ ] Una foto de prueba con orientación EXIF 6 genera una miniatura vertical.
-- [ ] Generar las miniaturas dos veces seguidas no vuelve a escribir ninguna.
-- [ ] Un archivo corrupto no detiene la generación y queda anotado como error.
-- [ ] El protocolo `mnemos://` rechaza ids inexistentes y nunca sirve archivos fuera de la biblioteca (prueba automática).
+- [x] Indexar una carpeta de prueba con JPEG, PNG, TIFF y DNG genera una miniatura para cada uno en `.mnemos/miniaturas/v1/`, de 360 px de alto. Pruebas: `genera_miniaturas_de_cada_formato` y `la_miniatura_de_un_raw_sale_de_su_vista_previa` en `mnemos-imaging`, y `genera_las_que_faltan_una_sola_vez` en `mnemos-core`.
+- [x] Una foto de prueba con orientación EXIF 6 genera una miniatura vertical. Pruebas: `aplica_la_orientacion` y `la_miniatura_de_un_raw_sale_de_su_vista_previa`.
+- [x] Generar las miniaturas dos veces seguidas no vuelve a escribir ninguna. Prueba: `genera_las_que_faltan_una_sola_vez`.
+- [x] Un archivo corrupto no detiene la generación y queda anotado como error. Prueba: `un_fallo_se_anota_y_no_se_repite_hasta_que_cambia_el_archivo`.
+- [x] El protocolo `mnemos://` rechaza ids inexistentes y nunca sirve archivos fuera de la biblioteca (prueba automática). Pruebas: `solo_acepta_ids_numericos` en la aplicación y `busca_una_foto_por_id` en `mnemos-core`.
 - [x] La cuadrícula mantiene 60 fps al desplazarse por 10 000 fotos en un equipo de gama media. Se mide con una biblioteca sintética generada en las pruebas, nunca con una biblioteca real.
 - [x] El visor muestra una imagen en menos de 100 ms al abrir una foto y al pasar a la siguiente. Medido en Chromium; falta confirmarlo dentro de Tauri (`docs/rendimiento.md`).
-- [ ] Importar desde la aplicación muestra el progreso, se puede cancelar y no deja nada en `.mnemos/tmp/`.
-- [ ] Los originales no se modifican: ni el contenido ni la fecha cambian al generar miniaturas ni al verlos (prueba automática).
+- [x] Importar desde la aplicación muestra el progreso, se puede cancelar y no deja nada en `.mnemos/tmp/`. Prueba: `informa_del_avance_y_se_para_al_cancelar`; el panel se comprobó con capturas.
+- [x] Los originales no se modifican: ni el contenido ni la fecha cambian al generar miniaturas ni al verlos (prueba automática). Pruebas: `no_modifica_los_originales` en `mnemos-core` y `no_modifica_el_original` en `mnemos-imaging` y en la aplicación.
 
 ## Fuera de alcance
 - Revelado de RAW: F3.
