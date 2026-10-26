@@ -73,6 +73,14 @@ describe("disponer", () => {
     for (const c of fila.celdas) expect(c.x + c.ancho).toBeLessThanOrEqual(op.ancho + 1e-6);
   });
 
+  it("un día de una foto vertical deja sitio a su título antes del siguiente", () => {
+    // 180 px de alto con proporción 2:3 son 120 px de ancho, menos que el título.
+    const fotos = [foto(1, "2025-11-30", 2000, 3000), foto(2, "2025-10-25", 2000, 3000)];
+    const [fila] = filas(disponer(mesesDe(fotos), fotos, { ...op, anchoMinDia: 140 }).bloques);
+    expect(fila.titulos.map((t) => t.x)).toEqual([0, 140 + op.separacionDias]);
+    expect(fila.celdas[0].ancho).toBe(120);
+  });
+
   it("un día que no cabe en lo que queda de fila baja a la siguiente", () => {
     const fotos = [
       ...Array.from({ length: 3 }, (_, i) => foto(i, "2026-10-20")),

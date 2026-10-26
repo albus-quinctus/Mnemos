@@ -1,13 +1,44 @@
 <script lang="ts">
+  import { busqueda, escribir, limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
   import { importacion, importarCarpeta } from "$lib/importacion/importacion.svelte";
   import Icono from "./Icono.svelte";
+
+  let campo = $state<HTMLInputElement>();
+
+  function alPulsar(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      limpiarBusqueda();
+      campo?.blur();
+    }
+  }
 </script>
 
 <header>
   <label class="buscar">
     <Icono nombre="buscar" />
-    <!-- La búsqueda queda fuera de la spec 002. -->
-    <input type="search" placeholder="Buscar en tus fotos (próximamente)" disabled />
+    <input
+      type="search"
+      placeholder="Buscar en tus fotos"
+      aria-label="Buscar por nombre, carpeta o fecha"
+      bind:this={campo}
+      value={busqueda.texto}
+      oninput={(e) => escribir(e.currentTarget.value)}
+      onkeydown={alPulsar}
+      disabled={!busqueda.disponible}
+    />
+    {#if busqueda.texto}
+      <button
+        type="button"
+        class="limpiar"
+        aria-label="Borrar la búsqueda"
+        onclick={() => {
+          limpiarBusqueda();
+          campo?.focus();
+        }}
+      >
+        <Icono nombre="cerrar" />
+      </button>
+    {/if}
   </label>
   <button
     type="button"
@@ -52,8 +83,42 @@
     outline: none;
   }
 
+  .buscar:focus-within {
+    outline: 2px solid var(--acento);
+    outline-offset: -2px;
+  }
+
+  input {
+    color: var(--texto);
+  }
+
   input::placeholder {
     color: var(--texto-suave);
+  }
+
+  /* La cruz propia sustituye a la del sistema. */
+  input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .limpiar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-right: -0.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--texto-suave);
+    cursor: pointer;
+  }
+
+  .limpiar:hover {
+    background: var(--superficie);
+    color: var(--texto);
   }
 
   .importar {

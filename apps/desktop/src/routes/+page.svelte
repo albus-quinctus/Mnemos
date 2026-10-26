@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
+  import { busqueda, limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
 
@@ -46,6 +47,13 @@
     if (ruta) await usar("crear_biblioteca", ruta);
   }
 
+  // Cada biblioteca empieza sin búsqueda.
+  $effect(() => {
+    busqueda.disponible = info !== null;
+    void info?.root;
+    limpiarBusqueda();
+  });
+
   onMount(async () => {
     try {
       const ultima = await invoke<string | null>("ultima_biblioteca");
@@ -59,10 +67,22 @@
 </script>
 
 {#if info}
-  <!-- Se monta de nuevo con cada biblioteca para empezar desde cero. -->
-  {#key `${info.root}#${importacion.version}`}
-    <Cuadricula />
-  {/key}
+  <div class="capas">
+    <!-- Se monta de nuevo con cada biblioteca para empezar desde cero. Durante
+         una búsqueda queda oculta debajo, para volver al mismo punto. -->
+    {#key `${info.root}#${importacion.version}`}
+      <div class="capa" class:oculta={busqueda.consulta !== ""}>
+        <Cuadricula />
+      </div>
+    {/key}
+    {#if busqueda.consulta}
+      {#key `${busqueda.consulta}#${importacion.version}`}
+        <div class="capa resultados">
+          <Cuadricula texto={busqueda.consulta} onSalir={limpiarBusqueda} />
+        </div>
+      {/key}
+    {/if}
+  </div>
 {:else}
   <section class="abrir">
     <h1>Fotos</h1>
@@ -90,6 +110,24 @@
 {/if}
 
 <style>
+  .capas {
+    position: relative;
+    height: 100%;
+  }
+
+  .capa {
+    position: absolute;
+    inset: 0;
+  }
+
+  .oculta {
+    visibility: hidden;
+  }
+
+  .resultados {
+    background: var(--fondo);
+  }
+
   .abrir {
     max-width: 40rem;
     padding: 2rem 1.5rem;
