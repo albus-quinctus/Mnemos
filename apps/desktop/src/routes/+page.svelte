@@ -1,5 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { open } from "@tauri-apps/plugin-dialog";
+  import { onMount } from "svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
 
   type LibraryInfo = {
@@ -10,24 +12,49 @@
     tags: number;
   };
 
-  let ruta = $state("");
   let info = $state<LibraryInfo | null>(null);
   let error = $state("");
-  let cargando = $state(false);
+  let ocupado = $state(false);
+  // Mientras se intenta abrir la última biblioteca no se ofrece nada más.
+  let arrancando = $state(true);
 
-  async function abrir(event: Event) {
-    event.preventDefault();
-    cargando = true;
+  async function elegirCarpeta(titulo: string): Promise<string | null> {
+    const ruta = await open({ directory: true, multiple: false, title: titulo });
+    return typeof ruta === "string" ? ruta : null;
+  }
+
+  async function usar(comando: "abrir_biblioteca" | "crear_biblioteca", ruta: string) {
+    ocupado = true;
     error = "";
-    info = null;
     try {
-      info = await invoke<LibraryInfo>("abrir_biblioteca", { ruta });
+      info = await invoke<LibraryInfo>(comando, { ruta });
     } catch (e) {
       error = String(e);
     } finally {
-      cargando = false;
+      ocupado = false;
     }
   }
+
+  async function abrir() {
+    const ruta = await elegirCarpeta("Elige la carpeta de la biblioteca");
+    if (ruta) await usar("abrir_biblioteca", ruta);
+  }
+
+  async function crear() {
+    const ruta = await elegirCarpeta("Elige la carpeta para la nueva biblioteca");
+    if (ruta) await usar("crear_biblioteca", ruta);
+  }
+
+  onMount(async () => {
+    try {
+      const ultima = await invoke<string | null>("ultima_biblioteca");
+      if (ultima) await usar("abrir_biblioteca", ultima);
+    } catch (e) {
+      error = String(e);
+    } finally {
+      arrancando = false;
+    }
+  });
 </script>
 
 {#if info}
@@ -40,13 +67,20 @@
     <h1>Fotos</h1>
     <p class="lema">Tu biblioteca de fotos, portátil y privada.</p>
 
-    <form onsubmit={abrir}>
-      <label for="ruta">Carpeta de la biblioteca</label>
-      <div class="fila">
-        <input id="ruta" placeholder="/media/disco/Biblioteca" bind:value={ruta} required />
-        <button type="submit" disabled={cargando}>Abrir</button>
+    {#if arrancando}
+      <p class="aviso">Abriendo tu última biblioteca…</p>
+    {:else}
+      <div class="acciones">
+        <button type="button" onclick={abrir} disabled={ocupado}>Abrir biblioteca…</button>
+        <button type="button" class="secundario" onclick={crear} disabled={ocupado}>
+          Crear biblioteca…
+        </button>
       </div>
-    </form>
+      <p class="ayuda">
+        Una biblioteca es una carpeta con tus fotos. Al crearla, MNEMOS añade sus datos
+        dentro de ella y no toca los archivos que ya tenga.
+      </p>
+    {/if}
 
     {#if error}
       <p class="error" role="alert">{error}</p>
@@ -71,28 +105,11 @@
     margin-top: 0.25rem;
   }
 
-  form {
-    margin-top: 2rem;
-  }
-
-  label {
-    display: block;
-    font-size: 0.9rem;
-    margin-bottom: 0.4rem;
-  }
-
-  .fila {
+  .acciones {
     display: flex;
-    gap: 0.5rem;
-  }
-
-  input {
-    flex: 1;
-    min-height: var(--objetivo);
-    padding: 0 0.8rem;
-    border: 1px solid var(--borde);
-    border-radius: var(--radio);
-    background: var(--superficie);
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
   }
 
   button {
@@ -106,9 +123,22 @@
     cursor: pointer;
   }
 
+  button.secundario {
+    border: 1px solid var(--borde);
+    background: var(--superficie);
+    color: var(--texto);
+  }
+
   button:disabled {
     opacity: 0.6;
     cursor: default;
+  }
+
+  .ayuda,
+  .aviso {
+    margin-top: 1.25rem;
+    color: var(--texto-suave);
+    font-size: 0.9rem;
   }
 
   .error {
