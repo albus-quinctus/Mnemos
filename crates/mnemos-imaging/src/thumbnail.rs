@@ -6,7 +6,7 @@ use std::path::Path;
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::metadata::Orientation;
-use image::{DynamicImage, ImageReader, Limits, RgbImage};
+use image::{DynamicImage, ImageFormat, ImageReader, Limits, RgbImage};
 
 /// Alto de una miniatura, en píxeles.
 pub const THUMBNAIL_HEIGHT: u32 = 360;
@@ -28,8 +28,9 @@ pub struct Thumbnail {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ThumbnailError {
-    /// Formato que todavía no se decodifica: RAW, HEIC, HEIF, AVIF o desconocido.
-    #[error("formato sin miniatura todavía")]
+    /// Formato que todavía no se decodifica (HEIC, HEIF, AVIF o desconocido)
+    /// o RAW sin vista previa incrustada.
+    #[error("sin vista previa")]
     Unsupported,
     #[error("no se pudo leer el archivo: {0}")]
     Io(#[from] std::io::Error),
@@ -37,25 +38,38 @@ pub enum ThumbnailError {
     Decode(#[from] image::ImageError),
 }
 
-/// Genera la miniatura de una imagen JPEG, PNG, WebP, GIF, BMP o TIFF.
+/// Genera la miniatura de una imagen JPEG, PNG, WebP, GIF, BMP o TIFF, o de
+/// la vista previa incrustada en un RAW.
 ///
 /// `orientation` es la orientación EXIF guardada al indexar (1 a 8); un valor
 /// fuera de rango se trata como 1. El formato se reconoce por el contenido, no
-/// por la extensión, salvo los RAW, que se rechazan aunque parezcan un TIFF:
-/// su miniatura sale de la vista previa incrustada (tarea 4).
+/// por la extensión, salvo los RAW: aunque parezcan un TIFF, su miniatura
+/// sale siempre de la vista previa que trae el archivo, nunca se revelan.
 pub fn thumbnail(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    if crate::is_raw(path) {
-        return Err(ThumbnailError::Unsupported);
-    }
-    let mut reader = ImageReader::open(path)?.with_guessed_format()?;
-    if reader.format().is_none() {
-        return Err(ThumbnailError::Unsupported);
-    }
+    let img = if crate::is_raw(path) {
+        let jpeg = crate::raw_preview(path)?.ok_or(ThumbnailError::Unsupported)?;
+        let mut reader = ImageReader::with_format(Cursor::new(jpeg), ImageFormat::Jpeg);
+        reader.limits(limits());
+        reader.decode()?
+    } else {
+        let mut reader = ImageReader::open(path)?.with_guessed_format()?;
+        if reader.format().is_none() {
+            return Err(ThumbnailError::Unsupported);
+        }
+        reader.limits(limits());
+        reader.decode()?
+    };
+    render(img, orientation)
+}
+
+fn limits() -> Limits {
     let mut limits = Limits::default();
     limits.max_alloc = Some(MAX_DECODE_ALLOC);
-    reader.limits(limits);
+    limits
+}
 
-    let mut img = reader.decode()?;
+/// Gira, reduce y codifica en JPEG una imagen ya decodificada.
+fn render(mut img: DynamicImage, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
     let orientation = u8::try_from(orientation)
         .ok()
         .and_then(Orientation::from_exif)
@@ -231,6 +245,24 @@ mod tests {
             thumbnail(&dir.join("no_existe.jpg"), 1),
             Err(ThumbnailError::Io(_))
         ));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn la_miniatura_de_un_raw_sale_de_su_vista_previa() {
+        use crate::raw::tests::{TiffBuilder, tiny_jpeg};
+        let dir = tempdir("raw");
+        let path = dir.join("camara.NEF");
+        let file = TiffBuilder::new(*b"II")
+            .orientation(6)
+            .jpeg(tiny_jpeg(8, 8), false)
+            .jpeg(tiny_jpeg(800, 600), true)
+            .build();
+        std::fs::write(&path, file).unwrap();
+        let orientation = crate::orientation(&path).unwrap();
+        assert_eq!(orientation, 6);
+        let thumb = thumbnail(&path, orientation).unwrap();
+        assert_eq!(decoded_size(&thumb), (270, 360));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
