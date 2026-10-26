@@ -9,7 +9,7 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
-1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) hecha: miniaturas, cuadrícula, visor, abrir o crear biblioteca, importar desde la aplicación y rendimiento con 10 000 fotos (`docs/rendimiento.md`). Todos sus criterios de aceptación tienen prueba. La tarea 14 (HEIC y AVIF) queda aplazada; la prueba de `libheif` está en la decisión 004. Siguiente: spec 003, búsqueda básica (`docs/specs/003-busqueda-basica.md`, en borrador), lo último de F1.
+1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) hecha: miniaturas, cuadrícula, visor, abrir o crear biblioteca, importar desde la aplicación y rendimiento con 10 000 fotos (`docs/rendimiento.md`). Todos sus criterios de aceptación tienen prueba. La tarea 14 (HEIC y AVIF) queda aplazada; la prueba de `libheif` está en la decisión 004. Siguiente: spec 003, búsqueda básica (`docs/specs/003-busqueda-basica.md`, aprobada), lo último de F1.
 2. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
 ## Pendientes / ideas aparcadas

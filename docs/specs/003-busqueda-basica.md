@@ -1,6 +1,6 @@
 # 003 · Búsqueda básica
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F1
 
 ## Qué y por qué
@@ -15,7 +15,7 @@ Quiero encontrar una foto escribiendo parte de su nombre, de la carpeta donde es
   - un año: `2024`;
   - mes y año: `marzo 2024`, `mar 2024`, `2024-03` o `03/2024`;
   - un día: `26/10/2026` o `2026-10-26`;
-  - un mes sin año: `marzo`, que vale para marzo de cualquier año.
+  - un mes o un día sin año (`marzo`, `26/10`): se toma el más reciente que tenga fotos. Si hoy es octubre de 2026 y hay fotos de marzo de 2024 y de 2026, `marzo` es marzo de 2026.
   Una fecha se combina con las palabras: `playa 2024` son las fotos de 2024 cuya ruta contiene `playa`. Si un número no encaja como fecha, se busca como palabra.
 - **Visor:** al abrir una foto desde los resultados, las flechas y la tira recorren solo los resultados.
 - **Sin resultados:** "No hay fotos para «texto»", con una pista: se busca por nombre, carpeta o fecha.
@@ -35,6 +35,7 @@ Quiero encontrar una foto escribiendo parte de su nombre, de la carpeta donde es
 - [ ] `cumple` encuentra `Cumpleaños/IMG_0001.jpg`, y `CUMPLEANOS` también (prueba automática).
 - [ ] `playa 2024` solo devuelve fotos de 2024 cuya ruta contiene `playa` (prueba automática).
 - [ ] `marzo 2024`, `2024-03` y `03/2024` dan el mismo resultado (prueba automática).
+- [ ] `marzo` sin año da el marzo más reciente con fotos (prueba automática).
 - [ ] Ningún texto de entrada provoca un error de FTS5. Se prueba con una lista de textos raros y con entradas al azar (prueba automática).
 - [ ] Al mover un archivo a otra carpeta y volver a indexar, la búsqueda por el nombre de la carpeta nueva lo encuentra (prueba automática).
 - [ ] Una búsqueda en 10 000 fotos sintéticas responde en menos de 100 ms (en `docs/rendimiento.md`).
