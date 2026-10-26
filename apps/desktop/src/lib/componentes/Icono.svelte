@@ -11,6 +11,9 @@
     papelera: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
     buscar: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 3-4-4",
     importar: "M12 4v11m0 0-4-4m4 4 4-4M5 20h14",
+    cerrar: "M6 6l12 12M18 6 6 18",
+    anterior: "M15 5l-7 7 7 7",
+    siguiente: "M9 5l7 7-7 7",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;
