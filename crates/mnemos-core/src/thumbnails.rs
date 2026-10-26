@@ -75,14 +75,15 @@ impl Library {
     }
 
     /// Fotos sin miniatura en disco, sin contar las que ya fallaron con su
-    /// contenido actual. Si dos fotos comparten huella, solo sale una.
+    /// contenido actual, en el orden de la cuadrícula. Si dos fotos comparten
+    /// huella, solo sale una.
     pub fn pending_thumbnails(&self) -> Result<Vec<ThumbnailJob>> {
         let mut stmt = self.conn.prepare(
             "SELECT p.id, p.rel_path, p.content_hash, coalesce(p.orientation, 1)
              FROM photos p
              LEFT JOIN thumbnail_failures f ON f.content_hash = p.content_hash
              WHERE p.content_hash IS NOT NULL AND f.content_hash IS NULL
-             ORDER BY p.modified_at DESC, p.id DESC",
+             ORDER BY coalesce(p.taken_at, p.modified_at) DESC, p.id DESC",
         )?;
         let rows = stmt.query_map([], |r| {
             Ok((
