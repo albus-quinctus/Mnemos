@@ -3,10 +3,11 @@
   // instante la miniatura ampliada y la cambia por la foto completa en cuanto
   // carga. La anterior y la siguiente se precargan en memoria.
   import { onDestroy } from "svelte";
-  import type { FotoCuadricula } from "$lib/biblioteca";
+  import { detalles as pedirDetalles, type Detalles, type FotoCuadricula } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
   import { CacheImagenes, vecinas } from "./cache";
+  import { dimensiones, fecha, tamano } from "./formato";
 
   let {
     fotos,
@@ -92,8 +93,30 @@
     if (destino >= 0 && destino < fotos.length) onCambiar(destino);
   }
 
+  // Panel de detalles: se abre y se cierra con la tecla i y sigue abierto al
+  // pasar de foto.
+  let panel = $state(false);
+  let info = $state<Detalles | null>(null);
+  $effect(() => {
+    if (!panel || !foto) return;
+    const id = foto.id;
+    let vigente = true;
+    pedirDetalles(id)
+      .then((d) => {
+        if (vigente) info = d;
+      })
+      .catch(() => {
+        if (vigente) info = null;
+      });
+    return () => {
+      vigente = false;
+    };
+  });
+
   function alPulsar(e: KeyboardEvent) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Escape") onCerrar();
+    else if (e.key === "i" || e.key === "I") panel = !panel;
     else if (e.key === "ArrowRight") ir(1);
     else if (e.key === "ArrowLeft") ir(-1);
     else return;
@@ -121,6 +144,7 @@
 
 <div
   class="visor"
+  class:con-panel={panel}
   role="dialog"
   aria-modal="true"
   aria-label={foto?.name ?? "Visor"}
@@ -132,6 +156,17 @@
       <Icono nombre="cerrar" />
     </button>
     <span class="nombre">{foto?.name}</span>
+    <button
+      type="button"
+      class="boton info"
+      class:activo={panel}
+      aria-label="Detalles"
+      aria-pressed={panel}
+      title="Detalles (i)"
+      onclick={() => (panel = !panel)}
+    >
+      <Icono nombre="info" />
+    </button>
   </header>
 
   <div class="escenario">
@@ -173,6 +208,27 @@
       {/if}
     {/each}
   </nav>
+
+  {#if panel}
+    <aside class="panel" aria-label="Detalles">
+      <h2>Detalles</h2>
+      {#if info}
+        <dl>
+          <dt>Ruta</dt>
+          <dd class="mono">{info.rel_path}</dd>
+          <dt>Dimensiones</dt>
+          <dd>{dimensiones(info.width, info.height)}</dd>
+          <dt>Tamaño</dt>
+          <dd>{tamano(info.size_bytes)}</dd>
+          <dt>Modificada</dt>
+          <dd>{fecha(info.modified_at)}</dd>
+          <dt>Formato</dt>
+          <dd>{info.format || "Desconocido"}</dd>
+        </dl>
+        <p class="nota">El original no se modifica nunca.</p>
+      {/if}
+    </aside>
+  {/if}
 </div>
 
 <style>
@@ -182,9 +238,65 @@
     z-index: 10;
     display: grid;
     grid-template-rows: auto 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
     background: var(--visor-fondo);
     color: var(--visor-texto);
     outline: none;
+  }
+
+  .visor.con-panel {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  .panel {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    padding: 20px;
+    border-left: 1px solid var(--visor-superficie);
+    background: var(--visor-fondo);
+    overflow-y: auto;
+  }
+
+  .panel h2 {
+    margin: 4px 0 20px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  dl {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+  }
+
+  dt {
+    margin-top: 12px;
+    color: var(--visor-texto-suave);
+    font-size: 0.8rem;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .mono {
+    font-family: var(--fuente-mono);
+    font-size: 0.85rem;
+  }
+
+  .nota {
+    margin-top: 24px;
+    color: var(--visor-texto-suave);
+    font-size: 0.8rem;
+  }
+
+  .info {
+    margin-left: auto;
+  }
+
+  .boton.activo {
+    background: var(--visor-superficie);
   }
 
   header {

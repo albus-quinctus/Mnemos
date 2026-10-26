@@ -44,3 +44,17 @@ export type EventoMiniaturas =
 export function priorizarMiniaturas(ids: number[]): Promise<void> {
   return invoke("priorizar_miniaturas", { ids });
 }
+
+// Detalles de una foto para el panel del visor (`mnemos_core::PhotoDetails`).
+export interface Detalles {
+  rel_path: string;
+  width: number | null; // ya girada según la orientación
+  height: number | null;
+  size_bytes: number;
+  modified_at: number; // segundos desde la época Unix
+  format: string; // "JPEG", "PNG", "DNG"…
+}
+
+export function detalles(id: number): Promise<Detalles | null> {
+  return invoke("detalles", { id });
+}

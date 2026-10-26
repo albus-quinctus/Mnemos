@@ -104,7 +104,7 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 8. [x] Tokens de color, fuentes empaquetadas y estructura de la Galería: menú lateral y barra superior.
 9. [x] Cuadrícula justificada y virtualizada.
 10. [x] Visor: apertura con la miniatura, carga del original, flechas, precarga y tira de miniaturas.
-11. [ ] Panel de detalles del visor.
+11. [x] Panel de detalles del visor.
 12. [ ] Abrir o crear una biblioteca con el diálogo y recordar la última.
 13. [ ] Importar desde la aplicación con progreso y cancelación.
 14. [ ] Miniaturas de HEIC y AVIF, si la decisión 004 se acepta.
