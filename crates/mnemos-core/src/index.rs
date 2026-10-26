@@ -284,6 +284,35 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn una_foto_movida_se_encuentra_por_su_ruta_nueva() {
+        let (dir, mut lib) = library();
+        let vieja = dir.path().join("Originales/Varios/a.png");
+        write_png(&vieja, 1, 1, b"a");
+        lib.index().unwrap();
+        let nueva = dir.path().join("Originales/Vacaciones/a.png");
+        fs::create_dir_all(nueva.parent().unwrap()).unwrap();
+        fs::rename(&vieja, &nueva).unwrap();
+        lib.index().unwrap();
+
+        let rutas = |palabra: &str| -> Vec<String> {
+            let mut stmt = lib
+                .connection()
+                .prepare(
+                    "SELECT p.rel_path FROM photo_search s JOIN photos p ON p.id = s.rowid
+                     WHERE photo_search MATCH ?1",
+                )
+                .unwrap();
+            stmt.query_map([palabra], |r| r.get(0))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap()
+        };
+        assert_eq!(rutas("vacaciones"), ["Originales/Vacaciones/a.png"]);
+        // La ruta vieja sigue como foto desaparecida, igual que en la cuadrícula.
+        assert_eq!(rutas("varios"), ["Originales/Varios/a.png"]);
+    }
+
+    #[test]
     fn indexar_dos_veces_no_cambia_nada() {
         let (dir, mut lib) = library();
         write_png(&dir.path().join("Originales/a.png"), 1, 1, b"a");
