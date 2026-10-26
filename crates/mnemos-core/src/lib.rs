@@ -10,6 +10,7 @@ pub mod import;
 pub mod index;
 pub mod library;
 pub mod paths;
+pub mod search;
 pub mod thumbnails;
 pub mod timeline;
 
@@ -18,5 +19,6 @@ pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, PhotoDetails, PhotoMedia};
 pub use paths::RelPath;
+pub use search::{DateFilter, SearchQuery};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
 pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage};
