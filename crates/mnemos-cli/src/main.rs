@@ -3,13 +3,16 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use mnemos_core::{FileError, ImportReport, IndexReport, Library, LibraryInfo, Result};
+use mnemos_core::{
+    FileError, ImportReport, IndexReport, Library, LibraryInfo, Result, ThumbnailReport,
+};
 
 const USAGE: &str = "Uso:
   mnemos init <biblioteca>            Crea una biblioteca vacía
   mnemos info <biblioteca>            Muestra el resumen de la biblioteca
   mnemos index <biblioteca>           Registra las fotos que hay en Originales/
-  mnemos import <biblioteca> <origen> Copia las fotos de <origen> a la biblioteca";
+  mnemos import <biblioteca> <origen> Copia las fotos de <origen> a la biblioteca
+  mnemos miniaturas <biblioteca>      Genera las miniaturas que faltan";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -23,6 +26,9 @@ fn main() -> ExitCode {
         ["import", lib, source] => Library::open(Path::new(lib))
             .and_then(|mut lib| lib.import_from(Path::new(source)))
             .map(|r| print_import(&r)),
+        ["miniaturas", lib] => Library::open(Path::new(lib))
+            .and_then(|lib| lib.generate_thumbnails())
+            .map(|r| print_thumbnails(&r)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -60,6 +66,16 @@ fn print_import(r: &ImportReport) -> bool {
     println!("Copiadas:   {}", r.copied);
     println!("Duplicadas: {}", r.duplicates);
     print_errors(&r.errors)
+}
+
+fn print_thumbnails(r: &ThumbnailReport) -> bool {
+    println!("Generadas:      {}", r.written);
+    println!("Sin miniatura:  {}", r.failed.len());
+    for (path, message) in &r.failed {
+        eprintln!("  {path}: {message}");
+    }
+    // Un formato sin miniatura no es un error de la orden.
+    true
 }
 
 /// Muestra los errores por archivo. Devuelve `true` si no hubo ninguno.

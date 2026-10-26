@@ -96,7 +96,7 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 2. [x] Extensiones RAW en `mnemos-imaging` y lectura de la orientación EXIF al indexar (migración 0002).
 3. [x] Miniaturas de JPEG, PNG, WebP, GIF, BMP y TIFF con orientación en `mnemos-imaging`.
 4. [x] Miniaturas de RAW a partir de la vista previa incrustada.
-5. [ ] Cola de miniaturas en segundo plano en `mnemos-core`, con prioridad, hilos limitados y escritura vía `.mnemos/tmp/`.
+5. [x] Cola de miniaturas en segundo plano en `mnemos-core`, con prioridad, hilos limitados y escritura vía `.mnemos/tmp/`.
 6. [ ] Protocolo `mnemos://` en la aplicación, con conversión en memoria para los formatos que el motor web no muestra, y la nueva CSP.
 7. [ ] Consulta paginada de fotos agrupadas por mes en `mnemos-core` y su comando de Tauri.
 8. [ ] Tokens de color, fuentes empaquetadas y estructura de la Galería: menú lateral y barra superior.
