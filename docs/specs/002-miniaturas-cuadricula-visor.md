@@ -1,6 +1,6 @@
 # 002 · Miniaturas, cuadrícula y visor
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F1
 
 ## Qué y por qué
