@@ -18,6 +18,7 @@ pnpm install
 pnpm tauri dev                                      # aplicación de escritorio
 cargo run -p mnemos-cli -- init BIBLIOTECA           # crea una biblioteca vacía
 cargo run -p mnemos-cli -- import BIBLIOTECA ORIGEN  # copia fotos sin tocar el origen
+cargo run -p mnemos-cli -- miniaturas BIBLIOTECA     # genera las miniaturas que faltan
 cargo run -p mnemos-cli -- index BIBLIOTECA          # registra lo que hay en Originales/
 cargo test --workspace                              # pruebas del núcleo
 ```

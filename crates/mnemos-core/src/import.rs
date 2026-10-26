@@ -15,11 +15,8 @@ use walkdir::WalkDir;
 use crate::error::{Error, Result};
 use crate::files::{hash_file, is_hidden, unix_secs, year_month};
 use crate::index::{FileError, hash_exists, insert_photo, read_orientation};
-use crate::library::{DATA_DIR, Library, ORIGINALS_DIR};
+use crate::library::{DATA_DIR, Library, ORIGINALS_DIR, TMP_DIR};
 use crate::paths::RelPath;
-
-/// Carpeta temporal para las copias a medias, dentro de `.mnemos/`.
-const TMP_DIR: &str = "tmp";
 
 /// Resultado de una importación.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]

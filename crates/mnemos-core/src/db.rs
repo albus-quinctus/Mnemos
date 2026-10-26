@@ -12,6 +12,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_inicial.sql"),
     include_str!("migrations/0002_orientacion.sql"),
     include_str!("migrations/0003_orientacion_raw.sql"),
+    include_str!("migrations/0004_fallos_miniaturas.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.

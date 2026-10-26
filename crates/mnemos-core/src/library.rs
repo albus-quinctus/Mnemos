@@ -11,7 +11,10 @@ use crate::error::{Error, Result};
 pub const ORIGINALS_DIR: &str = "Originales";
 /// Carpeta interna con la base de datos y los datos generados.
 pub const DATA_DIR: &str = ".mnemos";
-const DB_FILE: &str = "mnemos.db";
+pub(crate) const DB_FILE: &str = "mnemos.db";
+/// Carpeta de escrituras a medias dentro de `.mnemos/`: lo que hay aquí
+/// nunca está en su sitio definitivo.
+pub(crate) const TMP_DIR: &str = "tmp";
 const DATA_SUBDIRS: &[&str] = &["miniaturas", "ediciones", "copias"];
 
 /// Biblioteca de MNEMOS abierta.

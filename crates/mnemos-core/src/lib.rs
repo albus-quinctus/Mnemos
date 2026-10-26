@@ -10,9 +10,11 @@ pub mod import;
 pub mod index;
 pub mod library;
 pub mod paths;
+pub mod thumbnails;
 
 pub use error::{Error, Result};
 pub use import::ImportReport;
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo};
 pub use paths::RelPath;
+pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
