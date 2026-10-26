@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
-use mnemos_core::{Library, LibraryInfo, Month, ThumbnailQueue, TimelineCursor, TimelinePage};
+use mnemos_core::{
+    Library, LibraryInfo, Month, PhotoDetails, ThumbnailQueue, TimelineCursor, TimelinePage,
+};
 use tauri::http::{Method, StatusCode, header};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -95,6 +97,12 @@ fn fotos(
     with_library(&estado, |lib| lib.timeline_page(despues, limite))
 }
 
+/// Detalles de una foto para el panel del visor.
+#[tauri::command]
+fn detalles(id: i64, estado: State<'_, OpenLibrary>) -> Result<Option<PhotoDetails>, String> {
+    with_library(&estado, |lib| lib.photo_details(id))
+}
+
 /// Atiende `mnemos://localhost/miniatura/<id>` y `mnemos://localhost/foto/<id>`.
 fn serve(
     app: &AppHandle,
@@ -141,6 +149,7 @@ pub fn run() {
             abrir_biblioteca,
             meses,
             fotos,
+            detalles,
             priorizar_miniaturas
         ])
         .run(tauri::generate_context!())
