@@ -1,10 +1,20 @@
 //! Búsqueda básica (spec 003): interpreta lo que se escribe en el campo de
-//! búsqueda.
+//! búsqueda y devuelve sus resultados.
 //!
 //! El texto se separa en palabras, que se buscan en la ruta con FTS5, y como
 //! mucho una fecha, que filtra por el día de la foto. Las palabras nunca se
 //! pasan tal cual a FTS5: van entre comillas, así que ningún texto puede
 //! producir un error de sintaxis.
+//!
+//! Los resultados salen como la cuadrícula: meses con su número de fotos y
+//! páginas con el mismo cursor, del más reciente al más antiguo.
+
+use rusqlite::types::Value;
+use rusqlite::{params, params_from_iter};
+
+use crate::error::Result;
+use crate::library::Library;
+use crate::timeline::{DATE, Filter, Month, TimelineCursor, TimelinePage};
 
 /// Filtro de fecha reconocido en la consulta.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +113,102 @@ impl SearchQuery {
             .map(|w| format!("\"{}\"*", w.replace('"', "\"\"")))
             .collect();
         Some(phrases.join(" AND "))
+    }
+}
+
+impl Library {
+    /// Meses con resultados, del más reciente al más antiguo. Con una consulta
+    /// vacía son los de toda la biblioteca.
+    pub fn search_months(&self, query: &SearchQuery) -> Result<Vec<Month>> {
+        match self.search_filter(query)? {
+            Some(filter) => self.months_where(&filter),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// Hasta `limit` resultados a partir de `after`, como `timeline_page`.
+    pub fn search_page(
+        &self,
+        query: &SearchQuery,
+        after: Option<TimelineCursor>,
+        limit: u32,
+    ) -> Result<TimelinePage> {
+        match self.search_filter(query)? {
+            Some(filter) => self.page_where(&filter, after, limit),
+            None => Ok(TimelinePage {
+                photos: Vec::new(),
+                next: None,
+            }),
+        }
+    }
+
+    /// Condición SQL de la consulta, o nada si no puede tener resultados: un
+    /// mes o un día sin año del que no hay ninguna foto.
+    fn search_filter(&self, query: &SearchQuery) -> Result<Option<Filter>> {
+        let mut filter = Filter::default();
+        if let Some(expr) = query.fts_match() {
+            filter
+                .sql
+                .push_str(" AND id IN (SELECT rowid FROM photo_search WHERE photo_search MATCH ?)");
+            filter.params.push(Value::Text(expr));
+        }
+        let Some(date) = query.date else {
+            return Ok(Some(filter));
+        };
+        let (start, span) = match date {
+            DateFilter::Year(year) => (format!("{year:04}-01-01"), "+1 year"),
+            DateFilter::Month { year, month } => (format!("{year:04}-{month:02}-01"), "+1 month"),
+            DateFilter::Day { year, month, day } => {
+                (format!("{year:04}-{month:02}-{day:02}"), "+1 day")
+            }
+            DateFilter::MonthLatest(month) => {
+                let Some(year) = self.latest_year(&filter, "%m", &format!("{month:02}"))? else {
+                    return Ok(None);
+                };
+                (format!("{year}-{month:02}-01"), "+1 month")
+            }
+            DateFilter::DayLatest { month, day } => {
+                let Some(year) =
+                    self.latest_year(&filter, "%m-%d", &format!("{month:02}-{day:02}"))?
+                else {
+                    return Ok(None);
+                };
+                (format!("{year}-{month:02}-{day:02}"), "+1 day")
+            }
+        };
+        // El periodo va en hora local; 'utc' lo pasa a segundos UTC, que es
+        // como se guardan las fechas. Así la consulta usa el índice por fecha.
+        let (from, to): (i64, i64) = self.conn.query_row(
+            "SELECT unixepoch(?1, 'utc'), unixepoch(?1, ?2, 'utc')",
+            params![start, span],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        filter
+            .sql
+            .push_str(&format!(" AND {DATE} >= ? AND {DATE} < ?"));
+        filter.params.extend([Value::from(from), Value::from(to)]);
+        Ok(Some(filter))
+    }
+
+    /// Año más reciente con resultados cuya fecha local, con el formato de
+    /// `strftime` dado, vale `value`.
+    fn latest_year(&self, filter: &Filter, format: &str, value: &str) -> Result<Option<String>> {
+        let params = [
+            Value::from(format.to_owned()),
+            Value::from(value.to_owned()),
+        ]
+        .into_iter()
+        .chain(filter.params.iter().cloned());
+        let year = self.conn.query_row(
+            &format!(
+                "SELECT max(strftime('%Y', {DATE}, 'unixepoch', 'localtime')) FROM photos
+                 WHERE strftime(?, {DATE}, 'unixepoch', 'localtime') = ? {}",
+                filter.sql
+            ),
+            params_from_iter(params),
+            |r| r.get(0),
+        )?;
+        Ok(year)
     }
 }
 
@@ -207,6 +313,8 @@ fn month_name(token: &str, abbreviated: bool) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use rusqlite::Connection;
 
     use super::*;
@@ -390,6 +498,139 @@ mod tests {
                 })
                 .collect();
             buscar(&conn, &texto);
+        }
+    }
+
+    /// Biblioteca indexada de verdad con fotos en `Originales/` y la fecha de
+    /// modificación dada en hora local («2024-03-15 12:00»).
+    fn biblioteca(fotos: &[(&str, &str)]) -> (tempfile::TempDir, Library) {
+        use crate::index::tests::{set_mtime, write_png};
+        let dir = tempfile::tempdir().unwrap();
+        let mut lib = Library::create(dir.path()).unwrap();
+        for (i, (ruta, fecha)) in fotos.iter().enumerate() {
+            let ruta = dir.path().join("Originales").join(ruta);
+            write_png(&ruta, 4, 3, &i.to_le_bytes());
+            let secs: u64 = lib
+                .connection()
+                .query_row("SELECT unixepoch(?1, 'utc')", [fecha], |r| r.get(0))
+                .unwrap();
+            set_mtime(&ruta, secs);
+        }
+        assert_eq!(lib.index().unwrap().added as usize, fotos.len());
+        (dir, lib)
+    }
+
+    /// Nombres de los resultados, recorriendo todas las páginas de 2 en 2.
+    fn resultados(lib: &Library, texto: &str) -> Vec<String> {
+        let query = SearchQuery::parse(texto);
+        let mut nombres = Vec::new();
+        let mut after = None;
+        loop {
+            let page = lib.search_page(&query, after, 2).unwrap();
+            nombres.extend(page.photos.iter().map(|p| p.name.clone()));
+            match page.next {
+                Some(next) => after = Some(next),
+                None => break,
+            }
+        }
+        let total: u64 = lib
+            .search_months(&query)
+            .unwrap()
+            .iter()
+            .map(|m| m.photos)
+            .sum();
+        assert_eq!(total as usize, nombres.len(), "{texto:?}");
+        nombres
+    }
+
+    fn ejemplo() -> (tempfile::TempDir, Library) {
+        biblioteca(&[
+            ("Cumpleaños/IMG_0001.png", "2026-10-20 12:00"),
+            ("Playa/a.png", "2024-07-10 12:00"),
+            ("Playa/b.png", "2025-07-10 12:00"),
+            ("Varios/marzo-viejo.png", "2024-03-01 00:30"),
+            ("Varios/marzo-nuevo.png", "2026-03-31 23:30"),
+            ("Varios/abril.png", "2026-04-01 00:30"),
+            ("Varios/dia.png", "2025-10-26 08:00"),
+        ])
+    }
+
+    #[test]
+    fn busca_en_la_biblioteca_por_palabras() {
+        let (_dir, lib) = ejemplo();
+        assert_eq!(resultados(&lib, "cumple"), ["IMG_0001.png"]);
+        assert_eq!(resultados(&lib, "CUMPLEANOS"), ["IMG_0001.png"]);
+        assert_eq!(resultados(&lib, "playa"), ["b.png", "a.png"]);
+        assert!(resultados(&lib, "nada").is_empty());
+        assert_eq!(resultados(&lib, "  ").len(), 7);
+    }
+
+    #[test]
+    fn combina_palabras_con_la_fecha() {
+        let (_dir, lib) = ejemplo();
+        assert_eq!(resultados(&lib, "playa 2024"), ["a.png"]);
+        assert_eq!(resultados(&lib, "2024 playa"), ["a.png"]);
+        let meses = lib.search_months(&SearchQuery::parse("playa")).unwrap();
+        let meses: Vec<_> = meses.iter().map(|m| (m.month.as_str(), m.photos)).collect();
+        assert_eq!(meses, [("2025-07", 1), ("2024-07", 1)]);
+    }
+
+    #[test]
+    fn las_formas_de_un_mes_dan_lo_mismo_y_respetan_sus_limites() {
+        let (_dir, lib) = ejemplo();
+        for texto in ["marzo 2026", "mar 2026", "2026-03", "03/2026"] {
+            assert_eq!(resultados(&lib, texto), ["marzo-nuevo.png"], "{texto}");
+        }
+        assert_eq!(resultados(&lib, "2024-03"), ["marzo-viejo.png"]);
+        assert_eq!(resultados(&lib, "26/10/2025"), ["dia.png"]);
+        assert_eq!(resultados(&lib, "2025-10-26"), ["dia.png"]);
+    }
+
+    #[test]
+    fn un_mes_o_un_dia_sin_ano_es_el_mas_reciente_con_fotos() {
+        let (_dir, lib) = ejemplo();
+        assert_eq!(resultados(&lib, "marzo"), ["marzo-nuevo.png"]);
+        // Con palabras, el más reciente que tenga resultados.
+        assert_eq!(resultados(&lib, "viejo marzo"), ["marzo-viejo.png"]);
+        assert_eq!(resultados(&lib, "julio"), ["b.png"]);
+        assert_eq!(resultados(&lib, "26/10"), ["dia.png"]);
+        assert_eq!(resultados(&lib, "10/07"), ["b.png"]);
+        assert!(resultados(&lib, "enero").is_empty());
+        assert!(resultados(&lib, "cumple julio").is_empty());
+    }
+
+    #[test]
+    fn buscar_no_toca_los_originales() {
+        let (dir, lib) = ejemplo();
+        let ruta = dir.path().join("Originales/Playa/a.png");
+        let antes = (
+            fs::read(&ruta).unwrap(),
+            fs::metadata(&ruta).unwrap().modified().unwrap(),
+        );
+        for texto in ["playa", "2024", "marzo", "\"\"", "nada"] {
+            resultados(&lib, texto);
+        }
+        let despues = (
+            fs::read(&ruta).unwrap(),
+            fs::metadata(&ruta).unwrap().modified().unwrap(),
+        );
+        assert_eq!(antes, despues);
+    }
+
+    #[test]
+    fn los_textos_raros_no_dan_error_en_la_biblioteca() {
+        let (_dir, lib) = ejemplo();
+        for texto in [
+            "\"",
+            "*",
+            "NEAR(a b)",
+            "rel_path:x",
+            "a\u{0}b",
+            "31/02/2024",
+            "2024-13",
+            "^",
+        ] {
+            resultados(&lib, texto);
         }
     }
 }

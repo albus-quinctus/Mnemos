@@ -5,7 +5,8 @@
 //! páginas. La paginación va por cursor (fecha e id de la última foto), así que
 //! cada página cuesta lo mismo aunque la biblioteca tenga 100 000 fotos.
 
-use rusqlite::params;
+use rusqlite::params_from_iter;
+use rusqlite::types::Value;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -15,7 +16,15 @@ use crate::library::Library;
 pub const MAX_PAGE: u32 = 1000;
 
 /// Fecha por la que se ordena: la de captura o, si falta, la de modificación.
-const DATE: &str = "coalesce(taken_at, modified_at)";
+pub(crate) const DATE: &str = "coalesce(taken_at, modified_at)";
+
+/// Condición extra sobre `photos` para la búsqueda: un trozo de SQL que
+/// empieza por `AND`, con parámetros anónimos (`?`), y sus valores.
+#[derive(Debug, Default)]
+pub(crate) struct Filter {
+    pub sql: String,
+    pub params: Vec<Value>,
+}
 
 /// Un mes con fotos, en hora local: `"2026-10"`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -57,12 +66,22 @@ pub struct TimelinePage {
 impl Library {
     /// Meses con fotos, del más reciente al más antiguo.
     pub fn timeline_months(&self) -> Result<Vec<Month>> {
+        self.months_where(&Filter::default())
+    }
+
+    /// Hasta `limit` fotos a partir de `after` (o desde la más reciente).
+    pub fn timeline_page(&self, after: Option<TimelineCursor>, limit: u32) -> Result<TimelinePage> {
+        self.page_where(&Filter::default(), after, limit)
+    }
+
+    pub(crate) fn months_where(&self, filter: &Filter) -> Result<Vec<Month>> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT strftime('%Y-%m', {DATE}, 'unixepoch', 'localtime') AS month, count(*)
-             FROM photos GROUP BY month ORDER BY month DESC"
+             FROM photos WHERE 1 {} GROUP BY month ORDER BY month DESC",
+            filter.sql
         ))?;
         let months = stmt
-            .query_map([], |r| {
+            .query_map(params_from_iter(&filter.params), |r| {
                 Ok(Month {
                     month: r.get(0)?,
                     photos: r.get(1)?,
@@ -72,8 +91,12 @@ impl Library {
         Ok(months)
     }
 
-    /// Hasta `limit` fotos a partir de `after` (o desde la más reciente).
-    pub fn timeline_page(&self, after: Option<TimelineCursor>, limit: u32) -> Result<TimelinePage> {
+    pub(crate) fn page_where(
+        &self,
+        filter: &Filter,
+        after: Option<TimelineCursor>,
+        limit: u32,
+    ) -> Result<TimelinePage> {
         let limit = limit.clamp(1, MAX_PAGE);
         let (date, id) = after.map_or((i64::MAX, i64::MAX), |c| (c.date, c.id));
         // Se pide una de más para saber si hay página siguiente.
@@ -83,12 +106,17 @@ impl Library {
                     content_hash IN (SELECT content_hash FROM thumbnail_failures),
                     rel_path
              FROM photos
-             WHERE ({DATE}, id) < (?1, ?2)
+             WHERE ({DATE}, id) < (?, ?) {}
              ORDER BY {DATE} DESC, id DESC
-             LIMIT ?3"
+             LIMIT ?",
+            filter.sql
         ))?;
+        let params = [Value::from(date), Value::from(id)]
+            .into_iter()
+            .chain(filter.params.iter().cloned())
+            .chain([Value::from(i64::from(limit) + 1)]);
         let mut photos = stmt
-            .query_map(params![date, id, limit + 1], |r| {
+            .query_map(params_from_iter(params), |r| {
                 let (w, h): (Option<u32>, Option<u32>) = (r.get(3)?, r.get(4)?);
                 let orientation: u16 = r.get(5)?;
                 let (width, height) = if mnemos_imaging::swaps_dimensions(orientation) {
@@ -124,6 +152,7 @@ impl Library {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::params;
 
     // Mediados de mes, para que la zona horaria del equipo no cambie el mes.
     const OCT_2026: i64 = 1_791_892_800; // 2026-10-13 12:00 UTC

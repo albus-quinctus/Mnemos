@@ -1,4 +1,4 @@
-//! Prueba de rendimiento de la spec 002 con una biblioteca sintética.
+//! Prueba de rendimiento de las specs 002 y 003 con una biblioteca sintética.
 //!
 //! No corre con `cargo test` normal porque tarda. Se lanza en modo release:
 //!
@@ -17,7 +17,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
-use mnemos_core::{Library, ThumbnailEvent, ThumbnailQueue};
+use mnemos_core::{Library, SearchQuery, ThumbnailEvent, ThumbnailQueue};
 
 const PAGINA: u32 = 500;
 // Tres años hacia atrás desde el 26-10-2026.
@@ -136,6 +136,34 @@ fn biblioteca_de_10000_fotos() {
     println!("{:<40} {peor:>10.2?}", "  página más lenta");
     assert_eq!(vistas, total);
 
+    // Búsquedas: lo que tarda la interfaz en tener los meses y la primera
+    // página de resultados.
+    let mut peor_busqueda = Duration::ZERO;
+    for texto in [
+        "img",
+        "originales",
+        "img_05000",
+        "005",
+        "2025",
+        "marzo",
+        "26/10",
+        "img 2024",
+        "marzo 2025",
+        "nada",
+    ] {
+        let query = SearchQuery::parse(texto);
+        let ((meses, pagina), tiempo) = medir(&format!("buscar «{texto}»"), || {
+            (
+                lib.search_months(&query).unwrap(),
+                lib.search_page(&query, None, PAGINA).unwrap(),
+            )
+        });
+        let encontradas: u64 = meses.iter().map(|m| m.photos).sum();
+        println!("{:<40} {encontradas:>10}", "  fotos encontradas");
+        assert!(pagina.photos.len() as u64 <= encontradas);
+        peor_busqueda = peor_busqueda.max(tiempo);
+    }
+
     let (_, tiempo_detalles) = medir("detalles de una foto (visor)", || {
         lib.photo_details(total as i64 / 2).unwrap().unwrap()
     });
@@ -154,6 +182,10 @@ fn biblioteca_de_10000_fotos() {
         "{tiempo_meses:?}"
     );
     assert!(peor < Duration::from_millis(100), "{peor:?}");
+    assert!(
+        peor_busqueda < Duration::from_millis(100),
+        "{peor_busqueda:?}"
+    );
     assert!(
         tiempo_detalles < Duration::from_millis(20),
         "{tiempo_detalles:?}"
