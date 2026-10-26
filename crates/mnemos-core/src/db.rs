@@ -8,7 +8,10 @@ use crate::error::{Error, Result};
 
 /// Migraciones en orden. La posición `i` lleva el esquema a la versión `i + 1`.
 /// Nunca se edita una migración publicada: se añade una nueva.
-const MIGRATIONS: &[&str] = &[include_str!("migrations/0001_inicial.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/0001_inicial.sql"),
+    include_str!("migrations/0002_orientacion.sql"),
+];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
 pub const SCHEMA_VERSION: u32 = MIGRATIONS.len() as u32;

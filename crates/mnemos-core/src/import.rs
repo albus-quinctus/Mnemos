@@ -14,7 +14,7 @@ use walkdir::WalkDir;
 
 use crate::error::{Error, Result};
 use crate::files::{hash_file, is_hidden, unix_secs, year_month};
-use crate::index::{FileError, hash_exists, insert_photo};
+use crate::index::{FileError, hash_exists, insert_photo, read_orientation};
 use crate::library::{DATA_DIR, Library, ORIGINALS_DIR};
 use crate::paths::RelPath;
 
@@ -126,6 +126,7 @@ fn import_file(
         unix_secs(modified),
         &hash,
         mnemos_imaging::dimensions(&dest),
+        read_orientation(&dest),
     )?;
     imported.insert(hash);
     Ok(Outcome::Copied)
