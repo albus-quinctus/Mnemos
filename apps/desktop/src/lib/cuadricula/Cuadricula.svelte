@@ -2,6 +2,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount, tick } from "svelte";
   import {
+    buscarFotos,
+    buscarMeses,
     fotos as pedirFotos,
     meses as pedirMeses,
     priorizarMiniaturas,
@@ -15,6 +17,10 @@
   import BarraMeses from "./BarraMeses.svelte";
   import { disponer, nombreDia, visibles, type Opciones } from "./disposicion";
 
+  // Con `texto`, la cuadrícula muestra solo los resultados de esa búsqueda.
+  // `onSalir` se llama con Esc cuando el visor no está abierto.
+  let { texto = "", onSalir }: { texto?: string; onSalir?: () => void } = $props();
+
   const PAGINA = 500;
   // Margen por encima y por debajo de la pantalla que también se pinta, para
   // que al desplazarse rápido no se vean huecos.
@@ -27,6 +33,9 @@
   let quedan = $state(true);
   let cargando = false;
   let error = $state("");
+  // Ya han llegado los meses: hasta entonces no se dice que no hay fotos.
+  let listo = $state(false);
+  const total = $derived(meses.reduce((suma, m) => suma + m.photos, 0));
 
   // Versión de la miniatura de cada foto: sube cuando la cola la termina, para
   // volver a pedir la que antes dio 404. Las cargadas no se tocan.
@@ -45,6 +54,7 @@
     separacion: 4,
     separacionDias: 16,
     altoTitulo: 44,
+    anchoMinDia: 140,
   });
   const disposicion = $derived(disponer(meses, fotos, opciones));
   const enPantalla = $derived(
@@ -74,7 +84,9 @@
     if (cargando || !quedan) return;
     cargando = true;
     try {
-      const pagina = await pedirFotos(siguiente, PAGINA);
+      const pagina = texto
+        ? await buscarFotos(texto, siguiente, PAGINA)
+        : await pedirFotos(siguiente, PAGINA);
       fotos = fotos.concat(pagina.photos);
       siguiente = pagina.next;
       quedan = pagina.next !== null;
@@ -139,9 +151,10 @@
     listen<EventoMiniaturas>("miniaturas", (e) => alEvento(e.payload))
       .then((f) => (dejarDeEscuchar = f))
       .catch(() => {});
-    pedirMeses()
+    (texto ? buscarMeses(texto) : pedirMeses())
       .then((m) => {
         meses = m;
+        listo = true;
         quedan = m.length > 0;
         return cargarPagina();
       })
@@ -153,7 +166,20 @@
   });
 </script>
 
-<div class="vista">
+<div
+  class="vista"
+  role="presentation"
+  onkeydown={(e) => {
+    if (e.key === "Escape" && abierta === null) onSalir?.();
+  }}
+>
+{#if texto && listo && !error && total > 0}
+  <p class="resumen">
+    {total.toLocaleString("es")}
+    {total === 1 ? "foto" : "fotos"} para «{texto}»
+  </p>
+{/if}
+<div class="marco">
 <div
   id="cuadricula"
   class="cuadricula"
@@ -164,8 +190,18 @@
 >
   {#if error}
     <p class="aviso" role="alert">{error}</p>
-  {:else if meses.length === 0}
-    <p class="aviso">Esta biblioteca aún no tiene fotos.</p>
+  {:else if listo && meses.length === 0}
+    {#if texto}
+      <div class="sin-resultados">
+        <p class="titulo">No hay fotos para «{texto}»</p>
+        <p>
+          Se busca en el nombre del archivo, en sus carpetas y en la fecha: por ejemplo
+          «playa», «marzo 2024» o «26/10».
+        </p>
+      </div>
+    {:else}
+      <p class="aviso">Esta biblioteca aún no tiene fotos.</p>
+    {/if}
   {/if}
 
   <div class="lienzo" style:height="{disposicion.alto}px">
@@ -226,6 +262,7 @@
     />
   {/if}
 </div>
+</div>
 
 {#if abierta !== null}
   <Visor
@@ -240,8 +277,35 @@
 
 <style>
   .vista {
-    position: relative;
+    display: flex;
+    flex-direction: column;
     height: 100%;
+  }
+
+  .marco {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .resumen {
+    margin: 0;
+    padding: 1rem 64px 0.25rem 24px;
+    color: var(--texto-suave);
+    font-size: 0.9rem;
+  }
+
+  .sin-resultados {
+    max-width: 32rem;
+    padding: 3rem 0;
+    color: var(--texto-suave);
+  }
+
+  .sin-resultados .titulo {
+    margin-bottom: 0.5rem;
+    color: var(--texto);
+    font-size: 1.1rem;
+    font-weight: 500;
   }
 
   .cuadricula {

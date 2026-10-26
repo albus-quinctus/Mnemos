@@ -11,6 +11,9 @@ export interface Opciones {
   separacion: number; // hueco entre fotos y entre filas
   separacionDias: number; // hueco entre dos días que comparten fila
   altoTitulo: number; // alto del título del día, encima de sus fotos
+  // Ancho que ocupa como mínimo un día que comparte fila, para que su título
+  // no pise el del día siguiente cuando tiene una sola foto vertical.
+  anchoMinDia?: number;
 }
 
 export interface Celda {
@@ -112,11 +115,12 @@ export function disponer(meses: Mes[], fotos: FotoCuadricula[], op: Opciones): D
 
       // Un día de una sola fila corta cabe junto al anterior si hay sitio.
       const corto = filas.length === 1 && !filas[0].completa;
+      const ocupa = (fila: FilaDia) => Math.max(fila.anchoUsado, op.anchoMinDia ?? 0);
       if (abierta && corto && xLibre + op.separacionDias + filas[0].anchoUsado <= ancho) {
         const x0 = xLibre + op.separacionDias;
         abierta.titulos.push({ dia, x: x0 });
         abierta.celdas.push(...filas[0].celdas.map((c) => ({ ...c, x: c.x + x0 })));
-        xLibre = x0 + filas[0].anchoUsado;
+        xLibre = x0 + ocupa(filas[0]);
         continue;
       }
 
@@ -133,7 +137,7 @@ export function disponer(meses: Mes[], fotos: FotoCuadricula[], op: Opciones): D
         if (n === filas.length - 1 && !fila.completa && n === 0) {
           // Fila corta de un día: queda abierta para los días siguientes.
           abierta = bloque;
-          xLibre = fila.anchoUsado;
+          xLibre = ocupa(fila);
         } else {
           bloques.push(bloque);
           y += bloque.alto + op.separacion;
