@@ -9,7 +9,7 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
-1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) aprobada. Decisión 004 (RAW con extractor propio, HEIC/AVIF con `libheif` tras una prueba en CI) propuesta. Siguiente tarea: extensiones RAW y orientación EXIF al indexar.
+1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en curso. Hechas: decisión 004 y tarea 2 (extensiones RAW y orientación EXIF con `kamadak-exif`, migración 0002). Siguiente: tarea 3, miniaturas de JPEG, PNG, WebP, GIF, BMP y TIFF.
 2. Probar con 10 000 fotos desde un HDD externo y medir tiempos de indexado.
 
 ## Pendientes / ideas aparcadas

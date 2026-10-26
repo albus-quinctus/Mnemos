@@ -1,6 +1,6 @@
 # 002 · Miniaturas, cuadrícula y visor
 
-- Estado: aprobada
+- Estado: en curso
 - Fase: F1
 
 ## Qué y por qué
@@ -92,8 +92,8 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 - Qué hacer con las fotos desaparecidas.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Decisión 004: librerías para las vistas previas RAW y para HEIC/AVIF, con licencia y empaquetado.
-2. [ ] Extensiones RAW en `mnemos-imaging` y lectura de la orientación EXIF al indexar (migración 0002).
+1. [x] Decisión 004: librerías para las vistas previas RAW y para HEIC/AVIF, con licencia y empaquetado.
+2. [x] Extensiones RAW en `mnemos-imaging` y lectura de la orientación EXIF al indexar (migración 0002).
 3. [ ] Miniaturas de JPEG, PNG, WebP, GIF, BMP y TIFF con orientación en `mnemos-imaging`.
 4. [ ] Miniaturas de RAW a partir de la vista previa incrustada.
 5. [ ] Cola de miniaturas en segundo plano en `mnemos-core`, con prioridad, hilos limitados y escritura vía `.mnemos/tmp/`.

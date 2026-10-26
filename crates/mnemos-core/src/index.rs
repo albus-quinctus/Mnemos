@@ -92,32 +92,63 @@ impl Library {
     }
 }
 
-/// Tamaño y fecha de modificación de cada foto registrada.
-fn known_files(conn: &Connection) -> Result<HashMap<String, (i64, i64)>> {
-    let mut stmt = conn.prepare("SELECT rel_path, size_bytes, modified_at FROM photos")?;
-    let rows = stmt.query_map([], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?))))?;
+/// Lo que el indexado necesita saber de una foto ya registrada.
+#[derive(Debug, PartialEq, Eq)]
+struct Known {
+    size: i64,
+    modified: i64,
+    has_orientation: bool,
+}
+
+fn known_files(conn: &Connection) -> Result<HashMap<String, Known>> {
+    let mut stmt = conn
+        .prepare("SELECT rel_path, size_bytes, modified_at, orientation IS NOT NULL FROM photos")?;
+    let rows = stmt.query_map([], |r| {
+        Ok((
+            r.get(0)?,
+            Known {
+                size: r.get(1)?,
+                modified: r.get(2)?,
+                has_orientation: r.get(3)?,
+            },
+        ))
+    })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Orientación EXIF que se guarda: 1 (sin girar) si no se puede leer.
+pub(crate) fn read_orientation(path: &Path) -> u16 {
+    mnemos_imaging::orientation(path).unwrap_or(1)
 }
 
 fn index_file(
     conn: &Connection,
     path: &Path,
     rel: &RelPath,
-    known: Option<&(i64, i64)>,
+    known: Option<&Known>,
 ) -> Result<Outcome> {
     let meta = fs::metadata(path)?;
     let size = meta.len() as i64;
     let modified = unix_secs(meta.modified()?);
-    if known == Some(&(size, modified)) {
+    if let Some(known) = known.filter(|k| (k.size, k.modified) == (size, modified)) {
+        if !known.has_orientation {
+            // Registrada antes de la migración 0002: basta con leer el EXIF.
+            conn.execute(
+                "UPDATE photos SET orientation = ?2 WHERE rel_path = ?1",
+                params![rel.as_str(), read_orientation(path)],
+            )?;
+        }
         return Ok(Outcome::Unchanged);
     }
 
     let hash = hash_file(path)?;
     let dims = mnemos_imaging::dimensions(path);
+    let orientation = read_orientation(path);
     if known.is_some() {
         conn.execute(
             "UPDATE photos
-             SET size_bytes = ?2, modified_at = ?3, content_hash = ?4, width = ?5, height = ?6
+             SET size_bytes = ?2, modified_at = ?3, content_hash = ?4, width = ?5, height = ?6,
+                 orientation = ?7
              WHERE rel_path = ?1",
             params![
                 rel.as_str(),
@@ -125,12 +156,13 @@ fn index_file(
                 modified,
                 hash,
                 dims.map(|d| d.0),
-                dims.map(|d| d.1)
+                dims.map(|d| d.1),
+                orientation
             ],
         )?;
         Ok(Outcome::Updated)
     } else {
-        insert_photo(conn, rel, size, modified, &hash, dims)?;
+        insert_photo(conn, rel, size, modified, &hash, dims, orientation)?;
         Ok(Outcome::Added)
     }
 }
@@ -143,18 +175,21 @@ pub(crate) fn insert_photo(
     modified: i64,
     hash: &str,
     dims: Option<(u32, u32)>,
+    orientation: u16,
 ) -> Result<()> {
     conn.execute(
         "INSERT INTO photos
-             (rel_path, size_bytes, modified_at, content_hash, width, height, imported_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, unixepoch())",
+             (rel_path, size_bytes, modified_at, content_hash, width, height, orientation,
+              imported_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch())",
         params![
             rel.as_str(),
             size,
             modified,
             hash,
             dims.map(|d| d.0),
-            dims.map(|d| d.1)
+            dims.map(|d| d.1),
+            orientation
         ],
     )?;
     let id = conn.last_insert_rowid();
@@ -288,6 +323,80 @@ pub(crate) mod tests {
         let report = lib.index().unwrap();
         assert_eq!(report.missing, 1);
         assert_eq!(lib.info().unwrap().photos, 1);
+    }
+
+    /// JPEG mínimo con un segmento EXIF que solo lleva la orientación.
+    fn write_jpeg_oriented(path: &Path, orientation: u16) {
+        let mut tiff = b"II*\0".to_vec();
+        tiff.extend_from_slice(&8u32.to_le_bytes());
+        tiff.extend_from_slice(&1u16.to_le_bytes());
+        tiff.extend_from_slice(&0x0112u16.to_le_bytes());
+        tiff.extend_from_slice(&3u16.to_le_bytes());
+        tiff.extend_from_slice(&1u32.to_le_bytes());
+        tiff.extend_from_slice(&orientation.to_le_bytes());
+        tiff.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+        let mut payload = b"Exif\0\0".to_vec();
+        payload.extend_from_slice(&tiff);
+        let mut v = vec![0xFF, 0xD8, 0xFF, 0xE1];
+        v.extend_from_slice(&(payload.len() as u16 + 2).to_be_bytes());
+        v.extend_from_slice(&payload);
+        v.extend_from_slice(&[0xFF, 0xD9]);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, v).unwrap();
+    }
+
+    fn orientation_of(lib: &Library, rel: &str) -> Option<u16> {
+        lib.connection()
+            .query_row(
+                "SELECT orientation FROM photos WHERE rel_path = ?1",
+                [rel],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn guarda_la_orientacion_exif() {
+        let (dir, mut lib) = library();
+        write_jpeg_oriented(&dir.path().join("Originales/movil.jpg"), 6);
+        write_png(&dir.path().join("Originales/sin_exif.png"), 1, 1, b"a");
+        let report = lib.index().unwrap();
+        assert_eq!(report.added, 2);
+        assert_eq!(orientation_of(&lib, "Originales/movil.jpg"), Some(6));
+        assert_eq!(orientation_of(&lib, "Originales/sin_exif.png"), Some(1));
+    }
+
+    #[test]
+    fn completa_la_orientacion_de_fotos_anteriores_sin_rehacer_la_huella() {
+        let (dir, mut lib) = library();
+        write_jpeg_oriented(&dir.path().join("Originales/movil.jpg"), 8);
+        lib.index().unwrap();
+        // Simula una foto registrada antes de la migración 0002.
+        lib.connection()
+            .execute(
+                "UPDATE photos SET orientation = NULL, content_hash = 'antigua'",
+                [],
+            )
+            .unwrap();
+
+        let report = lib.index().unwrap();
+        assert_eq!((report.added, report.updated, report.unchanged), (0, 0, 1));
+        assert_eq!(orientation_of(&lib, "Originales/movil.jpg"), Some(8));
+        let hash: String = lib
+            .connection()
+            .query_row("SELECT content_hash FROM photos", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(hash, "antigua");
+    }
+
+    #[test]
+    fn indexa_los_raw() {
+        let (dir, mut lib) = library();
+        fs::write(dir.path().join("Originales/camara.NEF"), b"datos raw").unwrap();
+        fs::write(dir.path().join("Originales/canon.cr3"), b"datos raw").unwrap();
+        let report = lib.index().unwrap();
+        assert_eq!(report.added, 2);
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
     }
 
     #[test]
