@@ -9,10 +9,12 @@ export interface Mes {
 
 export interface FotoCuadricula {
   id: number;
+  name: string; // nombre del archivo, sin carpetas
   month: string;
   date: number; // segundos desde la época Unix
   width: number | null; // ya girada según la orientación
   height: number | null;
+  thumbnail_failed: boolean; // sin miniatura posible: se muestra el marcador
 }
 
 export interface Cursor {
@@ -31,4 +33,14 @@ export function meses(): Promise<Mes[]> {
 
 export function fotos(despues: Cursor | null, limite: number): Promise<PaginaFotos> {
   return invoke("fotos", { despues, limite });
+}
+
+// Lo que emite la cola de miniaturas (`mnemos_core::ThumbnailEvent`).
+export type EventoMiniaturas =
+  | { tipo: "ready"; photo_ids: number[] }
+  | { tipo: "failed"; photo_ids: number[]; message: string }
+  | { tipo: "stopped"; message: string };
+
+export function priorizarMiniaturas(ids: number[]): Promise<void> {
+  return invoke("priorizar_miniaturas", { ids });
 }

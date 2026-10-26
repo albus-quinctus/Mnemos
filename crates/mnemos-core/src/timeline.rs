@@ -29,10 +29,15 @@ pub struct Month {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct GridPhoto {
     pub id: i64,
+    /// Nombre del archivo, sin carpetas, para el marcador "Sin vista previa".
+    pub name: String,
     pub month: String,
     pub date: i64,
     pub width: Option<u32>,
     pub height: Option<u32>,
+    /// La miniatura no se pudo generar: la cuadrícula muestra el marcador
+    /// "Sin vista previa" en vez de esperarla.
+    pub thumbnail_failed: bool,
 }
 
 /// Dónde sigue la página siguiente: justo después de esta foto.
@@ -74,7 +79,9 @@ impl Library {
         // Se pide una de más para saber si hay página siguiente.
         let mut stmt = self.conn.prepare(&format!(
             "SELECT id, {DATE}, strftime('%Y-%m', {DATE}, 'unixepoch', 'localtime'),
-                    width, height, coalesce(orientation, 1)
+                    width, height, coalesce(orientation, 1),
+                    content_hash IN (SELECT content_hash FROM thumbnail_failures),
+                    rel_path
              FROM photos
              WHERE ({DATE}, id) < (?1, ?2)
              ORDER BY {DATE} DESC, id DESC
@@ -89,12 +96,15 @@ impl Library {
                 } else {
                     (w, h)
                 };
+                let rel_path: String = r.get(7)?;
                 Ok(GridPhoto {
                     id: r.get(0)?,
+                    name: rel_path.rsplit('/').next().unwrap_or_default().to_owned(),
                     date: r.get(1)?,
                     month: r.get(2)?,
                     width,
                     height,
+                    thumbnail_failed: r.get(6)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -176,6 +186,7 @@ mod tests {
             ]
         );
         assert_eq!(page.photos[0].month, "2026-10");
+        assert_eq!(page.photos[0].name, "c.jpg");
         assert_eq!(page.next, None);
     }
 
@@ -242,6 +253,23 @@ mod tests {
         let page = lib.timeline_page(None, 10).unwrap();
         let dims: Vec<_> = page.photos.iter().map(|p| (p.width, p.height)).collect();
         assert_eq!(dims, [(Some(3000), Some(4000)), (Some(4000), Some(3000))]);
+    }
+
+    #[test]
+    fn marca_las_fotos_sin_miniatura_posible() {
+        let (_dir, lib) = library(&[
+            ("Originales/rota.jpg", OCT_2026, None, 1),
+            ("Originales/buena.jpg", SEP_2026, None, 1),
+        ]);
+        lib.conn
+            .execute_batch(
+                "UPDATE photos SET content_hash = rel_path;
+                 INSERT INTO thumbnail_failures VALUES ('Originales/rota.jpg', 'dañada', 0);",
+            )
+            .unwrap();
+        let page = lib.timeline_page(None, 10).unwrap();
+        let failed: Vec<_> = page.photos.iter().map(|p| p.thumbnail_failed).collect();
+        assert_eq!(failed, [true, false]);
     }
 
     #[test]

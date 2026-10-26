@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
 
   type LibraryInfo = {
     root: string;
@@ -29,32 +30,29 @@
   }
 </script>
 
-<section class="abrir">
-  <h1>Fotos</h1>
-  <p class="lema">Tu biblioteca de fotos, portátil y privada.</p>
+{#if info}
+  <!-- Se monta de nuevo con cada biblioteca para empezar desde cero. -->
+  {#key info.root}
+    <Cuadricula />
+  {/key}
+{:else}
+  <section class="abrir">
+    <h1>Fotos</h1>
+    <p class="lema">Tu biblioteca de fotos, portátil y privada.</p>
 
-  <form onsubmit={abrir}>
-    <label for="ruta">Carpeta de la biblioteca</label>
-    <div class="fila">
-      <input id="ruta" placeholder="/media/disco/Biblioteca" bind:value={ruta} required />
-      <button type="submit" disabled={cargando}>Abrir</button>
-    </div>
-  </form>
+    <form onsubmit={abrir}>
+      <label for="ruta">Carpeta de la biblioteca</label>
+      <div class="fila">
+        <input id="ruta" placeholder="/media/disco/Biblioteca" bind:value={ruta} required />
+        <button type="submit" disabled={cargando}>Abrir</button>
+      </div>
+    </form>
 
-  {#if error}
-    <p class="error" role="alert">{error}</p>
-  {/if}
-
-  {#if info}
-    <dl>
-      <dt>Biblioteca</dt><dd>{info.root}</dd>
-      <dt>Esquema</dt><dd>v{info.schema_version}</dd>
-      <dt>Fotos</dt><dd>{info.photos}</dd>
-      <dt>Álbumes</dt><dd>{info.albums}</dd>
-      <dt>Etiquetas</dt><dd>{info.tags}</dd>
-    </dl>
-  {/if}
-</section>
+    {#if error}
+      <p class="error" role="alert">{error}</p>
+    {/if}
+  </section>
+{/if}
 
 <style>
   .abrir {
@@ -115,23 +113,5 @@
 
   .error {
     color: var(--error);
-  }
-
-  dl {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.4rem 1.5rem;
-    margin-top: 2rem;
-  }
-
-  dt {
-    color: var(--texto-suave);
-  }
-
-  dd {
-    margin: 0;
-    font-family: var(--fuente-mono);
-    font-size: 0.9em;
-    word-break: break-all;
   }
 </style>
