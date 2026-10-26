@@ -14,7 +14,7 @@ pub mod thumbnails;
 pub mod timeline;
 
 pub use error::{Error, Result};
-pub use import::ImportReport;
+pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, PhotoDetails, PhotoMedia};
 pub use paths::RelPath;

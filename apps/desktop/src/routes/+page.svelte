@@ -3,6 +3,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
+  import { importacion } from "$lib/importacion/importacion.svelte";
 
   type LibraryInfo = {
     root: string;
@@ -59,7 +60,7 @@
 
 {#if info}
   <!-- Se monta de nuevo con cada biblioteca para empezar desde cero. -->
-  {#key info.root}
+  {#key `${info.root}#${importacion.version}`}
     <Cuadricula />
   {/key}
 {:else}

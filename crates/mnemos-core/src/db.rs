@@ -28,6 +28,9 @@ pub fn open(path: &Path) -> Result<Connection> {
 }
 
 fn configure(conn: &Connection) -> Result<()> {
+    // La importación escribe mientras la cuadrícula lee: esperar un poco es
+    // mejor que fallar con "database is locked".
+    conn.busy_timeout(std::time::Duration::from_secs(10))?;
     // Journal clásico y escritura síncrona completa: más seguro en discos
     // externos que se pueden desconectar y en sistemas de archivos como exFAT.
     conn.execute_batch(
