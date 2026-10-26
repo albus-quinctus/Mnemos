@@ -160,8 +160,10 @@ fn import_file(
     };
 
     let rel = RelPath::from_absolute(root, &dest)?;
+    // La foto y su entrada en el índice de búsqueda se guardan juntas.
+    let tx = conn.unchecked_transaction()?;
     insert_photo(
-        conn,
+        &tx,
         &rel,
         meta.len() as i64,
         unix_secs(modified),
@@ -169,6 +171,7 @@ fn import_file(
         mnemos_imaging::dimensions(&dest),
         read_orientation(&dest),
     )?;
+    tx.commit()?;
     imported.insert(hash);
     Ok(Outcome::Copied)
 }
@@ -350,6 +353,23 @@ mod tests {
         assert_eq!(lib.info().unwrap().photos, 1);
         let tmp = dir.path().join("Biblioteca/.mnemos/tmp");
         assert_eq!(fs::read_dir(tmp).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn lo_importado_se_puede_buscar() {
+        let (_dir, mut lib, src) = setup();
+        write_png(&src.join("Cumpleaños/a.png"), 1, 1, b"a");
+        write_png(&src.join("b.png"), 1, 1, b"b");
+        lib.import_from(&src).unwrap();
+        let (fotos, indexadas): (i64, i64) = lib
+            .connection()
+            .query_row(
+                "SELECT (SELECT count(*) FROM photos), (SELECT count(*) FROM photo_search)",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((fotos, indexadas), (2, 2));
     }
 
     #[test]
