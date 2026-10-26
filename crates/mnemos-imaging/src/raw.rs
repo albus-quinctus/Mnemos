@@ -228,7 +228,7 @@ impl Entry {
         }
         let at = base + u64::from(self.offset(e));
         match src.read_at(at, u64::from(self.count) * 4) {
-            Ok(bytes) => bytes.chunks_exact(4).map(|c| e.u32(c)).collect(),
+            Ok(bytes) => bytes.as_chunks::<4>().0.iter().map(|c| e.u32(c)).collect(),
             Err(_) => Vec::new(),
         }
     }
@@ -314,7 +314,9 @@ fn read_ifd(src: &mut Source, e: Endian, at: u64) -> io::Result<(Vec<Entry>, u32
     let count = e.u16(&src.read_at(at, 2)?).min(MAX_IFD_ENTRIES);
     let bytes = src.read_at(at + 2, u64::from(count) * 12 + 4)?;
     let entries = bytes
-        .chunks_exact(12)
+        .as_chunks::<12>()
+        .0
+        .iter()
         .map(|c| Entry {
             tag: e.u16(&c[0..2]),
             kind: e.u16(&c[2..4]),
