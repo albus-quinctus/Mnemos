@@ -1,6 +1,6 @@
 # Rendimiento
 
-Mediciones de la spec 002 (tarea 15) con bibliotecas sintéticas. Nunca se usa una biblioteca real.
+Mediciones de la spec 002 (tarea 15) y de la búsqueda de la spec 003 (tarea 3) con bibliotecas sintéticas. Nunca se usa una biblioteca real.
 
 ## Cómo repetirlas
 - Núcleo: `cargo test --release -p mnemos-core --test rendimiento -- --ignored --nocapture`. `MNEMOS_FOTOS=50000` cambia el tamaño.
@@ -20,6 +20,24 @@ Equipo: contenedor Linux con 4 núcleos Xeon a 2,1 GHz, disco SSD y Chromium sin
 | Recorrer toda la cuadrícula en páginas de 500 | 20 ms en total; la página más lenta, 1,6 ms |
 | Detalles de una foto | 0,07 ms |
 | Espacio de las miniaturas | 68 MB |
+
+### Búsqueda en el núcleo, 10 000 fotos
+Cada tiempo es lo que tarda la interfaz en tener los meses con resultados y la primera página de 500. El objetivo de la spec 003 es menos de 100 ms.
+
+| Búsqueda | Fotos encontradas | Tiempo |
+|---|---|---|
+| `img` (todas) | 10 000 | 25 ms |
+| `originales` (todas) | 10 000 | 24 ms |
+| `img 2024` | 2762 | 15 ms |
+| `marzo` (sin año, el más reciente) | 339 | 11 ms |
+| `26/10` (sin año) | 4 | 10 ms |
+| `2025` | 3983 | 6 ms |
+| `005` | 1100 | 4 ms |
+| `marzo 2025` | 338 | 1,2 ms |
+| `img_05000` | 1 | 0,5 ms |
+| `nada` | 0 | 0,3 ms |
+
+Las palabras que casan con todas las fotos son el peor caso, porque se cuentan todas para la barra de meses.
 
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
