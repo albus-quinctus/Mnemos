@@ -9,7 +9,7 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
-1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en curso. Hechas: tareas 1 a 5 (decisión 004, RAW y orientación, miniaturas, vistas previas RAW, cola en segundo plano y `mnemos miniaturas`). Siguiente: tarea 6, protocolo `mnemos://` en la aplicación.
+1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en curso. Hechas: tareas 1 a 6 (decisión 004, RAW y orientación, miniaturas, vistas previas RAW, cola en segundo plano, `mnemos miniaturas` y protocolo `mnemos://`). Siguiente: tarea 7, consulta paginada de fotos por mes.
 2. Probar con 10 000 fotos desde un HDD externo y medir tiempos de indexado.
 
 ## Pendientes / ideas aparcadas

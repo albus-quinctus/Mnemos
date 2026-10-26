@@ -7,6 +7,7 @@ mod raw;
 mod thumbnail;
 
 pub use raw::raw_preview;
+pub use thumbnail::{DISPLAY_MAX_SIDE, DISPLAY_QUALITY, display_image, display_size, web_mime};
 pub use thumbnail::{
     THUMBNAIL_HEIGHT, THUMBNAIL_MAX_WIDTH, THUMBNAIL_QUALITY, Thumbnail, ThumbnailError, thumbnail,
     thumbnail_size,

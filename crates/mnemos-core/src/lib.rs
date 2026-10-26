@@ -15,6 +15,6 @@ pub mod thumbnails;
 pub use error::{Error, Result};
 pub use import::ImportReport;
 pub use index::{FileError, IndexReport};
-pub use library::{Library, LibraryInfo};
+pub use library::{Library, LibraryInfo, PhotoMedia};
 pub use paths::RelPath;
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
