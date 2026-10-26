@@ -11,6 +11,7 @@ pub mod index;
 pub mod library;
 pub mod paths;
 pub mod thumbnails;
+pub mod timeline;
 
 pub use error::{Error, Result};
 pub use import::ImportReport;
@@ -18,3 +19,4 @@ pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, PhotoMedia};
 pub use paths::RelPath;
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
+pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage};

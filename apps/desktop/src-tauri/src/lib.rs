@@ -3,7 +3,7 @@ mod media;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use mnemos_core::{Library, LibraryInfo};
+use mnemos_core::{Library, LibraryInfo, Month, TimelineCursor, TimelinePage};
 use tauri::http::{Method, StatusCode, header};
 use tauri::{Manager, State};
 
@@ -17,6 +17,33 @@ fn abrir_biblioteca(ruta: String, estado: State<'_, OpenLibrary>) -> Result<Libr
     let info = lib.info().map_err(|e| e.to_string())?;
     *estado.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(lib);
     Ok(info)
+}
+
+/// Ejecuta `f` con la biblioteca abierta, o falla si no hay ninguna.
+fn with_library<T>(
+    estado: &OpenLibrary,
+    f: impl FnOnce(&Library) -> mnemos_core::Result<T>,
+) -> Result<T, String> {
+    let guard = estado.0.lock().unwrap_or_else(|e| e.into_inner());
+    let lib = guard.as_ref().ok_or("no hay ninguna biblioteca abierta")?;
+    f(lib).map_err(|e| e.to_string())
+}
+
+/// Meses con fotos y cuántas tiene cada uno, del más reciente al más antiguo.
+#[tauri::command]
+fn meses(estado: State<'_, OpenLibrary>) -> Result<Vec<Month>, String> {
+    with_library(&estado, Library::timeline_months)
+}
+
+/// Página de fotos para la cuadrícula, a partir de `despues` o desde la más
+/// reciente.
+#[tauri::command]
+fn fotos(
+    despues: Option<TimelineCursor>,
+    limite: u32,
+    estado: State<'_, OpenLibrary>,
+) -> Result<TimelinePage, String> {
+    with_library(&estado, |lib| lib.timeline_page(despues, limite))
 }
 
 /// Atiende `mnemos://localhost/miniatura/<id>` y `mnemos://localhost/foto/<id>`.
@@ -60,7 +87,7 @@ pub fn run() {
             // Decodificar un RAW o un TIFF lleva tiempo: fuera del hilo de la interfaz.
             std::thread::spawn(move || responder.respond(serve(&app, &request)));
         })
-        .invoke_handler(tauri::generate_handler![abrir_biblioteca])
+        .invoke_handler(tauri::generate_handler![abrir_biblioteca, meses, fotos])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");
 }
