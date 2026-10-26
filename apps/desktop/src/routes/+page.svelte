@@ -29,8 +29,8 @@
   }
 </script>
 
-<main>
-  <h1>MNEMOS</h1>
+<section class="abrir">
+  <h1>Fotos</h1>
   <p class="lema">Tu biblioteca de fotos, portátil y privada.</p>
 
   <form onsubmit={abrir}>
@@ -54,45 +54,22 @@
       <dt>Etiquetas</dt><dd>{info.tags}</dd>
     </dl>
   {/if}
-</main>
+</section>
 
 <style>
-  :global(:root) {
-    --fondo: #f6f6f4;
-    --texto: #1c1c1a;
-    --suave: #6b6b66;
-    --borde: #d6d6d0;
-    --acento: #2f5d50;
-    --error: #a3271f;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    color: var(--texto);
-    background: var(--fondo);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(:root) {
-      --fondo: #161615;
-      --texto: #ececea;
-      --suave: #9b9b95;
-      --borde: #3a3a37;
-      --acento: #7fbfa9;
-      --error: #f08a80;
-    }
-  }
-
-  main {
+  .abrir {
     max-width: 40rem;
-    margin: 0 auto;
-    padding: 3rem 1.5rem;
+    padding: 2rem 1.5rem;
   }
 
   h1 {
     margin: 0;
-    letter-spacing: 0.2em;
+    font-size: 1.5rem;
+    font-weight: 600;
   }
 
   .lema {
-    color: var(--suave);
+    color: var(--texto-suave);
     margin-top: 0.25rem;
   }
 
@@ -113,21 +90,21 @@
 
   input {
     flex: 1;
-    padding: 0.6rem 0.8rem;
+    min-height: var(--objetivo);
+    padding: 0 0.8rem;
     border: 1px solid var(--borde);
-    border-radius: 6px;
-    background: transparent;
-    color: inherit;
-    font: inherit;
+    border-radius: var(--radio);
+    background: var(--superficie);
   }
 
   button {
-    padding: 0.6rem 1.2rem;
+    min-height: var(--objetivo);
+    padding: 0 1.2rem;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radio);
     background: var(--acento);
-    color: var(--fondo);
-    font: inherit;
+    color: var(--acento-texto);
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -148,11 +125,13 @@
   }
 
   dt {
-    color: var(--suave);
+    color: var(--texto-suave);
   }
 
   dd {
     margin: 0;
+    font-family: var(--fuente-mono);
+    font-size: 0.9em;
     word-break: break-all;
   }
 </style>
