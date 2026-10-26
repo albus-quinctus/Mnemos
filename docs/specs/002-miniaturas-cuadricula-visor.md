@@ -107,5 +107,5 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 11. [x] Panel de detalles del visor.
 12. [x] Abrir o crear una biblioteca con el diálogo y recordar la última.
 13. [x] Importar desde la aplicación con progreso y cancelación.
-14. [ ] Miniaturas de HEIC y AVIF, si la decisión 004 se acepta.
+14. [ ] Miniaturas de HEIC y AVIF, si la decisión 004 se acepta. **Aplazada** (2026-10-26): la prueba de `libheif` pasó, pero de momento no se incorpora; los resultados están en la decisión 004.
 15. [ ] Prueba con 10 000 fotos sintéticas y medición de tiempos.
