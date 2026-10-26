@@ -27,6 +27,13 @@ Condiciones: licencia compatible con GPL-3.0-or-later, funcionar en Windows, mac
 - Antes de la tarea 14 de la spec 002 se hace una prueba aislada: compilar y decodificar un HEIC y un AVIF en el CI de los tres sistemas. Si la prueba falla o añade más de 5 minutos al CI, se vuelve a esta decisión.
 - Hasta entonces, estas fotos se muestran con el marcador "Sin vista previa".
 
+#### Resultado de la prueba (2026-10-26)
+- Rama `prueba/libheif`, con el flujo `.github/workflows/prueba-libheif.yml` y el crate `prueba-libheif/`. La rama no se fusiona.
+- `embedded-libheif` **no basta**: compila `libheif`, pero enlaza `libde265` y `dav1d` como librerías del sistema.
+- Lo que funciona en los tres sistemas: `libheif` 1.23.5 de vcpkg (etiqueta 2026.10.16) como librería estática, con `libde265` para HEIC y `aom` (BSD-2-Clause) para AVIF, porque `dav1d` aún no está en una versión publicada de vcpkg. Los triplets son `x64-linux`, `arm64-osx` y `x64-windows-static-md`. El ejecutable decodifica un HEIC y un AVIF sin depender de nada instalado en el equipo.
+- Tiempo en el CI: sin caché, vcpkg tarda unos 6 min en Linux, 5 en macOS y 10 en Windows. Con la caché de vcpkg, cada trabajo tarda alrededor de 1 min en total.
+- **Aplazada** por Paulo el 2026-10-26: HEIC y AVIF siguen sin miniatura por ahora. La decisión sigue como propuesta, para retomarla con estos datos.
+
 ## Alternativas consideradas
 - **`rawler`** (dnglab, LGPL-2.1, Rust puro). Es la opción más completa: conoce casi todos los RAW y en el futuro podría servir para revelarlos. En contra:
   - Trae dependencias pesadas como `rayon`, `jxl-oxide` y `image` con sus propias opciones.
