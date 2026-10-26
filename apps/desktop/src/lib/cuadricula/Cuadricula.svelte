@@ -1,6 +1,6 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import {
     fotos as pedirFotos,
     meses as pedirMeses,
@@ -11,6 +11,7 @@
     type Mes,
   } from "$lib/biblioteca";
   import { miniaturaUrl } from "$lib/media";
+  import Visor from "$lib/visor/Visor.svelte";
   import BarraMeses from "./BarraMeses.svelte";
   import { disponer, nombreDia, visibles, type Opciones } from "./disposicion";
 
@@ -49,6 +50,25 @@
   const enPantalla = $derived(
     visibles(disposicion.bloques, desplazamiento - MARGEN, desplazamiento + altoVista + MARGEN),
   );
+
+  // Foto abierta en el visor, por su posición en `fotos`.
+  let abierta = $state<number | null>(null);
+
+  /** Al cerrar el visor, la cuadrícula muestra y enfoca la última foto vista. */
+  async function cerrarVisor() {
+    const indice = abierta;
+    abierta = null;
+    if (indice === null || !contenedor) return;
+    const bloque = disposicion.bloques.find(
+      (b) => b.tipo === "fila" && b.celdas.some((c) => c.indice === indice),
+    );
+    if (bloque && (bloque.y < desplazamiento || bloque.y + bloque.alto > desplazamiento + altoVista)) {
+      contenedor.scrollTo({ top: Math.max(0, bloque.y - altoVista / 3) });
+      desplazamiento = contenedor.scrollTop;
+    }
+    await tick();
+    contenedor.querySelector<HTMLElement>(`[data-indice="${indice}"]`)?.focus();
+  }
 
   async function cargarPagina() {
     if (cargando || !quedan) return;
@@ -159,8 +179,12 @@
           {/each}
           {#each bloque.celdas as celda (fotos[celda.indice].id)}
             {@const foto = fotos[celda.indice]}
-            <div
+            <button
+              type="button"
               class="celda"
+              data-indice={celda.indice}
+              aria-label={foto.name}
+              onclick={() => (abierta = celda.indice)}
               style:left="{celda.x}px"
               style:top="{bloque.altoTitulo}px"
               style:width="{celda.ancho}px"
@@ -183,7 +207,7 @@
                   />
                 {/key}
               {/if}
-            </div>
+            </button>
           {/each}
         </div>
       {:else}
@@ -202,6 +226,17 @@
     />
   {/if}
 </div>
+
+{#if abierta !== null}
+  <Visor
+    {fotos}
+    indice={abierta}
+    {quedan}
+    onCambiar={(i) => (abierta = i)}
+    onCerrar={cerrarVisor}
+    onPedirMas={cargarPagina}
+  />
+{/if}
 
 <style>
   .vista {
@@ -249,9 +284,16 @@
 
   .celda {
     position: absolute;
+    padding: 0;
+    border: 0;
     overflow: hidden;
     border-radius: 2px;
     background: var(--hueco);
+    cursor: pointer;
+  }
+
+  .celda:focus-visible {
+    outline-offset: -2px;
   }
 
   img {
