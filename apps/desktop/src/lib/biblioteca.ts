@@ -31,8 +31,26 @@ export function meses(): Promise<Mes[]> {
   return invoke("meses");
 }
 
-export function fotos(despues: Cursor | null, limite: number): Promise<PaginaFotos> {
+export function fotos(
+  despues: Cursor | null,
+  limite: number,
+): Promise<PaginaFotos> {
   return invoke("fotos", { despues, limite });
+}
+
+// Búsqueda (spec 003): los mismos tipos que la cuadrícula, solo con los
+// resultados de `texto`. El núcleo interpreta el texto; un texto vacío da la
+// biblioteca entera.
+export function buscarMeses(texto: string): Promise<Mes[]> {
+  return invoke("buscar_meses", { texto });
+}
+
+export function buscarFotos(
+  texto: string,
+  despues: Cursor | null,
+  limite: number,
+): Promise<PaginaFotos> {
+  return invoke("buscar_fotos", { texto, despues, limite });
 }
 
 // Lo que emite la cola de miniaturas (`mnemos_core::ThumbnailEvent`).

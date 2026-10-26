@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
 use mnemos_core::{
-    ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso, ThumbnailQueue,
+    ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso, SearchQuery, ThumbnailQueue,
     TimelineCursor, TimelinePage,
 };
 use serde::Serialize;
@@ -156,6 +156,25 @@ fn fotos(
     estado: State<'_, OpenLibrary>,
 ) -> Result<TimelinePage, String> {
     with_library(&estado, |lib| lib.timeline_page(despues, limite))
+}
+
+/// Meses con resultados para `texto` y cuántos tiene cada uno (spec 003).
+#[tauri::command]
+fn buscar_meses(texto: String, estado: State<'_, OpenLibrary>) -> Result<Vec<Month>, String> {
+    let consulta = SearchQuery::parse(&texto);
+    with_library(&estado, |lib| lib.search_months(&consulta))
+}
+
+/// Página de resultados para `texto`, con el mismo cursor que `fotos`.
+#[tauri::command]
+fn buscar_fotos(
+    texto: String,
+    despues: Option<TimelineCursor>,
+    limite: u32,
+    estado: State<'_, OpenLibrary>,
+) -> Result<TimelinePage, String> {
+    let consulta = SearchQuery::parse(&texto);
+    with_library(&estado, |lib| lib.search_page(&consulta, despues, limite))
 }
 
 /// Detalles de una foto para el panel del visor.
@@ -330,6 +349,8 @@ pub fn run() {
             ultima_biblioteca,
             meses,
             fotos,
+            buscar_meses,
+            buscar_fotos,
             detalles,
             priorizar_miniaturas,
             importar,
