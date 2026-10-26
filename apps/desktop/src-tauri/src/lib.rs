@@ -1,3 +1,4 @@
+mod configuracion;
 mod media;
 
 use std::path::{Path, PathBuf};
@@ -30,14 +31,67 @@ fn abrir_biblioteca(
     estado: State<'_, OpenLibrary>,
     miniaturas: State<'_, Thumbnails>,
 ) -> Result<LibraryInfo, String> {
-    let root = PathBuf::from(ruta);
-    let lib = Library::open(&root).map_err(|e| e.to_string())?;
+    let lib = Library::open(&PathBuf::from(ruta)).map_err(|e| e.to_string())?;
+    adoptar(lib, &app, &estado, &miniaturas)
+}
+
+/// Crea una biblioteca en la carpeta elegida y la abre.
+#[tauri::command]
+fn crear_biblioteca(
+    ruta: String,
+    app: AppHandle,
+    estado: State<'_, OpenLibrary>,
+    miniaturas: State<'_, Thumbnails>,
+) -> Result<LibraryInfo, String> {
+    let lib = Library::create(&PathBuf::from(ruta)).map_err(|e| e.to_string())?;
+    adoptar(lib, &app, &estado, &miniaturas)
+}
+
+/// Ruta de la última biblioteca abierta, si se recuerda.
+#[tauri::command]
+fn ultima_biblioteca(app: AppHandle) -> Result<Option<String>, String> {
+    let carpeta = carpeta_config(&app)?;
+    let config = configuracion::Configuracion::leer(&carpeta);
+    Ok(config
+        .ultima_biblioteca
+        .map(|ruta| ruta.display().to_string()))
+}
+
+/// Deja `lib` como biblioteca activa, arranca sus miniaturas y la recuerda.
+fn adoptar(
+    lib: Library,
+    app: &AppHandle,
+    estado: &OpenLibrary,
+    miniaturas: &Thumbnails,
+) -> Result<LibraryInfo, String> {
     let info = lib.info().map_err(|e| e.to_string())?;
+    let root = lib.root().to_path_buf();
     // Primero se para la cola anterior, para no mezclar bibliotecas.
     lock(&miniaturas.0).take();
     *lock(&estado.0) = Some(lib);
-    start_thumbnails(&app, &root, &miniaturas)?;
+    start_thumbnails(app, &root, miniaturas)?;
+    recordar(app, &root);
     Ok(info)
+}
+
+fn carpeta_config(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path().app_config_dir().map_err(|e| e.to_string())
+}
+
+/// Guarda la biblioteca como la última abierta. Si falla, la biblioteca sigue
+/// abierta: solo se pierde el recuerdo para el próximo arranque.
+fn recordar(app: &AppHandle, root: &Path) {
+    let config = configuracion::Configuracion {
+        ultima_biblioteca: Some(root.to_owned()),
+    };
+    let guardado = carpeta_config(app).and_then(|carpeta| {
+        config
+            .guardar(&carpeta)
+            .map_err(|e| format!("no se pudo guardar la configuración: {e}"))
+    });
+    if let Err(e) = guardado {
+        eprintln!("{e}");
+    }
 }
 
 /// Arranca la cola de miniaturas y le pasa en segundo plano las que faltan:
@@ -140,6 +194,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(OpenLibrary::default())
         .manage(Thumbnails::default())
+        .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("mnemos", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             // Decodificar un RAW o un TIFF lleva tiempo: fuera del hilo de la interfaz.
@@ -147,6 +202,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             abrir_biblioteca,
+            crear_biblioteca,
+            ultima_biblioteca,
             meses,
             fotos,
             detalles,
