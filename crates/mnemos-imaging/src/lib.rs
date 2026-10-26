@@ -1,7 +1,14 @@
 //! Tratamiento de imágenes de MNEMOS.
 //!
-//! Reconoce los formatos de imagen y lee sus dimensiones y su orientación.
-//! Las miniaturas, el resto del EXIF y las recetas de edición llegan después.
+//! Reconoce los formatos de imagen, lee sus dimensiones y su orientación, y
+//! genera miniaturas. El resto del EXIF y las recetas de edición llegan después.
+
+mod thumbnail;
+
+pub use thumbnail::{
+    THUMBNAIL_HEIGHT, THUMBNAIL_MAX_WIDTH, THUMBNAIL_QUALITY, Thumbnail, ThumbnailError, thumbnail,
+    thumbnail_size,
+};
 
 use std::fs::File;
 use std::io::BufReader;

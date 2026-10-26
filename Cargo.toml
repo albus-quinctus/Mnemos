@@ -14,6 +14,7 @@ publish = false
 mnemos-core = { path = "crates/mnemos-core" }
 mnemos-imaging = { path = "crates/mnemos-imaging" }
 blake3 = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff"] }
 imagesize = "0.14"
 kamadak-exif = "0.6"
 rusqlite = { version = "0.37", features = ["bundled"] }
