@@ -9,11 +9,13 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
-1. Spec 002: miniaturas en `.mnemos/miniaturas/`, cuadrícula y visor en la aplicación, con importación y progreso desde la interfaz (plugin `dialog` para elegir carpetas).
+1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en borrador, pendiente de aprobación. Primera tarea: decisión 004 sobre las librerías para RAW y HEIC/AVIF.
 2. Probar con 10 000 fotos desde un HDD externo y medir tiempos de indexado.
 
 ## Pendientes / ideas aparcadas
 - Revisar e instalar las skills de `docs/skills.md`.
 - Crear `tests/fixtures/` con imágenes de ejemplo sin datos personales.
 - Decidir qué hacer con las fotos desaparecidas (hoy solo se cuentan).
+- Revelado de RAW (F3); hoy solo se usa la vista previa incrustada.
+- Caché en disco de vistas grandes para el visor, si la precarga en memoria se queda corta.
 - Empaquetado portátil (ejecutables en la raíz del disco) y prueba en exFAT.
