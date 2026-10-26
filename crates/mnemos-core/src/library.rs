@@ -1,11 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 
 use crate::db;
 use crate::error::{Error, Result};
+use crate::paths::RelPath;
 
 /// Carpeta con las fotos originales. MNEMOS nunca modifica su contenido.
 pub const ORIGINALS_DIR: &str = "Originales";
@@ -31,6 +32,14 @@ pub struct LibraryInfo {
     pub photos: u64,
     pub albums: u64,
     pub tags: u64,
+}
+
+/// Lo que hace falta para mostrar una foto: dónde está y cómo girarla.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMedia {
+    pub rel_path: RelPath,
+    pub content_hash: Option<String>,
+    pub orientation: u16,
 }
 
 impl Library {
@@ -73,6 +82,32 @@ impl Library {
         &self.conn
     }
 
+    /// Datos para mostrar la foto `id`, o `None` si no existe.
+    pub fn photo_media(&self, id: i64) -> Result<Option<PhotoMedia>> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT rel_path, content_hash, coalesce(orientation, 1) FROM photos WHERE id = ?1",
+                [id],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, Option<String>>(1)?,
+                        r.get::<_, u16>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        row.map(|(rel_path, content_hash, orientation)| {
+            Ok(PhotoMedia {
+                rel_path: RelPath::new(&rel_path)?,
+                content_hash,
+                orientation,
+            })
+        })
+        .transpose()
+    }
+
     pub fn info(&self) -> Result<LibraryInfo> {
         let count = |table: &str| -> Result<u64> {
             let sql = format!("SELECT count(*) FROM {table}");
@@ -106,6 +141,23 @@ mod tests {
         let info = Library::open(&root).unwrap().info().unwrap();
         assert_eq!(info.schema_version, db::SCHEMA_VERSION);
         assert_eq!((info.photos, info.albums, info.tags), (0, 0, 0));
+    }
+
+    #[test]
+    fn busca_una_foto_por_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lib = Library::create(dir.path()).unwrap();
+        fs::write(dir.path().join("Originales/a.png"), b"\x89PNG\r\n\x1a\n").unwrap();
+        lib.index().unwrap();
+        let id: i64 = lib
+            .connection()
+            .query_row("SELECT id FROM photos", [], |r| r.get(0))
+            .unwrap();
+        let media = lib.photo_media(id).unwrap().unwrap();
+        assert_eq!(media.rel_path.as_str(), "Originales/a.png");
+        assert_eq!(media.orientation, 1);
+        assert!(media.content_hash.is_some());
+        assert_eq!(lib.photo_media(id + 1).unwrap(), None);
     }
 
     #[test]

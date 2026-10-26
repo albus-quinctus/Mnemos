@@ -1993,11 +1993,14 @@ dependencies = [
 name = "mnemos-desktop"
 version = "0.0.1"
 dependencies = [
+ "image",
  "mnemos-core",
+ "mnemos-imaging",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tempfile",
 ]
 
 [[package]]

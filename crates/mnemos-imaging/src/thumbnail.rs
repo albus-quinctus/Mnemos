@@ -46,20 +46,81 @@ pub enum ThumbnailError {
 /// por la extensión, salvo los RAW: aunque parezcan un TIFF, su miniatura
 /// sale siempre de la vista previa que trae el archivo, nunca se revelan.
 pub fn thumbnail(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    let img = if crate::is_raw(path) {
+    render(
+        decode(path)?,
+        orientation,
+        thumbnail_size,
+        THUMBNAIL_QUALITY,
+    )
+}
+
+/// Lado mayor de las imágenes que se generan para el visor.
+pub const DISPLAY_MAX_SIDE: u32 = 2560;
+/// Calidad JPEG de las imágenes que se generan para el visor.
+pub const DISPLAY_QUALITY: u8 = 90;
+
+/// Imagen para el visor cuando el motor web no puede mostrar el original
+/// (TIFF, RAW): ya girada, con el lado mayor de [`DISPLAY_MAX_SIDE`] como
+/// mucho y en JPEG. Se genera en memoria y no se guarda.
+pub fn display_image(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
+    render(decode(path)?, orientation, display_size, DISPLAY_QUALITY)
+}
+
+/// Tamaño de la imagen del visor: el lado mayor se limita a
+/// [`DISPLAY_MAX_SIDE`] y nunca se amplía.
+pub fn display_size(width: u32, height: u32) -> (u32, u32) {
+    let (width, height) = (width.max(1), height.max(1));
+    let long = width.max(height);
+    if long <= DISPLAY_MAX_SIDE {
+        return (width, height);
+    }
+    let scale = |side: u32| {
+        ((u64::from(side) * u64::from(DISPLAY_MAX_SIDE) + u64::from(long) / 2) / u64::from(long))
+            .max(1) as u32
+    };
+    (scale(width), scale(height))
+}
+
+/// Tipo MIME del archivo si el motor web lo puede mostrar tal cual (JPEG,
+/// PNG, WebP, GIF o BMP), según su contenido y no su extensión. Los RAW nunca
+/// se muestran tal cual, aunque empiecen como un JPEG.
+pub fn web_mime(path: &Path) -> std::io::Result<Option<&'static str>> {
+    use std::io::Read;
+    if crate::is_raw(path) {
+        return Ok(None);
+    }
+    let mut head = [0u8; 12];
+    let n = std::fs::File::open(path)?.read(&mut head)?;
+    let head = &head[..n];
+    Ok(if head.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("image/jpeg")
+    } else if head.starts_with(b"\x89PNG") {
+        Some("image/png")
+    } else if head.starts_with(b"GIF8") {
+        Some("image/gif")
+    } else if head.starts_with(b"RIFF") && head.get(8..12) == Some(b"WEBP") {
+        Some("image/webp")
+    } else if head.starts_with(b"BM") {
+        Some("image/bmp")
+    } else {
+        None
+    })
+}
+
+/// Decodifica la imagen, o la vista previa incrustada si es un RAW.
+fn decode(path: &Path) -> Result<DynamicImage, ThumbnailError> {
+    if crate::is_raw(path) {
         let jpeg = crate::raw_preview(path)?.ok_or(ThumbnailError::Unsupported)?;
         let mut reader = ImageReader::with_format(Cursor::new(jpeg), ImageFormat::Jpeg);
         reader.limits(limits());
-        reader.decode()?
-    } else {
-        let mut reader = ImageReader::open(path)?.with_guessed_format()?;
-        if reader.format().is_none() {
-            return Err(ThumbnailError::Unsupported);
-        }
-        reader.limits(limits());
-        reader.decode()?
-    };
-    render(img, orientation)
+        return Ok(reader.decode()?);
+    }
+    let mut reader = ImageReader::open(path)?.with_guessed_format()?;
+    if reader.format().is_none() {
+        return Err(ThumbnailError::Unsupported);
+    }
+    reader.limits(limits());
+    Ok(reader.decode()?)
 }
 
 fn limits() -> Limits {
@@ -69,18 +130,22 @@ fn limits() -> Limits {
 }
 
 /// Gira, reduce y codifica en JPEG una imagen ya decodificada.
-fn render(mut img: DynamicImage, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
+fn render(
+    mut img: DynamicImage,
+    orientation: u16,
+    size: fn(u32, u32) -> (u32, u32),
+    quality: u8,
+) -> Result<Thumbnail, ThumbnailError> {
     let orientation = u8::try_from(orientation)
         .ok()
         .and_then(Orientation::from_exif)
         .unwrap_or(Orientation::NoTransforms);
     img.apply_orientation(orientation);
 
-    let (width, height) = thumbnail_size(img.width(), img.height());
+    let (width, height) = size(img.width(), img.height());
     let small = resize(&img, width, height);
     let mut jpeg = Vec::new();
-    JpegEncoder::new_with_quality(Cursor::new(&mut jpeg), THUMBNAIL_QUALITY)
-        .encode_image(&small)?;
+    JpegEncoder::new_with_quality(Cursor::new(&mut jpeg), quality).encode_image(&small)?;
     Ok(Thumbnail {
         jpeg,
         width,
@@ -263,6 +328,42 @@ mod tests {
         assert_eq!(orientation, 6);
         let thumb = thumbnail(&path, orientation).unwrap();
         assert_eq!(decoded_size(&thumb), (270, 360));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn la_imagen_del_visor_se_limita_sin_ampliar() {
+        assert_eq!(display_size(6000, 4000), (2560, 1707));
+        assert_eq!(display_size(3000, 6000), (1280, 2560));
+        assert_eq!(display_size(800, 600), (800, 600));
+
+        let dir = tempdir("visor");
+        let path = dir.join("foto.tiff");
+        write_image(&path, 3000, 2000, ImageFormat::Tiff);
+        let img = display_image(&path, 6).unwrap();
+        assert_eq!(decoded_size(&img), (1707, 2560));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn reconoce_lo_que_el_motor_web_muestra_tal_cual() {
+        let dir = tempdir("mime");
+        for (name, format, mime) in [
+            ("a.jpg", ImageFormat::Jpeg, Some("image/jpeg")),
+            ("b.png", ImageFormat::Png, Some("image/png")),
+            ("c.webp", ImageFormat::WebP, Some("image/webp")),
+            ("d.gif", ImageFormat::Gif, Some("image/gif")),
+            ("e.bmp", ImageFormat::Bmp, Some("image/bmp")),
+            ("f.tiff", ImageFormat::Tiff, None),
+            // Un JPEG con extensión RAW no se sirve tal cual.
+            ("g.nef", ImageFormat::Jpeg, None),
+            // Por contenido, no por extensión.
+            ("h.png", ImageFormat::Jpeg, Some("image/jpeg")),
+        ] {
+            let path = dir.join(name);
+            write_image(&path, 4, 4, format);
+            assert_eq!(web_mime(&path).unwrap(), mime, "{name}");
+        }
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
