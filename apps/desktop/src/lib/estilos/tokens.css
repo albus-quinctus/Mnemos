@@ -1,0 +1,84 @@
+/* Tokens de color y tipografía (decisión 003). Claro por defecto y oscuro
+   según la preferencia del sistema; los componentes solo usan variables. */
+
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+:root {
+  color-scheme: light dark;
+
+  --fuente: "Inter Variable", system-ui, sans-serif;
+  --fuente-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  /* Galería: fondo neutro y acento azul. */
+  --fondo: #f7f7f8;
+  --superficie: #ffffff;
+  --superficie-alta: #eceef1;
+  --texto: #1b1c1e;
+  --texto-suave: #5d6168;
+  --borde: #dcdfe4;
+  --acento: #1a5fd0;
+  --acento-texto: #ffffff;
+  --acento-suave: #e3ecfb;
+  --hueco: #e6e8eb;
+  --error: #b3261e;
+
+  /* Cuarto oscuro: el visor es oscuro en los dos modos. */
+  --visor-fondo: #0d0d0e;
+  --visor-superficie: #18181a;
+  --visor-texto: #ececee;
+  --visor-texto-suave: #a0a1a7;
+
+  --radio: 8px;
+  --objetivo: 44px; /* tamaño mínimo de clic */
+  --menu-ancho: 232px;
+  --barra-alto: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #121315;
+    --superficie: #1a1b1e;
+    --superficie-alta: #25272b;
+    --texto: #e8e9eb;
+    --texto-suave: #a3a7ae;
+    --borde: #33363b;
+    --acento: #7aa7f5;
+    --acento-texto: #0d1a33;
+    --acento-suave: #1d2a40;
+    --hueco: #222428;
+    --error: #f2938c;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--fuente);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--texto);
+  background: var(--fondo);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}

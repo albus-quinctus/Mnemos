@@ -99,7 +99,7 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 5. [x] Cola de miniaturas en segundo plano en `mnemos-core`, con prioridad, hilos limitados y escritura vía `.mnemos/tmp/`.
 6. [x] Protocolo `mnemos://` en la aplicación, con conversión en memoria para los formatos que el motor web no muestra, y la nueva CSP.
 7. [x] Consulta paginada de fotos agrupadas por mes en `mnemos-core` y su comando de Tauri.
-8. [ ] Tokens de color, fuentes empaquetadas y estructura de la Galería: menú lateral y barra superior.
+8. [x] Tokens de color, fuentes empaquetadas y estructura de la Galería: menú lateral y barra superior.
 9. [ ] Cuadrícula justificada y virtualizada.
 10. [ ] Visor: apertura con la miniatura, carga del original, flechas, precarga y tira de miniaturas.
 11. [ ] Panel de detalles del visor.
