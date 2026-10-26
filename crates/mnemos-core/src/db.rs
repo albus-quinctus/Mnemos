@@ -11,6 +11,7 @@ use crate::error::{Error, Result};
 const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_inicial.sql"),
     include_str!("migrations/0002_orientacion.sql"),
+    include_str!("migrations/0003_orientacion_raw.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -93,6 +94,40 @@ mod tests {
         drop(open(&path).unwrap());
         let conn = open(&path).unwrap();
         assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn la_migracion_3_vuelve_a_leer_la_orientacion_de_ciertos_raw() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        {
+            // Biblioteca en la versión 2, con la orientación ya rellenada.
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..2].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            for name in ["a.CR3", "b.raf", "c.orf", "d.Rw2", "e.nef", "f.jpg"] {
+                conn.execute(
+                    "INSERT INTO photos (rel_path, size_bytes, modified_at, orientation, imported_at)
+                     VALUES (?1, 1, 1, 1, 1)",
+                    [name],
+                )
+                .unwrap();
+            }
+        }
+        let conn = open(&path).unwrap();
+        let pending: Vec<String> = conn
+            .prepare("SELECT rel_path FROM photos WHERE orientation IS NULL ORDER BY rel_path")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(pending, ["a.CR3", "b.raf", "c.orf", "d.Rw2"]);
     }
 
     #[test]

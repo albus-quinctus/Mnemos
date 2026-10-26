@@ -9,7 +9,7 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
-1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en curso. Hechas: tareas 1 a 3 (decisión 004, RAW y orientación, miniaturas con el crate `image`). Siguiente: tarea 4, miniaturas de RAW a partir de la vista previa incrustada.
+1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en curso. Hechas: tareas 1 a 4 (decisión 004, RAW y orientación, miniaturas, vistas previas RAW). Siguiente: tarea 5, cola de miniaturas en segundo plano en `mnemos-core`.
 2. Probar con 10 000 fotos desde un HDD externo y medir tiempos de indexado.
 
 ## Pendientes / ideas aparcadas
@@ -19,4 +19,5 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Revelado de RAW (F3); hoy solo se usa la vista previa incrustada.
 - Caché en disco de vistas grandes para el visor, si la precarga en memoria se queda corta.
 - Miniaturas de JPEG más rápidas: hoy una foto de 24 MP tarda unos 300 ms en modo release porque se decodifica entera. Probar la decodificación reducida (escalado DCT 1/2, 1/4 y 1/8) en la tarea 15.
+- Probar el extractor de vistas previas con RAW reales de cada marca (Sony ARW, Pentax PEF, Samsung SRW, Olympus ORF antiguos). Solo se ha probado con archivos sintéticos y con las muestras recortadas de exiftool.
 - Empaquetado portátil (ejecutables en la raíz del disco) y prueba en exFAT.

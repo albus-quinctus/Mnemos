@@ -3,15 +3,17 @@
 //! Reconoce los formatos de imagen, lee sus dimensiones y su orientación, y
 //! genera miniaturas. El resto del EXIF y las recetas de edición llegan después.
 
+mod raw;
 mod thumbnail;
 
+pub use raw::raw_preview;
 pub use thumbnail::{
     THUMBNAIL_HEIGHT, THUMBNAIL_MAX_WIDTH, THUMBNAIL_QUALITY, Thumbnail, ThumbnailError, thumbnail,
     thumbnail_size,
 };
 
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
 
 /// Extensiones de imagen que MNEMOS reconoce, en minúsculas.
@@ -58,13 +60,17 @@ pub fn dimensions(path: &Path) -> Option<(u32, u32)> {
 /// Devuelve `None` si el archivo no tiene EXIF, no trae la etiqueta o su
 /// valor no es válido; en ese caso la imagen se muestra tal cual (valor 1).
 /// Entiende JPEG, TIFF y los RAW basados en TIFF, PNG, WebP y HEIF. Los RAW
-/// con contenedor propio (CR3, RAF, ORF y RW2) se cubren con el extractor de
+/// con contenedor propio (CR3, RAF, ORF y RW2) se leen con el extractor de
 /// vistas previas de la decisión 004.
 pub fn orientation(path: &Path) -> Option<u16> {
     let file = File::open(path).ok()?;
-    let exif = exif::Reader::new()
-        .read_from_container(&mut BufReader::new(file))
-        .ok()?;
+    orientation_from_container(&mut BufReader::new(file))
+        .or_else(|| is_raw(path).then(|| raw::raw_orientation(path)).flatten())
+}
+
+/// Orientación EXIF de un contenedor que entiende `kamadak-exif`.
+pub(crate) fn orientation_from_container(reader: &mut (impl BufRead + Seek)) -> Option<u16> {
+    let exif = exif::Reader::new().read_from_container(reader).ok()?;
     let value = exif
         .get_field(exif::Tag::Orientation, exif::In::PRIMARY)?
         .value
