@@ -40,7 +40,9 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 
 ### Cuadrícula (estilo Galería, decisión 003)
 - Cuadrícula justificada: filas de altura parecida, cada foto con su proporción y sin recortes.
-- Agrupada por mes con encabezados ("Octubre de 2026"), de lo más reciente a lo más antiguo. Hasta que llegue la fecha EXIF en F2 se usa la fecha de modificación.
+- Como en Google Fotos: agrupada por día, de lo más reciente a lo más antiguo, con un título pequeño encima de cada día ("Lun, 26 oct"; con el año si no es el actual). Los días con pocas fotos comparten fila. Hasta que llegue la fecha EXIF en F2 se usa la fecha de modificación.
+- Filas de unos 150 px de alto y huecos finos entre fotos.
+- Barra a la derecha, en lugar de la del sistema, con los años y un punto por mes. Al pasar el ratón muestra el mes y con un clic o arrastrando salta a él.
 - Virtualizada: solo están en el DOM las filas visibles y un margen. Las fotos se piden al núcleo por páginas, nunca todas a la vez.
 - Mientras una miniatura no está lista se ve un hueco con el color de fondo y las dimensiones correctas, así que la cuadrícula no salta al cargar.
 - Menú lateral, barra superior y tokens de color claro y oscuro según la decisión 003. Las entradas del menú que aún no existen (Explorar, Álbumes, Etiquetas, Favoritos y Papelera) se ven desactivadas.
@@ -98,7 +100,7 @@ Quiero ver mis fotos en la aplicación: recorrer toda la biblioteca en una cuadr
 4. [x] Miniaturas de RAW a partir de la vista previa incrustada.
 5. [x] Cola de miniaturas en segundo plano en `mnemos-core`, con prioridad, hilos limitados y escritura vía `.mnemos/tmp/`.
 6. [x] Protocolo `mnemos://` en la aplicación, con conversión en memoria para los formatos que el motor web no muestra, y la nueva CSP.
-7. [x] Consulta paginada de fotos agrupadas por mes en `mnemos-core` y su comando de Tauri.
+7. [x] Consulta paginada de fotos, con el recuento por mes, en `mnemos-core` y su comando de Tauri.
 8. [x] Tokens de color, fuentes empaquetadas y estructura de la Galería: menú lateral y barra superior.
 9. [x] Cuadrícula justificada y virtualizada.
 10. [ ] Visor: apertura con la miniatura, carga del original, flechas, precarga y tira de miniaturas.
