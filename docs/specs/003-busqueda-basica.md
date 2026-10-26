@@ -51,7 +51,7 @@ Quiero encontrar una foto escribiendo parte de su nombre, de la carpeta donde es
 - Operadores (`-palabra`, `OR`, comillas para frases exactas).
 
 ## Tareas (≤1 h cada una)
-1. [ ] Intérprete de la consulta en `mnemos-core`: separa palabras y fechas y escapa las palabras para FTS5. Solo lógica, con pruebas, incluidas entradas al azar.
+1. [x] Intérprete de la consulta en `mnemos-core`: separa palabras y fechas y escapa las palabras para FTS5. Solo lógica, con pruebas, incluidas entradas al azar.
 2. [ ] Comprobar que `photo_search` se mantiene al indexar, actualizar e importar, y corregirlo si no. Si hace falta, una migración que reconstruya el índice.
 3. [ ] Consulta paginada de resultados y recuento por mes en `mnemos-core`, con el mismo cursor que la cuadrícula, y su medición con 10 000 fotos.
 4. [ ] Comandos de Tauri `buscar_meses` y `buscar_fotos`.
