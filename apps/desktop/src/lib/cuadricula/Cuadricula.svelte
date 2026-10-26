@@ -11,7 +11,8 @@
     type Mes,
   } from "$lib/biblioteca";
   import { miniaturaUrl } from "$lib/media";
-  import { disponer, nombreMes, visibles, type Opciones } from "./disposicion";
+  import BarraMeses from "./BarraMeses.svelte";
+  import { disponer, nombreDia, visibles, type Opciones } from "./disposicion";
 
   const PAGINA = 500;
   // Margen por encima y por debajo de la pantalla que también se pinta, para
@@ -38,10 +39,11 @@
   let desplazamiento = $state(0);
 
   const opciones = $derived<Opciones>({
-    ancho: Math.max(0, ancho - 48),
-    altoFila: 200,
+    ancho: Math.max(0, ancho - 24 - 64),
+    altoFila: 150,
     separacion: 4,
-    altoMes: 56,
+    separacionDias: 16,
+    altoTitulo: 44,
   });
   const disposicion = $derived(disponer(meses, fotos, opciones));
   const enPantalla = $derived(
@@ -131,7 +133,9 @@
   });
 </script>
 
+<div class="vista">
 <div
+  id="cuadricula"
   class="cuadricula"
   bind:this={contenedor}
   bind:clientWidth={ancho}
@@ -145,16 +149,23 @@
   {/if}
 
   <div class="lienzo" style:height="{disposicion.alto}px">
-    {#each enPantalla as bloque (bloque.tipo === "fila" ? `f${fotos[bloque.celdas[0].indice].id}` : `${bloque.tipo}${bloque.mes}`)}
-      {#if bloque.tipo === "mes"}
-        <h2 class="mes" style:transform="translateY({bloque.y}px)" style:height="{bloque.alto}px">
-          {nombreMes(bloque.mes)}
-        </h2>
-      {:else if bloque.tipo === "fila"}
+    {#each enPantalla as bloque (bloque.tipo === "fila" ? `f${fotos[bloque.celdas[0].indice].id}` : `p${bloque.mes}`)}
+      {#if bloque.tipo === "fila"}
         <div class="fila" style:transform="translateY({bloque.y}px)" style:height="{bloque.alto}px">
+          {#each bloque.titulos as titulo (titulo.dia)}
+            <h2 class="dia" style:left="{titulo.x}px" style:height="{bloque.altoTitulo}px">
+              {nombreDia(titulo.dia)}
+            </h2>
+          {/each}
           {#each bloque.celdas as celda (fotos[celda.indice].id)}
             {@const foto = fotos[celda.indice]}
-            <div class="celda" style:left="{celda.x}px" style:width="{celda.ancho}px">
+            <div
+              class="celda"
+              style:left="{celda.x}px"
+              style:top="{bloque.altoTitulo}px"
+              style:width="{celda.ancho}px"
+              style:height="{bloque.alto - bloque.altoTitulo}px"
+            >
               {#if foto.thumbnail_failed || fallidas.has(foto.id)}
                 <div class="sin-vista">
                   <span>Sin vista previa</span>
@@ -181,21 +192,41 @@
     {/each}
   </div>
 </div>
+  {#if disposicion.marcas.length > 0}
+    <BarraMeses
+      marcas={disposicion.marcas}
+      alto={disposicion.alto}
+      {altoVista}
+      {desplazamiento}
+      onIr={(y) => contenedor?.scrollTo({ top: y })}
+    />
+  {/if}
+</div>
 
 <style>
+  .vista {
+    position: relative;
+    height: 100%;
+  }
+
   .cuadricula {
     position: relative;
     height: 100%;
     overflow-y: auto;
-    padding: 0 24px 24px;
+    padding: 0 64px 24px 24px;
     contain: strict;
+    /* La barra de meses sustituye a la del sistema. */
+    scrollbar-width: none;
+  }
+
+  .cuadricula::-webkit-scrollbar {
+    display: none;
   }
 
   .lienzo {
     position: relative;
   }
 
-  .mes,
   .fila,
   .pendiente {
     position: absolute;
@@ -205,19 +236,19 @@
     will-change: transform;
   }
 
-  .mes {
+  .dia {
+    position: absolute;
+    top: 0;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     margin: 0;
-    padding-bottom: 12px;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
   }
 
   .celda {
     position: absolute;
-    top: 0;
-    height: 100%;
     overflow: hidden;
     border-radius: 2px;
     background: var(--hueco);
@@ -240,8 +271,8 @@
   .pendiente {
     background: repeating-linear-gradient(
       to bottom,
-      var(--hueco) 0 200px,
-      transparent 200px 204px
+      var(--hueco) 0 150px,
+      transparent 150px 154px
     );
     opacity: 0.6;
   }

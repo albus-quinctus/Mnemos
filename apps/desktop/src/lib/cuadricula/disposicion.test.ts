@@ -1,104 +1,136 @@
 import { describe, expect, it } from "vitest";
 import type { FotoCuadricula, Mes } from "../biblioteca";
-import { disponer, nombreMes, proporcion, visibles, type Bloque, type Opciones } from "./disposicion";
+import {
+  diaDe,
+  disponer,
+  mesEn,
+  nombreDia,
+  nombreMes,
+  proporcion,
+  visibles,
+  type Bloque,
+  type Opciones,
+} from "./disposicion";
 
-const op: Opciones = { ancho: 1000, altoFila: 200, separacion: 4, altoMes: 48 };
+const op: Opciones = { ancho: 1000, altoFila: 180, separacion: 4, separacionDias: 16, altoTitulo: 40 };
 
-function foto(id: number, month: string, width: number | null, height: number | null): FotoCuadricula {
-  return { id, name: `${id}.jpg`, month, date: 0, width, height, thumbnail_failed: false };
+// Mediodía local, para que el día no dependa de la zona horaria.
+function fecha(dia: string): number {
+  const [a, m, d] = dia.split("-").map(Number);
+  return new Date(a, m - 1, d, 12).getTime() / 1000;
 }
 
-function filas(bloques: Bloque[]) {
-  return bloques.filter((b) => b.tipo === "fila");
+function foto(id: number, dia: string, width: number | null = 3000, height: number | null = 2000): FotoCuadricula {
+  return { id, name: `${id}.jpg`, month: dia.slice(0, 7), date: fecha(dia), width, height, thumbnail_failed: false };
 }
+
+function mesesDe(fotos: FotoCuadricula[]): Mes[] {
+  const meses: Mes[] = [];
+  for (const f of fotos) {
+    const ultimo = meses.at(-1);
+    if (ultimo?.month === f.month) ultimo.photos++;
+    else meses.push({ month: f.month, photos: 1 });
+  }
+  return meses;
+}
+
+type Fila = Extract<Bloque, { tipo: "fila" }>;
+const filas = (bloques: Bloque[]) => bloques.filter((b): b is Fila => b.tipo === "fila");
 
 describe("disponer", () => {
-  it("llena cada fila hasta el borde sin recortar las proporciones", () => {
-    const fotos = Array.from({ length: 10 }, (_, i) => foto(i, "2026-10", 3000, 2000));
-    const { bloques } = disponer([{ month: "2026-10", photos: 10 }], fotos, op);
+  it("llena las filas de un día hasta el borde sin recortar las proporciones", () => {
+    const fotos = Array.from({ length: 12 }, (_, i) => foto(i, "2026-10-20"));
+    const { bloques } = disponer(mesesDe(fotos), fotos, op);
     const [primera] = filas(bloques);
     const ultima = primera.celdas.at(-1)!;
     expect(ultima.x + ultima.ancho).toBeCloseTo(op.ancho);
-    for (const celda of primera.celdas.slice(0, -1)) {
-      expect(celda.ancho / primera.alto).toBeCloseTo(1.5);
-    }
-    // Filas de altura parecida a la objetivo.
-    expect(primera.alto).toBeGreaterThan(op.altoFila * 0.7);
-    expect(primera.alto).toBeLessThan(op.altoFila * 1.5);
+    const altoFotos = primera.alto - primera.altoTitulo;
+    for (const celda of primera.celdas.slice(0, -1)) expect(celda.ancho / altoFotos).toBeCloseTo(1.5);
+    expect(altoFotos).toBeGreaterThan(op.altoFila * 0.7);
+    expect(altoFotos).toBeLessThan(op.altoFila * 1.5);
   });
 
-  it("no estira la última fila de cada mes", () => {
-    const fotos = [foto(1, "2026-10", 1000, 1000), foto(2, "2026-09", 1000, 1000)];
-    const meses: Mes[] = [
-      { month: "2026-10", photos: 1 },
-      { month: "2026-09", photos: 1 },
-    ];
-    const { bloques } = disponer(meses, fotos, op);
-    expect(bloques.map((b) => b.tipo)).toEqual(["mes", "fila", "mes", "fila"]);
-    for (const fila of filas(bloques)) {
-      expect(fila.alto).toBe(op.altoFila);
-      expect(fila.celdas[0].ancho).toBe(op.altoFila);
-    }
+  it("pone un título encima de cada día", () => {
+    const fotos = [...Array.from({ length: 12 }, (_, i) => foto(i, "2026-10-20")), foto(99, "2026-10-19")];
+    const { bloques } = disponer(mesesDe(fotos), fotos, op);
+    const titulos = filas(bloques).flatMap((f) => f.titulos.map((t) => t.dia));
+    expect(titulos).toEqual(["2026-10-20", "2026-10-19"]);
+    // Solo la primera fila de cada día deja sitio para el título.
+    expect(filas(bloques).map((f) => f.altoTitulo > 0)).toEqual([true, false, false, true]);
   });
 
-  it("coloca los bloques uno debajo de otro y suma el alto total", () => {
-    const fotos = Array.from({ length: 30 }, (_, i) => foto(i, i < 20 ? "2026-10" : "2026-09", 4000, 3000));
-    const meses: Mes[] = [
-      { month: "2026-10", photos: 20 },
-      { month: "2026-09", photos: 10 },
+  it("los días con pocas fotos comparten fila, separados por un hueco mayor", () => {
+    const cuadrada = (id: number, dia: string) => foto(id, dia, 1000, 1000);
+    const fotos = [cuadrada(1, "2026-10-20"), cuadrada(2, "2026-10-20"), cuadrada(3, "2026-10-18"), cuadrada(4, "2026-09-30")];
+    const { bloques } = disponer(mesesDe(fotos), fotos, op);
+    expect(filas(bloques)).toHaveLength(1);
+    const [fila] = filas(bloques);
+    expect(fila.titulos.map((t) => t.dia)).toEqual(["2026-10-20", "2026-10-18", "2026-09-30"]);
+    const [, segunda, tercera] = fila.celdas;
+    expect(tercera.x - (segunda.x + segunda.ancho)).toBeCloseTo(op.separacionDias);
+    expect(fila.titulos[1].x).toBe(tercera.x);
+    // Ninguna celda se sale de la fila.
+    for (const c of fila.celdas) expect(c.x + c.ancho).toBeLessThanOrEqual(op.ancho + 1e-6);
+  });
+
+  it("un día que no cabe en lo que queda de fila baja a la siguiente", () => {
+    const fotos = [
+      ...Array.from({ length: 3 }, (_, i) => foto(i, "2026-10-20")),
+      ...Array.from({ length: 3 }, (_, i) => foto(10 + i, "2026-10-19")),
     ];
-    const { bloques, alto } = disponer(meses, fotos, op);
+    const { bloques } = disponer(mesesDe(fotos), fotos, op);
+    expect(filas(bloques).map((f) => f.titulos.map((t) => t.dia))).toEqual([["2026-10-20"], ["2026-10-19"]]);
+  });
+
+  it("cada foto aparece una vez, en orden, y los bloques no se pisan", () => {
+    const dias = ["2026-10-20", "2026-10-18", "2026-10-02", "2026-09-30", "2026-09-01"];
+    const fotos = Array.from({ length: 60 }, (_, i) => foto(i, dias[Math.floor(i / 12)], 3000 + (i % 5) * 400, 2000));
+    const { bloques, alto } = disponer(mesesDe(fotos), fotos, op);
     for (let i = 1; i < bloques.length; i++) {
       expect(bloques[i].y).toBeGreaterThanOrEqual(bloques[i - 1].y + bloques[i - 1].alto);
     }
     const ultimo = bloques.at(-1)!;
     expect(alto).toBeCloseTo(ultimo.y + ultimo.alto + op.separacion);
-    // Cada foto aparece una sola vez y en orden.
-    const indices = filas(bloques).flatMap((f) => f.celdas.map((c) => c.indice));
-    expect(indices).toEqual(fotos.map((_, i) => i));
+    expect(filas(bloques).flatMap((f) => f.celdas.map((c) => c.indice))).toEqual(fotos.map((_, i) => i));
   });
 
-  it("reserva el alto de las fotos que aún no se han cargado", () => {
+  it("reserva el alto de lo no cargado y marca dónde empieza cada mes", () => {
     const meses: Mes[] = [
       { month: "2026-10", photos: 100 },
       { month: "2026-09", photos: 50 },
     ];
-    const cargadas = Array.from({ length: 30 }, (_, i) => foto(i, "2026-10", 3000, 2000));
-    const { bloques, alto } = disponer(meses, cargadas, op);
-    const pendientes = bloques.filter((b) => b.tipo === "pendiente");
-    expect(pendientes.map((b) => [b.mes, b.fotos])).toEqual([
+    const cargadas = Array.from({ length: 30 }, (_, i) => foto(i, `2026-10-${String(20 - Math.floor(i / 10)).padStart(2, "0")}`));
+    const { bloques, marcas, alto } = disponer(meses, cargadas, op);
+    expect(bloques.filter((b) => b.tipo === "pendiente").map((b) => [b.mes, b.fotos])).toEqual([
       ["2026-10", 70],
       ["2026-09", 50],
     ]);
+    expect(marcas.map((m) => m.mes)).toEqual(["2026-10", "2026-09"]);
+    expect(marcas[0].y).toBe(0);
+    expect(marcas[1].y).toBeGreaterThan(0);
+    expect(mesEn(marcas, marcas[1].y + 1)).toBe("2026-09");
+    expect(mesEn(marcas, 10)).toBe("2026-10");
     // Sin ninguna foto cargada la barra ya refleja toda la biblioteca.
-    const vacia = disponer(meses, [], op);
-    expect(vacia.alto).toBeGreaterThan(alto * 0.8);
+    expect(disponer(meses, [], op).alto).toBeGreaterThan(alto * 0.7);
   });
 
   it("acota las panorámicas y las fotos muy estrechas", () => {
     expect(proporcion({ width: 10000, height: 1000 })).toBe(3);
     expect(proporcion({ width: 100, height: 1000 })).toBe(0.5);
     expect(proporcion({ width: null, height: null })).toBe(1);
-    const { bloques } = disponer([{ month: "2026-10", photos: 1 }], [foto(1, "2026-10", 50000, 1000)], {
-      ...op,
-      ancho: 300,
-    });
-    const [fila] = filas(bloques);
-    expect(fila.celdas[0].ancho).toBeLessThanOrEqual(300 + 1e-6);
+    const fotos = [foto(1, "2026-10-20", 50000, 1000)];
+    const { bloques } = disponer(mesesDe(fotos), fotos, { ...op, ancho: 300 });
+    expect(filas(bloques)[0].celdas[0].ancho).toBeLessThanOrEqual(300 + 1e-6);
   });
 
   it("10 000 fotos se disponen deprisa", () => {
-    const fotos = Array.from({ length: 10_000 }, (_, i) =>
-      foto(i, `20${String(10 + Math.floor(i / 500)).padStart(2, "0")}-01`, 3000 + (i % 7) * 300, 2000),
-    );
-    const meses: Mes[] = [];
-    for (const f of fotos) {
-      const ultimo = meses.at(-1);
-      if (ultimo?.month === f.month) ultimo.photos++;
-      else meses.push({ month: f.month, photos: 1 });
-    }
+    const fotos = Array.from({ length: 10_000 }, (_, i) => {
+      const d = new Date(2026, 9, 26 - Math.floor(i / 7), 12);
+      const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return foto(i, dia, 3000 + (i % 7) * 300, 2000);
+    });
     const inicio = performance.now();
-    const { bloques } = disponer(meses, fotos, op);
+    const { bloques } = disponer(mesesDe(fotos), fotos, op);
     expect(performance.now() - inicio).toBeLessThan(500);
     expect(filas(bloques).flatMap((f) => f.celdas)).toHaveLength(10_000);
   });
@@ -107,20 +139,29 @@ describe("disponer", () => {
 describe("visibles", () => {
   it("devuelve solo los bloques que tocan la ventana", () => {
     const bloques: Bloque[] = Array.from({ length: 100 }, (_, i) => ({
-      tipo: "mes",
+      tipo: "pendiente",
       mes: String(i),
       y: i * 100,
       alto: 100,
+      fotos: 1,
     }));
-    const vistos = visibles(bloques, 1050, 1250);
-    expect(vistos.map((b) => b.y)).toEqual([1000, 1100, 1200]);
+    expect(visibles(bloques, 1050, 1250).map((b) => b.y)).toEqual([1000, 1100, 1200]);
     expect(visibles(bloques, 50_000, 60_000)).toEqual([]);
   });
 });
 
-describe("nombreMes", () => {
+describe("nombres", () => {
   it("escribe el mes en español con mayúscula", () => {
     expect(nombreMes("2026-10")).toBe("Octubre de 2026");
-    expect(nombreMes("2024-05")).toBe("Mayo de 2024");
+  });
+
+  it("escribe el día como Google Fotos, con el año solo si no es el actual", () => {
+    const hoy = new Date(2026, 9, 26);
+    expect(nombreDia("2026-10-20", hoy)).toBe("Mar, 20 oct");
+    expect(nombreDia("2025-10-20", hoy)).toBe("Lun, 20 oct 2025");
+  });
+
+  it("el día va en hora local", () => {
+    expect(diaDe({ date: fecha("2026-10-20") })).toBe("2026-10-20");
   });
 });
