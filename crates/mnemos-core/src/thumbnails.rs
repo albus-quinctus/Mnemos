@@ -441,10 +441,13 @@ mod tests {
         let rota = dir.path().join("Originales/rota.png");
         fs::create_dir_all(rota.parent().unwrap()).unwrap();
         fs::write(&rota, b"\x89PNG\r\n\x1a\nroto").unwrap();
+        write_image(&dir.path().join("Originales/sana.png"), 40, 30, 5);
         lib.index().unwrap();
 
+        // La foto rota no impide generar la sana.
         let report = lib.generate_thumbnails().unwrap();
         assert_eq!(report.failed.len(), 1);
+        assert_eq!(report.written, 1);
         assert!(lib.pending_thumbnails().unwrap().is_empty());
 
         write_image(&rota, 10, 10, 3);

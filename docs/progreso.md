@@ -9,7 +9,7 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Spec 001 (importar e indexar) implementada en núcleo y CLI: `mnemos index` y `mnemos import`. Copias verificadas con BLAKE3, sin tocar el origen, en `Originales/AAAA/MM/` según la fecha de modificación.
 
 ## Siguiente paso
-1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) en curso. Hechas: tareas 1 a 13 (decisión 004, RAW y orientación, miniaturas, vistas previas RAW, cola en segundo plano, `mnemos miniaturas`, protocolo `mnemos://`, consulta paginada por mes, estructura de la Galería y cuadrícula justificada y virtualizada por días al estilo de Google Fotos, que ya genera las miniaturas al abrir la biblioteca, visor con panel de detalles, abrir o crear biblioteca recordando la última, e importar desde la aplicación con progreso y cancelación). La tarea 14 (HEIC y AVIF) queda aplazada: la prueba de `libheif` pasó en los tres sistemas, pero de momento no se incorpora (resultados en la decisión 004). Tarea 15 hecha: con 10 000 fotos sintéticas, la cuadrícula va a 60 fps y el visor abre en 71 ms (`docs/rendimiento.md`). Siguiente: cerrar la spec 002 revisando sus criterios de aceptación pendientes.
+1. Spec 002 (`docs/specs/002-miniaturas-cuadricula-visor.md`) hecha: miniaturas, cuadrícula, visor, abrir o crear biblioteca, importar desde la aplicación y rendimiento con 10 000 fotos (`docs/rendimiento.md`). Todos sus criterios de aceptación tienen prueba. La tarea 14 (HEIC y AVIF) queda aplazada; la prueba de `libheif` está en la decisión 004. Siguiente: spec 003, búsqueda básica, lo último de F1.
 2. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
 ## Pendientes / ideas aparcadas

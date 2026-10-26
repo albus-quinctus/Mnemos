@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn informa_del_avance_y_se_para_al_cancelar() {
-        let (_dir, mut lib, src) = setup();
+        let (dir, mut lib, src) = setup();
         write_png(&src.join("a.png"), 1, 1, b"a");
         write_png(&src.join("b.png"), 1, 1, b"b");
         write_png(&src.join("c.png"), 1, 1, b"c");
@@ -346,8 +346,10 @@ mod tests {
         assert_eq!(report.copied, 1);
         assert_eq!(avances.len(), 1);
         assert_eq!(avances[0].total, 3);
-        // Lo ya copiado queda registrado.
+        // Lo ya copiado queda registrado y no quedan restos temporales.
         assert_eq!(lib.info().unwrap().photos, 1);
+        let tmp = dir.path().join("Biblioteca/.mnemos/tmp");
+        assert_eq!(fs::read_dir(tmp).unwrap().count(), 0);
     }
 
     #[test]
