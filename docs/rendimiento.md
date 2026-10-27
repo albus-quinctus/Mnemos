@@ -49,6 +49,21 @@ Las palabras que casan con todas las fotos son el peor caso, porque se cuentan t
 | Pasar a la siguiente foto | entre 29 y 34 ms | menos de 100 ms |
 | Celdas en el DOM | unas 60, sin importar el tamaño de la biblioteca | — |
 
+## Miniaturas de fotos grandes (2026-10-27)
+Los JPEG y las vistas previas RAW se decodifican ya reducidos a 1/2, 1/4 o 1/8 en la IDCT (`jpeg-decoder`), al menor tamaño que cubre la miniatura. Fotos generadas con grano de sensor; mediana de 5 repeticiones por foto, un hilo, en el mismo contenedor.
+
+| Foto | Antes | Después |
+|---|---|---|
+| 12 MP de móvil (4032 × 3024) | 195 ms | 66 ms |
+| 24 MP, submuestreo 4:2:0 | 364 ms | 132 ms |
+| 24 MP, 4:4:4 | 628 ms | 285 ms |
+| 24 MP progresivo | 672 ms | 382 ms |
+| 24 MP en gris | 157 ms | 89 ms |
+| 50 MP | 670 ms | 200 ms |
+| 6 MP en CMYK (sin reducción) | 186 ms | 186 ms |
+
+La miniatura reducida y la completa difieren en unos 44 dB de PSNR: no se distinguen a simple vista. Para repetirlo con fotos reales: `cargo run --release -p mnemos-imaging --example medir_miniaturas -- <carpeta> [repeticiones] [carpeta_salida]`.
+
 ## Pendiente
 - Repetir el indexado y las miniaturas desde un HDD externo con fotos reales de cámara de 12 a 24 MP. Las sintéticas son pequeñas y el disco del contenedor es rápido, así que las miniaturas reales tardarán más por foto.
 - Medir el visor dentro de la aplicación Tauri (WebView2, WKWebView, WebKitGTK) y no solo en Chromium.

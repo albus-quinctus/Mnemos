@@ -18,7 +18,7 @@ Fase **F1 Biblioteca y navegación**, en curso.
 - Decidir qué hacer con las fotos desaparecidas (hoy solo se cuentan).
 - Revelado de RAW (F3); hoy solo se usa la vista previa incrustada.
 - Caché en disco de vistas grandes para el visor, si la precarga en memoria se queda corta.
-- Miniaturas de JPEG más rápidas: hoy una foto de 24 MP tarda unos 300 ms en modo release porque se decodifica entera. Probar la decodificación reducida (escalado DCT 1/2, 1/4 y 1/8) en la tarea 15.
+- Miniaturas de JPEG más rápidas: hechas el 2026-10-27 con decodificación reducida (de 364 a 132 ms en una foto de 24 MP, ver `docs/rendimiento.md`). Falta medirlas con fotos reales desde el HDD con el ejemplo `medir_miniaturas`.
 - Probar el extractor de vistas previas con RAW reales de cada marca (Sony ARW, Pentax PEF, Samsung SRW, Olympus ORF antiguos). Solo se ha probado con archivos sintéticos y con las muestras recortadas de exiftool.
 - Empaquetado portátil (ejecutables en la raíz del disco) y prueba en exFAT.
 - `pnpm audit` avisa de 3 fallos leves en `@sveltejs/kit` y `cookie` que solo afectan al servidor de SvelteKit (la app es estática). Actualizar SvelteKit cuando haya versión corregida.
