@@ -1990,6 +1990,7 @@ dependencies = [
  "mnemos-imaging",
  "rusqlite",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.21",
  "walkdir",

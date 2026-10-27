@@ -15,9 +15,10 @@ use walkdir::WalkDir;
 
 use crate::error::{Error, Result};
 use crate::files::{hash_file, is_hidden, unix_secs, year_month};
-use crate::index::{FileError, hash_exists, insert_photo, read_orientation};
+use crate::index::{FileError, NewPhoto, hash_exists, insert_photo, read_orientation};
 use crate::library::{DATA_DIR, Library, ORIGINALS_DIR, TMP_DIR};
 use crate::paths::RelPath;
+use crate::taken::{Sidecars, Taken, improve_taken};
 
 /// Resultado de una importación.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
@@ -70,12 +71,17 @@ impl Library {
         let archivos = candidatos(&source, &root, &mut report);
         let total = archivos.len() as u64;
         let mut imported = HashSet::new();
+        let mut sidecars = Sidecars::default();
         for (i, archivo) in archivos.iter().enumerate() {
             if cancelar.load(Ordering::Relaxed) {
                 report.cancelled = true;
                 break;
             }
-            match import_file(&self.conn, &self.root, &tmp, archivo, &mut imported) {
+            let seen = Seen {
+                imported: &mut imported,
+                sidecars: &mut sidecars,
+            };
+            match import_file(&self.conn, &self.root, &tmp, archivo, seen) {
                 Ok(Outcome::Copied) => report.copied += 1,
                 Ok(Outcome::Duplicate) => report.duplicates += 1,
                 Err(err) => report.errors.push(FileError::new(archivo, err)),
@@ -118,12 +124,19 @@ fn candidatos(source: &Path, root: &Path, report: &mut ImportReport) -> Vec<Path
     archivos
 }
 
+/// Lo que la importación recuerda entre un archivo y el siguiente.
+struct Seen<'a> {
+    /// Huellas copiadas en esta importación.
+    imported: &'a mut HashSet<String>,
+    sidecars: &'a mut Sidecars,
+}
+
 fn import_file(
     conn: &Connection,
     root: &Path,
     tmp: &Path,
     src: &Path,
-    imported: &mut HashSet<String>,
+    seen: Seen,
 ) -> Result<Outcome> {
     let name = src
         .file_name()
@@ -132,7 +145,11 @@ fn import_file(
     let meta = fs::metadata(src)?;
     let modified = meta.modified()?;
     let hash = hash_file(src)?;
-    if imported.contains(&hash) || hash_exists(conn, &hash)? {
+    let taken = Taken::of_import(src, seen.sidecars);
+    if seen.imported.contains(&hash) || hash_exists(conn, &hash)? {
+        // Otra copia puede traer una fecha mejor: el .json de Takeout que no
+        // había cuando se importó, o el nombre de la copia de un álbum.
+        improve_taken(conn, &hash, &taken)?;
         return Ok(Outcome::Duplicate);
     }
 
@@ -142,7 +159,9 @@ fn import_file(
         return Err(err);
     }
 
-    let (year, month) = year_month(unix_secs(modified));
+    let (year, month) = taken
+        .year_month()
+        .unwrap_or_else(|| year_month(unix_secs(modified)));
     let dir = root
         .join(ORIGINALS_DIR)
         .join(format!("{year:04}"))
@@ -162,17 +181,17 @@ fn import_file(
     let rel = RelPath::from_absolute(root, &dest)?;
     // La foto y su entrada en el índice de búsqueda se guardan juntas.
     let tx = conn.unchecked_transaction()?;
-    insert_photo(
-        &tx,
-        &rel,
-        meta.len() as i64,
-        unix_secs(modified),
-        &hash,
-        mnemos_imaging::dimensions(&dest),
-        read_orientation(&dest),
-    )?;
+    let photo = NewPhoto {
+        size: meta.len() as i64,
+        modified: unix_secs(modified),
+        hash: &hash,
+        dims: mnemos_imaging::dimensions(&dest),
+        orientation: read_orientation(&dest),
+        taken,
+    };
+    insert_photo(&tx, &rel, &photo)?;
     tx.commit()?;
-    imported.insert(hash);
+    seen.imported.insert(hash);
     Ok(Outcome::Copied)
 }
 
@@ -390,5 +409,151 @@ mod tests {
             free_name(dir.path(), "sin").unwrap(),
             dir.path().join("sin (1)")
         );
+    }
+
+    const FIXTURE_EXIF: &[u8] = include_bytes!("../../../tests/fixtures/fecha-exif.jpg");
+
+    /// Fecha de captura (en hora local) y fuente de cada foto, por ruta.
+    fn fechas(lib: &Library) -> Vec<(String, Option<String>, String)> {
+        let mut stmt = lib
+            .connection()
+            .prepare(
+                "SELECT rel_path, strftime('%Y-%m-%d %H:%M:%S', taken_at, 'unixepoch', 'localtime'),
+                        taken_source
+                 FROM photos ORDER BY rel_path",
+            )
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    fn takeout_json(path: &Path, secs: i64) {
+        fs::write(
+            path,
+            format!(r#"{{"title":"x","photoTakenTime":{{"timestamp":"{secs}"}}}}"#),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn ordena_por_la_fecha_de_captura_y_no_por_la_de_modificacion() {
+        let (_dir, mut lib, src) = setup();
+        // EXIF: gana a todo lo demás, también al nombre y al .json.
+        fs::write(src.join("IMG_20190512_143000.jpg"), FIXTURE_EXIF).unwrap();
+        takeout_json(
+            &src.join("IMG_20190512_143000.jpg.supplemental-metadata.json"),
+            1_000_000_000,
+        );
+        // Nombre con hora: gana al .json.
+        write_png(&src.join("Screenshot_2018-09-11-22-06-14.png"), 1, 1, b"a");
+        takeout_json(
+            &src.join("Screenshot_2018-09-11-22-06-14.png.supplemental-metadata.json"),
+            1_000_000_000,
+        );
+        // .json de Takeout: gana a un nombre con solo el día.
+        write_png(&src.join("IMG-20181215-WA0003.png"), 1, 1, b"b");
+        takeout_json(
+            &src.join("IMG-20181215-WA0003.png.supplemental-metadata.json"),
+            NOV_2023 as i64,
+        );
+        // Solo el día en el nombre.
+        write_png(&src.join("IMG-20170102-WA0001.png"), 1, 1, b"c");
+        // Nada: se queda con la fecha de modificación.
+        write_png(&src.join("unknown.png"), 1, 1, b"d");
+        for f in fs::read_dir(&src).unwrap() {
+            set_mtime(&f.unwrap().path(), 1_800_000_000); // 2027
+        }
+
+        let report = lib.import_from(&src).unwrap();
+        assert_eq!(report.copied, 5, "{:?}", report.errors);
+
+        let nov_2023 = lib
+            .connection()
+            .query_row(
+                "SELECT strftime('%Y-%m-%d %H:%M:%S', ?1, 'unixepoch', 'localtime')",
+                [NOV_2023],
+                |r| r.get::<_, String>(0),
+            )
+            .unwrap();
+        let fila = |rel: &str, fecha: Option<&str>, fuente: &str| {
+            (rel.to_owned(), fecha.map(str::to_owned), fuente.to_owned())
+        };
+        assert_eq!(
+            fechas(&lib),
+            [
+                fila(
+                    "Originales/2015/06/IMG_20190512_143000.jpg",
+                    Some("2015-06-01 10:20:30"),
+                    "exif"
+                ),
+                fila(
+                    "Originales/2017/01/IMG-20170102-WA0001.png",
+                    Some("2017-01-02 00:00:00"),
+                    "nombre_dia"
+                ),
+                fila(
+                    "Originales/2018/09/Screenshot_2018-09-11-22-06-14.png",
+                    Some("2018-09-11 22:06:14"),
+                    "nombre"
+                ),
+                fila(
+                    "Originales/2023/11/IMG-20181215-WA0003.png",
+                    Some(&nov_2023),
+                    "takeout"
+                ),
+                fila("Originales/2027/01/unknown.png", None, "ninguna"),
+            ]
+        );
+    }
+
+    #[test]
+    fn reimportar_takeout_mejora_la_fecha_sin_copiar_otra_vez() {
+        let (dir, mut lib, src) = setup();
+        let foto = src.join("sin_fecha.png");
+        write_png(&foto, 1, 1, b"a");
+        set_mtime(&foto, 1_800_000_000);
+        lib.import_from(&src).unwrap();
+        let dest = dir
+            .path()
+            .join("Biblioteca/Originales/2027/01/sin_fecha.png");
+        let before = fs::read(&dest).unwrap();
+
+        // La misma foto, ahora con su .json y su copia editada en un álbum.
+        let album = dir.path().join("Takeout/Album");
+        fs::create_dir_all(&album).unwrap();
+        fs::copy(&foto, album.join("sin_fecha.png")).unwrap();
+        takeout_json(
+            &album.join("sin_fecha.png.supplemental-metadata.json"),
+            NOV_2023 as i64,
+        );
+        let report = lib.import_from(&dir.path().join("Takeout")).unwrap();
+        assert_eq!((report.copied, report.duplicates), (0, 1));
+
+        let (rel, _, fuente) = &fechas(&lib)[0];
+        assert_eq!(
+            (rel.as_str(), fuente.as_str()),
+            ("Originales/2027/01/sin_fecha.png", "takeout")
+        );
+        // El original no se mueve ni se modifica.
+        assert_eq!(fs::read(&dest).unwrap(), before);
+
+        // Una fuente peor no estropea la que ya hay.
+        fs::remove_file(album.join("sin_fecha.png.supplemental-metadata.json")).unwrap();
+        lib.import_from(&dir.path().join("Takeout")).unwrap();
+        assert_eq!(fechas(&lib)[0].2, "takeout");
+    }
+
+    #[test]
+    fn usa_el_json_del_original_en_las_copias_editadas() {
+        let (_dir, mut lib, src) = setup();
+        write_png(&src.join("foto-editada.png"), 1, 1, b"a");
+        takeout_json(
+            &src.join("foto.png.supplemental-metadata.json"),
+            NOV_2023 as i64,
+        );
+        lib.import_from(&src).unwrap();
+        assert_eq!(fechas(&lib)[0].2, "takeout");
     }
 }

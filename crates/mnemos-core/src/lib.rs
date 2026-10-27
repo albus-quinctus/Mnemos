@@ -11,6 +11,7 @@ pub mod index;
 pub mod library;
 pub mod paths;
 pub mod search;
+mod taken;
 pub mod thumbnails;
 pub mod timeline;
 

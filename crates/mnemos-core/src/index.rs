@@ -12,6 +12,7 @@ use crate::error::Result;
 use crate::files::{hash_file, is_hidden, unix_secs};
 use crate::library::{Library, ORIGINALS_DIR};
 use crate::paths::RelPath;
+use crate::taken::{Taken, set_taken, taken_at_sql};
 
 /// Resultado de indexar la biblioteca.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
@@ -98,11 +99,16 @@ struct Known {
     size: i64,
     modified: i64,
     has_orientation: bool,
+    /// Ya se buscó su fecha de captura (spec 004).
+    has_taken: bool,
 }
 
 fn known_files(conn: &Connection) -> Result<HashMap<String, Known>> {
-    let mut stmt = conn
-        .prepare("SELECT rel_path, size_bytes, modified_at, orientation IS NOT NULL FROM photos")?;
+    let mut stmt = conn.prepare(
+        "SELECT rel_path, size_bytes, modified_at, orientation IS NOT NULL,
+                taken_source IS NOT NULL
+         FROM photos",
+    )?;
     let rows = stmt.query_map([], |r| {
         Ok((
             r.get(0)?,
@@ -110,6 +116,7 @@ fn known_files(conn: &Connection) -> Result<HashMap<String, Known>> {
                 size: r.get(1)?,
                 modified: r.get(2)?,
                 has_orientation: r.get(3)?,
+                has_taken: r.get(4)?,
             },
         ))
     })?;
@@ -138,12 +145,17 @@ fn index_file(
                 params![rel.as_str(), read_orientation(path)],
             )?;
         }
+        if !known.has_taken {
+            // Registrada antes de la migración 0006.
+            set_taken(conn, rel.as_str(), &Taken::of_file(path))?;
+        }
         return Ok(Outcome::Unchanged);
     }
 
     let hash = hash_file(path)?;
     let dims = mnemos_imaging::dimensions(path);
     let orientation = read_orientation(path);
+    let taken = Taken::of_file(path);
     if known.is_some() {
         conn.execute(
             "UPDATE photos
@@ -160,28 +172,51 @@ fn index_file(
                 orientation
             ],
         )?;
+        set_taken(conn, rel.as_str(), &taken)?;
         Ok(Outcome::Updated)
     } else {
-        insert_photo(conn, rel, size, modified, &hash, dims, orientation)?;
+        let photo = NewPhoto {
+            size,
+            modified,
+            hash: &hash,
+            dims,
+            orientation,
+            taken,
+        };
+        insert_photo(conn, rel, &photo)?;
         Ok(Outcome::Added)
     }
 }
 
+/// Lo que se guarda de una foto nueva.
+pub(crate) struct NewPhoto<'a> {
+    pub size: i64,
+    pub modified: i64,
+    pub hash: &'a str,
+    pub dims: Option<(u32, u32)>,
+    pub orientation: u16,
+    pub taken: Taken,
+}
+
 /// Registra una foto nueva y la añade al índice de búsqueda.
-pub(crate) fn insert_photo(
-    conn: &Connection,
-    rel: &RelPath,
-    size: i64,
-    modified: i64,
-    hash: &str,
-    dims: Option<(u32, u32)>,
-    orientation: u16,
-) -> Result<()> {
+pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -> Result<()> {
+    let NewPhoto {
+        size,
+        modified,
+        hash,
+        dims,
+        orientation,
+        ref taken,
+    } = *photo;
+    let (exact, local) = taken.sql_params();
     conn.execute(
-        "INSERT INTO photos
-             (rel_path, size_bytes, modified_at, content_hash, width, height, orientation,
-              imported_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch())",
+        &format!(
+            "INSERT INTO photos
+                 (rel_path, size_bytes, modified_at, content_hash, width, height, orientation,
+                  imported_at, taken_at, taken_source)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {}, ?10)",
+            taken_at_sql(8, 9)
+        ),
         params![
             rel.as_str(),
             size,
@@ -189,7 +224,10 @@ pub(crate) fn insert_photo(
             hash,
             dims.map(|d| d.0),
             dims.map(|d| d.1),
-            orientation
+            orientation,
+            exact,
+            local,
+            taken.source.as_str()
         ],
     )?;
     let id = conn.last_insert_rowid();
@@ -439,5 +477,50 @@ pub(crate) mod tests {
             .query_row("SELECT width FROM photos", [], |r| r.get(0))
             .unwrap();
         assert_eq!(w, None);
+    }
+
+    #[test]
+    fn rellena_la_fecha_de_las_fotos_registradas_sin_ella() {
+        let (dir, mut lib) = library();
+        let originals = dir.path().join("Originales");
+        write_png(
+            &originals.join("2026/10/IMG_20190512_143000.png"),
+            1,
+            1,
+            b"a",
+        );
+        fs::write(
+            originals.join("2026/10/camara.jpg"),
+            include_bytes!("../../../tests/fixtures/fecha-exif.jpg"),
+        )
+        .unwrap();
+        lib.index().unwrap();
+        // Como si se hubieran registrado antes de la migración 0006.
+        lib.connection()
+            .execute("UPDATE photos SET taken_at = NULL, taken_source = NULL", [])
+            .unwrap();
+
+        let report = lib.index().unwrap();
+        assert_eq!(report.unchanged, 2);
+        let mut stmt = lib
+            .connection()
+            .prepare(
+                "SELECT strftime('%Y-%m-%d %H:%M:%S', taken_at, 'unixepoch', 'localtime'),
+                        taken_source
+                 FROM photos ORDER BY rel_path",
+            )
+            .unwrap();
+        let fechas: Vec<(String, String)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            fechas,
+            [
+                ("2019-05-12 14:30:00".to_owned(), "nombre".to_owned()),
+                ("2015-06-01 10:20:30".to_owned(), "exif".to_owned()),
+            ]
+        );
     }
 }
