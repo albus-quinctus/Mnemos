@@ -6,7 +6,8 @@ use std::path::Path;
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::metadata::Orientation;
-use image::{DynamicImage, ImageFormat, ImageReader, Limits, RgbImage};
+use image::{DynamicImage, GrayImage, ImageFormat, ImageReader, Limits, RgbImage};
+use jpeg_decoder::PixelFormat;
 
 /// Alto de una miniatura, en píxeles.
 pub const THUMBNAIL_HEIGHT: u32 = 360;
@@ -17,6 +18,9 @@ pub const THUMBNAIL_QUALITY: u8 = 80;
 
 /// Memoria máxima que puede reservar el decodificador para una imagen.
 const MAX_DECODE_ALLOC: u64 = 512 * 1024 * 1024;
+
+/// Tamaño de salida a partir del tamaño de la imagen ya girada.
+type Size = fn(u32, u32) -> (u32, u32);
 
 /// Miniatura ya girada y codificada en JPEG.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,7 +51,7 @@ pub enum ThumbnailError {
 /// sale siempre de la vista previa que trae el archivo, nunca se revelan.
 pub fn thumbnail(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
     render(
-        decode(path)?,
+        decode(path, orientation, thumbnail_size)?,
         orientation,
         thumbnail_size,
         THUMBNAIL_QUALITY,
@@ -63,7 +67,12 @@ pub const DISPLAY_QUALITY: u8 = 90;
 /// (TIFF, RAW): ya girada, con el lado mayor de [`DISPLAY_MAX_SIDE`] como
 /// mucho y en JPEG. Se genera en memoria y no se guarda.
 pub fn display_image(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    render(decode(path)?, orientation, display_size, DISPLAY_QUALITY)
+    render(
+        decode(path, orientation, display_size)?,
+        orientation,
+        display_size,
+        DISPLAY_QUALITY,
+    )
 }
 
 /// Tamaño de la imagen del visor: el lado mayor se limita a
@@ -108,19 +117,67 @@ pub fn web_mime(path: &Path) -> std::io::Result<Option<&'static str>> {
 }
 
 /// Decodifica la imagen, o la vista previa incrustada si es un RAW.
-fn decode(path: &Path) -> Result<DynamicImage, ThumbnailError> {
-    if crate::is_raw(path) {
-        let jpeg = crate::raw_preview(path)?.ok_or(ThumbnailError::Unsupported)?;
-        let mut reader = ImageReader::with_format(Cursor::new(jpeg), ImageFormat::Jpeg);
+///
+/// Los JPEG se reducen ya al decodificarlos (ver [`decode_jpeg_reduced`]) al
+/// menor tamaño que sigue cubriendo el que pide `size`; si no se puede, se
+/// decodifican enteros como el resto de formatos.
+fn decode(path: &Path, orientation: u16, size: Size) -> Result<DynamicImage, ThumbnailError> {
+    let jpeg = if crate::is_raw(path) {
+        crate::raw_preview(path)?.ok_or(ThumbnailError::Unsupported)?
+    } else if web_mime(path)? == Some("image/jpeg") {
+        std::fs::read(path)?
+    } else {
+        let mut reader = ImageReader::open(path)?.with_guessed_format()?;
+        if reader.format().is_none() {
+            return Err(ThumbnailError::Unsupported);
+        }
         reader.limits(limits());
         return Ok(reader.decode()?);
+    };
+    if let Some(img) = decode_jpeg_reduced(&jpeg, orientation, size) {
+        return Ok(img);
     }
-    let mut reader = ImageReader::open(path)?.with_guessed_format()?;
-    if reader.format().is_none() {
-        return Err(ThumbnailError::Unsupported);
-    }
+    let mut reader = ImageReader::with_format(Cursor::new(jpeg), ImageFormat::Jpeg);
     reader.limits(limits());
     Ok(reader.decode()?)
+}
+
+/// Decodifica un JPEG reducido ya en la IDCT a 1/2, 1/4 o 1/8: el menor de
+/// esos tamaños que, tras girarlo, sigue cubriendo el que pide `size`. Evita
+/// reconstruir los 24 millones de píxeles de una foto para quedarse con una
+/// miniatura de 540 × 360.
+///
+/// Devuelve `None` cuando no puede: JPEG en CMYK o de 16 bits, o archivo que
+/// este decodificador no acepta. Entonces se decodifica entero.
+fn decode_jpeg_reduced(jpeg: &[u8], orientation: u16, size: Size) -> Option<DynamicImage> {
+    let mut decoder = jpeg_decoder::Decoder::new(jpeg);
+    decoder.set_max_decoding_buffer_size(usize::try_from(MAX_DECODE_ALLOC).ok()?);
+    decoder.read_info().ok()?;
+    let info = decoder.info()?;
+    if !matches!(info.pixel_format, PixelFormat::RGB24 | PixelFormat::L8) {
+        return None;
+    }
+    let (width, height) = (u32::from(info.width), u32::from(info.height));
+    // Las orientaciones 5 a 8 intercambian el ancho y el alto.
+    let (want_w, want_h) = if (5..=8).contains(&orientation) {
+        let (w, h) = size(height, width);
+        (h, w)
+    } else {
+        size(width, height)
+    };
+    decoder
+        .scale(u16::try_from(want_w).ok()?, u16::try_from(want_h).ok()?)
+        .ok()?;
+    let pixels = decoder.decode().ok()?;
+    let info = decoder.info()?;
+    let (width, height) = (u32::from(info.width), u32::from(info.height));
+    match info.pixel_format {
+        PixelFormat::RGB24 => {
+            RgbImage::from_raw(width, height, pixels).map(DynamicImage::ImageRgb8)
+        }
+        PixelFormat::L8 => GrayImage::from_raw(width, height, pixels).map(DynamicImage::ImageLuma8),
+        _ => None,
+    }
 }
 
 fn limits() -> Limits {
@@ -133,7 +190,7 @@ fn limits() -> Limits {
 fn render(
     mut img: DynamicImage,
     orientation: u16,
-    size: fn(u32, u32) -> (u32, u32),
+    size: Size,
     quality: u8,
 ) -> Result<Thumbnail, ThumbnailError> {
     let orientation = u8::try_from(orientation)
@@ -214,6 +271,15 @@ mod tests {
         DynamicImage::ImageRgba8(img)
             .to_rgb8()
             .save_with_format(path, format)
+            .unwrap();
+    }
+
+    /// Como [`write_image`], pero en memoria y siempre en JPEG.
+    fn write_image_to(out: &mut Vec<u8>, width: u32, height: u32) {
+        let img = RgbImage::from_fn(width, height, |x, y| {
+            image::Rgb([(x % 256) as u8, (y % 256) as u8, 128])
+        });
+        img.write_to(&mut Cursor::new(out), ImageFormat::Jpeg)
             .unwrap();
     }
 
@@ -328,6 +394,67 @@ mod tests {
         assert_eq!(orientation, 6);
         let thumb = thumbnail(&path, orientation).unwrap();
         assert_eq!(decoded_size(&thumb), (270, 360));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn los_jpeg_se_reducen_al_decodificar() {
+        let mut jpeg = Vec::new();
+        write_image_to(&mut jpeg, 2400, 1600);
+        // 540 × 360 cabe en 1/4 (600 × 400) pero no en 1/8 (300 × 200).
+        let img = decode_jpeg_reduced(&jpeg, 1, thumbnail_size).unwrap();
+        assert_eq!((img.width(), img.height()), (600, 400));
+        // En una panorámica el giro decide la reducción: tumbada basta con
+        // 1/4 (1200 × 400 para 1080 × 360) y de pie con 1/8 (600 × 200 para
+        // 120 × 360 girada, es decir, 360 × 120 sin girar).
+        let mut pano = Vec::new();
+        write_image_to(&mut pano, 4800, 1600);
+        let img = decode_jpeg_reduced(&pano, 1, thumbnail_size).unwrap();
+        assert_eq!((img.width(), img.height()), (1200, 400));
+        let img = decode_jpeg_reduced(&pano, 6, thumbnail_size).unwrap();
+        assert_eq!((img.width(), img.height()), (600, 200));
+        // Una imagen pequeña no se reduce.
+        let mut small = Vec::new();
+        write_image_to(&mut small, 400, 300);
+        let img = decode_jpeg_reduced(&small, 1, thumbnail_size).unwrap();
+        assert_eq!((img.width(), img.height()), (400, 300));
+    }
+
+    #[test]
+    fn la_miniatura_reducida_se_parece_a_la_completa() {
+        let dir = tempdir("reducida");
+        let path = dir.join("foto.jpg");
+        write_image(&path, 2400, 1600, ImageFormat::Jpeg);
+        let reduced = thumbnail(&path, 1).unwrap();
+        let full = render(
+            image::open(&path).unwrap(),
+            1,
+            thumbnail_size,
+            THUMBNAIL_QUALITY,
+        )
+        .unwrap();
+        assert_eq!((reduced.width, reduced.height), (full.width, full.height));
+        let a = image::load_from_memory(&reduced.jpeg).unwrap().to_rgb8();
+        let b = image::load_from_memory(&full.jpeg).unwrap().to_rgb8();
+        let diff: u64 = a
+            .as_raw()
+            .iter()
+            .zip(b.as_raw())
+            .map(|(x, y)| u64::from(x.abs_diff(*y)))
+            .sum();
+        let mean = diff as f64 / a.as_raw().len() as f64;
+        assert!(mean < 3.0, "diferencia media {mean}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn los_jpeg_cmyk_se_decodifican_enteros() {
+        let jpeg = include_bytes!("../../../tests/fixtures/cmyk.jpg");
+        assert!(decode_jpeg_reduced(jpeg, 1, thumbnail_size).is_none());
+        let dir = tempdir("cmyk");
+        let path = dir.join("imprenta.jpg");
+        std::fs::write(&path, jpeg).unwrap();
+        assert_eq!(decoded_size(&thumbnail(&path, 1).unwrap()), (16, 16));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

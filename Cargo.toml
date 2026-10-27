@@ -16,6 +16,7 @@ mnemos-imaging = { path = "crates/mnemos-imaging" }
 blake3 = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff"] }
 imagesize = "0.14"
+jpeg-decoder = { version = "0.3", default-features = false }
 kamadak-exif = "0.6"
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
