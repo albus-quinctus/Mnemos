@@ -18,6 +18,9 @@ fn main() {
     };
     let runs: usize = args.next().and_then(|n| n.parse().ok()).unwrap_or(5).max(1);
     let out = args.next().map(PathBuf::from);
+    if let Some(out) = &out {
+        std::fs::create_dir_all(out).expect("no se pudo crear la carpeta de salida");
+    }
 
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
         .expect("no se pudo leer la carpeta")
@@ -34,19 +37,18 @@ fn main() {
     for path in &files {
         let orientation = mnemos_imaging::orientation(path).unwrap_or(1);
         let mut times = Vec::with_capacity(runs);
-        let mut last = None;
+        let mut result = mnemos_imaging::thumbnail(path, orientation);
         for _ in 0..runs {
             let start = Instant::now();
-            let result = mnemos_imaging::thumbnail(path, orientation);
+            result = mnemos_imaging::thumbnail(path, orientation);
             times.push(start.elapsed());
-            last = Some(result);
         }
         times.sort();
         let median = times[times.len() / 2];
         total += median;
         let name = name(path);
-        match last {
-            Some(Ok(thumb)) => {
+        match result {
+            Ok(thumb) => {
                 println!(
                     "{name:<28} {:>11.1} {:>11.1} {:>11}",
                     ms(median),
@@ -54,13 +56,11 @@ fn main() {
                     format!("{}x{}", thumb.width, thumb.height)
                 );
                 if let Some(out) = &out {
-                    std::fs::create_dir_all(out).expect("no se pudo crear la carpeta de salida");
                     std::fs::write(out.join(format!("{name}.miniatura.jpg")), &thumb.jpeg)
                         .expect("no se pudo guardar la miniatura");
                 }
             }
-            Some(Err(e)) => println!("{name:<28} {:>11.1} {:>11}   error: {e}", ms(median), ""),
-            None => {}
+            Err(e) => println!("{name:<28} {:>11.1} {:>11}   error: {e}", ms(median), ""),
         }
     }
     println!(
