@@ -38,6 +38,18 @@ pub(crate) fn year_month(secs: i64) -> (i64, u32) {
     (year, month as u32)
 }
 
+/// Días desde el 1970-01-01 de una fecha del calendario gregoriano; la
+/// inversa de [`year_month`] (algoritmo `days_from_civil`, también de Hinnant).
+pub(crate) fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let yoe = year.rem_euclid(400);
+    let mp = i64::from((month + 9) % 12);
+    let doy = (153 * mp + 2) / 5 + i64::from(day) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
 /// Archivos y carpetas ocultos (empiezan por `.`), salvo la raíz del recorrido.
 pub(crate) fn is_hidden(entry: &DirEntry) -> bool {
     entry.depth() > 0 && entry.file_name().to_string_lossy().starts_with('.')
@@ -55,5 +67,13 @@ mod tests {
         assert_eq!(year_month(1_700_000_000), (2023, 11));
         assert_eq!(year_month(1_704_067_199), (2023, 12)); // 2023-12-31 23:59:59
         assert_eq!(year_month(1_704_067_200), (2024, 1));
+    }
+
+    #[test]
+    fn calcula_los_dias_desde_1970() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(days_from_civil(1969, 12, 31), -1);
+        assert_eq!(days_from_civil(2000, 2, 29) * 86_400, 951_782_400);
+        assert_eq!(days_from_civil(2024, 1, 1) * 86_400, 1_704_067_200);
     }
 }
