@@ -384,9 +384,14 @@ fn sidecar_for<'a>(photo: &str, jsons: &'a [String]) -> Option<&'a str> {
     };
     let mut stems = vec![stem];
     stems.extend(EDITED_SUFFIXES.iter().filter_map(|s| stem.strip_suffix(s)));
-    for stem in stems {
+    // Primero el nombre tal cual (`foto (1).jpg.supplemental-metadata.json`),
+    // después sin el número de copia (`foto.jpg.supplemental-metadata(1).json`).
+    let candidates = stems.into_iter().flat_map(|stem| {
         let (core, copy) = split_copy(stem);
-        let full = format!("{}{ext}", core.trim_end());
+        [(stem, None), (core.trim_end(), copy)]
+    });
+    for (core, copy) in candidates {
+        let full = format!("{core}{ext}");
         let long = format!("{full}{SUPPLEMENTAL}");
         let found = jsons.iter().find(|json| {
             let base = &json[..json.len() - ".json".len()];
@@ -573,6 +578,7 @@ mod tests {
             "nombre muy largo que google takeout corta antes de.json",
             "foto.png.supplemental-me.json",
             "metadatos.json",
+            "Untitled (1).png.supplemental-metadata.json",
         ]
         .map(String::from)
         .into();
@@ -587,6 +593,7 @@ mod tests {
                 Some(&jsons[4]),
             ),
             ("foto.png", Some(&jsons[5])),
+            ("Untitled (1).png", Some(&jsons[7])),
             ("foto.jpg", None),
             ("otra.jpg", None),
         ];

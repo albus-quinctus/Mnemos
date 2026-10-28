@@ -33,3 +33,25 @@ export function fecha(segundos: number): string {
     })
     .replace(/\./g, "");
 }
+
+const ORIGENES: Record<string, string> = {
+  exif: "Según la cámara (EXIF)",
+  nombre: "Según el nombre del archivo",
+  takeout: "Según Google Fotos",
+  nombre_dia: "Según el nombre del archivo, solo el día",
+};
+
+/** Fecha de captura y de dónde sale, o "Sin fecha de captura". */
+export function fechaCaptura(
+  segundos: number | null,
+  fuente: string | null,
+): { texto: string; origen: string | null } {
+  if (segundos === null) return { texto: "Sin fecha de captura", origen: null };
+  const texto =
+    fuente === "nombre_dia"
+      ? new Date(segundos * 1000)
+          .toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })
+          .replace(/\./g, "")
+      : fecha(segundos);
+  return { texto, origen: (fuente && ORIGENES[fuente]) ?? null };
+}

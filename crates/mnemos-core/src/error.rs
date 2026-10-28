@@ -27,6 +27,12 @@ pub enum Error {
     #[error("la copia de {0} no coincide con el original; se ha descartado")]
     CopyMismatch(PathBuf),
 
+    #[error("no se puede leer la carpeta de origen {path}: {source}")]
+    SourceUnreadable {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("no se puede importar desde {0}: está dentro de la biblioteca")]
     SourceInsideLibrary(PathBuf),
 

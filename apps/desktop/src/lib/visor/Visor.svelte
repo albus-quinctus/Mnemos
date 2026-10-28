@@ -7,7 +7,7 @@
   import Icono from "$lib/componentes/Icono.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
   import { CacheImagenes, vecinas } from "./cache";
-  import { dimensiones, fecha, tamano } from "./formato";
+  import { dimensiones, fecha, fechaCaptura, tamano } from "./formato";
 
   let {
     fotos,
@@ -97,6 +97,7 @@
   // pasar de foto.
   let panel = $state(false);
   let info = $state<Detalles | null>(null);
+  const captura = $derived(info ? fechaCaptura(info.taken_at, info.taken_source) : null);
   $effect(() => {
     if (!panel || !foto) return;
     const id = foto.id;
@@ -220,6 +221,11 @@
           <dd>{dimensiones(info.width, info.height)}</dd>
           <dt>Tamaño</dt>
           <dd>{tamano(info.size_bytes)}</dd>
+          <dt>Fecha</dt>
+          <dd>
+            {captura?.texto}
+            {#if captura?.origen}<span class="origen">{captura?.origen}</span>{/if}
+          </dd>
           <dt>Modificada</dt>
           <dd>{fecha(info.modified_at)}</dd>
           <dt>Formato</dt>
@@ -283,6 +289,12 @@
   .mono {
     font-family: var(--fuente-mono);
     font-size: 0.85rem;
+  }
+
+  .origen {
+    display: block;
+    color: var(--visor-texto-suave);
+    font-size: 0.8rem;
   }
 
   .nota {

@@ -19,7 +19,8 @@ de modificación de la exportación y acaban juntas en el mismo mes.
      y marcas Unix en milisegundos (`1586252852190_15192911`).
   3. Solo al importar: `photoTakenTime` del `.json` que Google Takeout deja al
      lado de la foto (`foto.jpg.supplemental-metadata.json`, `foto.jpg.json`,
-     nombres truncados, copias `foto(1).jpg` y versiones `-editada`). Va detrás
+     nombres truncados, copias `foto(1).jpg` (y `foto (1).jpg` con su propio `.json`)
+     y versiones `-editada`). Va detrás
      del nombre con hora porque, en fotos sin EXIF, Google a veces guarda otra
      fecha (en el Takeout de prueba, 11 horas antes que la del nombre).
   4. El nombre del archivo con solo el día: `IMG-20181215-WA0003`.
@@ -28,6 +29,7 @@ de modificación de la exportación y acaban juntas en el mismo mes.
   `nombre_dia` o `ninguna`) para no volver a buscarla y para mejorarla después.
 - Una fecha sin zona horaria (EXIF sin desfase, nombre del archivo) es hora
   local: se muestra con la misma hora que marcaba la cámara.
+- El panel Detalles del visor muestra la fecha de captura y de dónde sale.
 - Al importar, la carpeta `Originales/AAAA/MM/` usa la fecha de captura.
 - `mnemos index` rellena la fecha de las fotos que aún no la tienen, con EXIF y
   nombre. Volver a importar la misma carpeta de Takeout completa las fechas de

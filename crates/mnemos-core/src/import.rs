@@ -59,7 +59,12 @@ impl Library {
         cancelar: &AtomicBool,
         mut progreso: impl FnMut(Progreso, &ImportReport),
     ) -> Result<ImportReport> {
-        let source = source.canonicalize()?;
+        let source = source
+            .canonicalize()
+            .map_err(|err| Error::SourceUnreadable {
+                path: source.to_owned(),
+                source: err,
+            })?;
         let root = self.root.canonicalize()?;
         if source.starts_with(&root) {
             return Err(Error::SourceInsideLibrary(source));
@@ -555,5 +560,14 @@ mod tests {
         );
         lib.import_from(&src).unwrap();
         assert_eq!(fechas(&lib)[0].2, "takeout");
+    }
+
+    #[test]
+    fn el_error_de_un_origen_inexistente_dice_su_ruta() {
+        let (dir, mut lib, _) = setup();
+        let falta = dir.path().join("no-existe");
+        let err = lib.import_from(&falta).unwrap_err();
+        assert!(matches!(err, Error::SourceUnreadable { .. }), "{err}");
+        assert!(err.to_string().contains("no-existe"), "{err}");
     }
 }
