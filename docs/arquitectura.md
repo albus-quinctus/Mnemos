@@ -28,4 +28,4 @@ DISCO/
 ## Reglas
 - Solo rutas relativas a `Biblioteca/`.
 - Edición no destructiva: la imagen editada se genera a partir del original y la receta.
-- Sistema de archivos recomendado para el disco: exFAT.
+- Sistema de archivos del disco: exFAT (spec 005; guía en `docs/guias/pasar-el-disco-a-exfat.md`).

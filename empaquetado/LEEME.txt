@@ -1,0 +1,40 @@
+MNEMOS · versión portátil
+=========================
+
+Este disco lleva MNEMOS y tu biblioteca de fotos (carpeta MNEMOS/).
+No hace falta instalar nada: los ajustes se guardan en el propio disco
+(carpeta .mnemos-portatil/) y no queda nada en el ordenador.
+
+Antes de desenchufar el disco, cierra MNEMOS y expulsa el disco.
+
+
+Windows 10 / 11
+---------------
+1. Doble clic en MNEMOS.exe.
+2. Si Windows avisa de "Windows protegió su PC", pulsa "Más información"
+   y "Ejecutar de todas formas". Pasa porque la app no está firmada.
+3. Si no se abre en un Windows 10 antiguo, falta WebView2:
+   https://developer.microsoft.com/microsoft-edge/webview2/
+
+
+macOS 11 o posterior
+--------------------
+1. La primera vez: clic derecho (o Control + clic) en MNEMOS.app y "Abrir".
+   macOS lo pide porque la app no está firmada por Apple.
+2. Las siguientes veces, doble clic.
+3. macOS no puede escribir en discos NTFS. Si el disco está en NTFS,
+   MNEMOS avisará de que está en solo lectura. Usa un disco en exFAT.
+
+
+Linux (x86_64)
+--------------
+1. Doble clic en MNEMOS-linux.AppImage o, en una terminal:
+       ./MNEMOS-linux.AppImage
+2. Si no se abre y dice que falta FUSE:
+       ./MNEMOS-linux.AppImage --appimage-extract-and-run
+3. Si el disco aparece en solo lectura después de desenchufarlo sin
+   expulsarlo (NTFS), repáralo con: sudo ntfsfix -d /dev/sdX1
+
+
+Código fuente y ayuda: https://github.com/albus-quinctus/Mnemos
+Licencia: GPL-3.0-or-later

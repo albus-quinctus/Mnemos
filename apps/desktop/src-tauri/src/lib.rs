@@ -1,5 +1,6 @@
 mod configuracion;
 mod media;
+mod portatil;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,6 +28,9 @@ struct Thumbnails(Mutex<Option<Arc<ThumbnailQueue>>>);
 #[derive(Default)]
 struct Importacion(Mutex<Option<Arc<AtomicBool>>>);
 
+/// Raíz del disco si la app se ejecuta en modo portátil (spec 005).
+struct Portatil(Option<PathBuf>);
+
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -38,7 +42,15 @@ fn abrir_biblioteca(
     estado: State<'_, OpenLibrary>,
     miniaturas: State<'_, Thumbnails>,
 ) -> Result<LibraryInfo, String> {
-    let lib = Library::open(&PathBuf::from(ruta)).map_err(|e| e.to_string())?;
+    let ruta = PathBuf::from(ruta);
+    if ruta.join(".mnemos").is_dir() && !portatil::se_puede_escribir(&ruta) {
+        return Err(format!(
+            "No se puede escribir en {}. El disco está en solo lectura: macOS no \
+             escribe en discos NTFS, y Windows o Linux montan así un disco con errores.",
+            ruta.display()
+        ));
+    }
+    let lib = Library::open(&ruta).map_err(|e| e.to_string())?;
     adoptar(lib, &app, &estado, &miniaturas)
 }
 
@@ -54,14 +66,19 @@ fn crear_biblioteca(
     adoptar(lib, &app, &estado, &miniaturas)
 }
 
-/// Ruta de la última biblioteca abierta, si se recuerda.
+/// Ruta de la última biblioteca abierta, si se recuerda. En modo portátil,
+/// si no hay ninguna, la carpeta `MNEMOS/` del disco.
 #[tauri::command]
 fn ultima_biblioteca(app: AppHandle) -> Result<Option<String>, String> {
     let carpeta = carpeta_config(&app)?;
     let config = configuracion::Configuracion::leer(&carpeta);
-    Ok(config
-        .ultima_biblioteca
-        .map(|ruta| ruta.display().to_string()))
+    let raiz = app.state::<Portatil>().0.clone();
+    let ruta = match (config.ultima_biblioteca, raiz) {
+        (Some(ruta), Some(raiz)) => Some(portatil::resolver(&raiz, &ruta)),
+        (None, Some(raiz)) => portatil::biblioteca_por_defecto(&raiz),
+        (ruta, None) => ruta,
+    };
+    Ok(ruta.map(|ruta| ruta.display().to_string()))
 }
 
 /// Deja `lib` como biblioteca activa, arranca sus miniaturas y la recuerda.
@@ -82,14 +99,21 @@ fn adoptar(
 }
 
 fn carpeta_config(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path().app_config_dir().map_err(|e| e.to_string())
+    match &app.state::<Portatil>().0 {
+        Some(raiz) => Ok(portatil::carpeta_config(raiz)),
+        None => app.path().app_config_dir().map_err(|e| e.to_string()),
+    }
 }
 
 /// Guarda la biblioteca como la última abierta. Si falla, la biblioteca sigue
 /// abierta: solo se pierde el recuerdo para el próximo arranque.
 fn recordar(app: &AppHandle, root: &Path) {
+    let ruta = match &app.state::<Portatil>().0 {
+        Some(raiz) => portatil::para_guardar(raiz, root),
+        None => root.to_owned(),
+    };
     let config = configuracion::Configuracion {
-        ultima_biblioteca: Some(root.to_owned()),
+        ultima_biblioteca: Some(ruta),
     };
     let guardado = carpeta_config(app).and_then(|carpeta| {
         config
@@ -331,9 +355,29 @@ fn serve(
     media::respond(&root, kind, &media, if_none_match)
 }
 
+/// Crea la ventana principal. En modo portátil, los datos del WebView (caché,
+/// almacenamiento local) se guardan en el disco y no en el perfil del usuario.
+fn crear_ventana(app: &AppHandle, raiz: Option<&Path>) -> tauri::Result<()> {
+    let mut ventana = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+        .title("MNEMOS")
+        .inner_size(1200.0, 800.0)
+        .min_inner_size(640.0, 480.0);
+    if let Some(raiz) = raiz {
+        ventana = ventana.data_directory(portatil::carpeta_webview(raiz));
+    }
+    ventana.build()?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let raiz = portatil::raiz();
     tauri::Builder::default()
+        .setup(|app| {
+            crear_ventana(app.handle(), app.state::<Portatil>().0.as_deref())?;
+            Ok(())
+        })
+        .manage(Portatil(raiz))
         .manage(OpenLibrary::default())
         .manage(Thumbnails::default())
         .manage(Importacion::default())
