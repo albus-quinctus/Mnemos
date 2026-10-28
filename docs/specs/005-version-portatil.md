@@ -1,6 +1,6 @@
 # 005 · Versión portátil en el disco
 
-- Estado: borrador
+- Estado: en curso
 - Fase: F1 (antes de la beta)
 
 ## Qué y por qué
@@ -39,12 +39,16 @@ ese equipo.
   biblioteca. Se descomprime en la raíz del disco.
 - Sin actualizaciones automáticas ni conexiones de red (regla 4).
 
-## Decisión pendiente: formato del disco
-El HDD de prueba está en **NTFS**. Windows y Linux leen y escriben NTFS, pero
-macOS solo lo lee. Para usar MNEMOS en un Mac habría que pasar el disco a
-**exFAT** (lo recomendado en `docs/arquitectura.md`), lo que obliga a copiar
-todo fuera, formatear y volver a copiar. Hasta decidirlo, en macOS la
-biblioteca se abriría en solo lectura o no se abriría.
+## Formato del disco: exFAT
+Decidido por Paulo el 2026-10-28: el disco se pasa a **exFAT**, que leen y
+escriben Windows, macOS y Linux. El HDD de prueba está en NTFS, que macOS solo
+lee; la guía `docs/guias/pasar-el-disco-a-exfat.md` explica cómo copiar todo
+fuera, formatear y volver a copiar. Mientras tanto, en un disco que no se puede
+escribir la app muestra un aviso en vez de fallar.
+
+exFAT no tiene diario: una desconexión mientras se escribe puede dañar el
+archivo abierto. Por eso la base de datos usa el modo de escritura segura de la
+decisión 002 y conviene expulsar el disco antes de desenchufarlo.
 
 ## Casos límite
 - El disco se desconecta con la app abierta: la base de datos ya está en modo
@@ -60,14 +64,14 @@ biblioteca se abriría en solo lectura o no se abriría.
   Microsoft; la app no la instala sola.
 
 ## Criterios de aceptación
-- [ ] Con `mnemos-portatil.json`, los ajustes y los datos del WebView se crean en el disco y no en el perfil del usuario (prueba automática de la resolución de rutas).
-- [ ] La última biblioteca se guarda como ruta relativa y se abre aunque cambie el punto de montaje (prueba automática).
-- [ ] Sin biblioteca guardada, abre `MNEMOS/` junto al ejecutable.
+- [x] Con `mnemos-portatil.json`, los ajustes y los datos del WebView se crean en el disco y no en el perfil del usuario (prueba automática de la resolución de rutas).
+- [x] La última biblioteca se guarda como ruta relativa y se abre aunque cambie el punto de montaje (prueba automática).
+- [x] Sin biblioteca guardada, abre `MNEMOS/` junto al ejecutable.
 - [ ] Sin `mnemos-portatil.json`, la app se comporta como hoy.
-- [ ] Una biblioteca en solo lectura muestra un aviso en vez de un error.
+- [x] Una biblioteca en solo lectura muestra un aviso en vez de un error.
 - [ ] El CI genera el zip portátil para las tres plataformas al etiquetar.
 - [ ] Probado en Linux con el HDD real; Windows y macOS quedan con guía de prueba manual.
-- [ ] Los originales no se modifican (prueba automática).
+- [x] Los originales no se modifican (prueba automática).
 
 ## Fuera de alcance
 - Firmar los ejecutables (Windows SmartScreen, notarización de Apple): cuesta dinero y cuentas de desarrollador.
@@ -76,10 +80,10 @@ biblioteca se abriría en solo lectura o no se abriría.
 - Incluir `mnemos-cli` en el disco (se puede añadir después en `herramientas/`).
 
 ## Tareas (≤1 h cada una)
-1. [ ] Módulo `portatil` en la app Tauri: detectar el modo y resolver las carpetas de ajustes y datos (con pruebas).
-2. [ ] Guardar y leer la última biblioteca como ruta relativa; abrir `MNEMOS/` si no hay ninguna.
-3. [ ] Carpeta de datos del WebView en el disco (`data_directory` de la ventana).
-4. [ ] Aviso de biblioteca de solo lectura.
-5. [ ] Workflow de publicación: compilar en los tres sistemas y montar el zip.
-6. [ ] `LEEME.txt` con instrucciones por sistema.
+1. [x] Módulo `portatil` en la app Tauri: detectar el modo y resolver las carpetas de ajustes y datos (con pruebas).
+2. [x] Guardar y leer la última biblioteca como ruta relativa; abrir `MNEMOS/` si no hay ninguna.
+3. [x] Carpeta de datos del WebView en el disco (`data_directory` de la ventana).
+4. [x] Aviso de biblioteca de solo lectura.
+5. [x] Workflow de publicación: compilar en los tres sistemas y montar el zip.
+6. [x] `LEEME.txt` con instrucciones por sistema.
 7. [ ] Prueba en el HDD real en Linux y guía de prueba para Windows y macOS.

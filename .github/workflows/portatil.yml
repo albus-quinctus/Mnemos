@@ -1,0 +1,104 @@
+name: Versión portátil
+
+# Compila MNEMOS para Windows, macOS y Linux y monta el zip que se descomprime
+# en la raíz del disco (spec 005). Al etiquetar una versión deja además un
+# borrador de publicación en GitHub con el zip.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  # Para comprobar el empaquetado en los PR que lo tocan.
+  pull_request:
+    paths:
+      - .github/workflows/portatil.yml
+      - empaquetado/**
+      - apps/desktop/src-tauri/**
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compilar:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            args: --bundles appimage
+          - os: windows-latest
+            args: --no-bundle
+          - os: macos-latest
+            args: --target universal-apple-darwin --bundles app
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Dependencias de sistema (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/desktop
+      - run: pnpm tauri build ${{ matrix.args }}
+        working-directory: apps/desktop
+      # tar conserva los permisos de ejecución, que upload-artifact pierde.
+      - name: Recoger el ejecutable
+        shell: bash
+        run: |
+          mkdir salida
+          case "${{ runner.os }}" in
+            Linux)   cp target/release/bundle/appimage/*.AppImage salida/MNEMOS-linux.AppImage
+                     chmod +x salida/MNEMOS-linux.AppImage ;;
+            Windows) cp target/release/mnemos-desktop.exe salida/MNEMOS.exe ;;
+            macOS)   cp -R target/universal-apple-darwin/release/bundle/macos/MNEMOS.app salida/ ;;
+          esac
+          tar -cf ejecutable-${{ runner.os }}.tar -C salida .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ejecutable-${{ runner.os }}
+          path: ejecutable-${{ runner.os }}.tar
+
+  zip:
+    needs: compilar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefactos
+      - name: Montar la estructura del disco
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_REF_TYPE" = tag ] || version="dev-${GITHUB_SHA::7}"
+          mkdir disco
+          for t in artefactos/*/*.tar; do tar -xf "$t" -C disco; done
+          cp empaquetado/LEEME.txt empaquetado/mnemos-portatil.json disco/
+          ls -la disco
+          (cd disco && zip -r -y "../MNEMOS-portatil-$version.zip" .)
+          echo "ZIP=MNEMOS-portatil-$version.zip" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MNEMOS-portatil
+          path: ${{ env.ZIP }}
+      - name: Borrador de publicación
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$ZIP" --draft --prerelease --title "MNEMOS $GITHUB_REF_NAME" --notes "Descomprime el zip en la raíz del disco. Instrucciones en LEEME.txt."

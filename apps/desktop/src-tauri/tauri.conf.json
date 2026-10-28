@@ -10,15 +10,7 @@
     "frontendDist": "../build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "MNEMOS",
-        "width": 1200,
-        "height": 800,
-        "minWidth": 640,
-        "minHeight": 480
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": "default-src 'self'; img-src 'self' mnemos: http://mnemos.localhost data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost mnemos: http://mnemos.localhost"
     }
