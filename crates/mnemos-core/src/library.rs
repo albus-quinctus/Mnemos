@@ -51,6 +51,11 @@ pub struct PhotoDetails {
     pub height: Option<u32>,
     pub size_bytes: u64,
     pub modified_at: i64,
+    /// Fecha de captura (spec 004), si se encontró.
+    pub taken_at: Option<i64>,
+    /// De dónde salió: `exif`, `nombre`, `takeout` o `nombre_dia`; `ninguna`
+    /// si se buscó y no hay; `None` si aún no se ha buscado.
+    pub taken_source: Option<String>,
     /// Formato según la extensión, en mayúsculas: "JPEG", "PNG", "DNG"…
     pub format: String,
 }
@@ -126,7 +131,8 @@ impl Library {
         let row = self
             .conn
             .query_row(
-                "SELECT rel_path, width, height, size_bytes, modified_at, coalesce(orientation, 1)
+                "SELECT rel_path, width, height, size_bytes, modified_at, coalesce(orientation, 1),
+                        taken_at, taken_source
                  FROM photos WHERE id = ?1",
                 [id],
                 |r| {
@@ -137,12 +143,14 @@ impl Library {
                         r.get::<_, u64>(3)?,
                         r.get::<_, i64>(4)?,
                         r.get::<_, u16>(5)?,
+                        r.get::<_, Option<i64>>(6)?,
+                        r.get::<_, Option<String>>(7)?,
                     ))
                 },
             )
             .optional()?;
-        Ok(
-            row.map(|(rel_path, w, h, size_bytes, modified_at, orientation)| {
+        Ok(row.map(
+            |(rel_path, w, h, size_bytes, modified_at, orientation, taken_at, taken_source)| {
                 let (width, height) = if mnemos_imaging::swaps_dimensions(orientation) {
                     (h, w)
                 } else {
@@ -155,9 +163,11 @@ impl Library {
                     height,
                     size_bytes,
                     modified_at,
+                    taken_at,
+                    taken_source,
                 }
-            }),
-        )
+            },
+        ))
     }
 
     pub fn info(&self) -> Result<LibraryInfo> {
@@ -232,8 +242,9 @@ mod tests {
         lib.connection()
             .execute(
                 "INSERT INTO photos (rel_path, size_bytes, modified_at, width, height, orientation,
-                                     imported_at)
-                 VALUES ('Originales/2026/10/IMG_1.JPG', 4200000, 1791892800, 4000, 3000, 6, 0)",
+                                     imported_at, taken_at, taken_source)
+                 VALUES ('Originales/2026/10/IMG_1.JPG', 4200000, 1791892800, 4000, 3000, 6, 0,
+                         1557664200, 'exif')",
                 [],
             )
             .unwrap();
@@ -248,6 +259,8 @@ mod tests {
                 height: Some(4000),
                 size_bytes: 4_200_000,
                 modified_at: 1_791_892_800,
+                taken_at: Some(1_557_664_200),
+                taken_source: Some("exif".to_owned()),
                 format: "JPEG".to_owned(),
             }
         );

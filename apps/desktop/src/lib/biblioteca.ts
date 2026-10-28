@@ -70,6 +70,8 @@ export interface Detalles {
   height: number | null;
   size_bytes: number;
   modified_at: number; // segundos desde la época Unix
+  taken_at: number | null; // fecha de captura (spec 004)
+  taken_source: string | null; // "exif", "nombre", "takeout", "nombre_dia", "ninguna" o null
   format: string; // "JPEG", "PNG", "DNG"…
 }
 
