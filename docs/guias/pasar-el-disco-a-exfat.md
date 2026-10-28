@@ -43,7 +43,7 @@ rsync -a --checksum --dry-run --itemize-changes /media/lilith/BACKUP_FOTOS/ ~/co
 
 Con la aplicación **Discos** (GNOME): elige el disco TOSHIBA, la partición
 `BACKUP_FOTOS`, el engranaje → «Formatear partición…», tipo «Otro» → «exFAT»,
-nombre `BACKUP_FOTOS`.
+nombre `FOTOS`.
 
 O en una terminal (comprueba antes con `lsblk -f` que la partición es la del
 TOSHIBA, porque el nombre `sdX1` cambia cada vez que se conecta):
@@ -52,14 +52,18 @@ TOSHIBA, porque el nombre `sdX1` cambia cada vez que se conecta):
 sudo apt install exfatprogs
 lsblk -f
 udisksctl unmount -b /dev/sdX1
-sudo mkfs.exfat -L BACKUP_FOTOS /dev/sdX1
+sudo mkfs.exfat -L FOTOS /dev/sdX1
 udisksctl mount -b /dev/sdX1
 ```
+
+El nombre de un disco exFAT tiene como mucho 11 caracteres (`BACKUP_FOTOS`
+tiene 12 y `mkfs.exfat` falla con «input string is too long»). A partir de
+aquí el disco se monta en `/media/lilith/FOTOS`.
 
 ## 4. Volver a copiar
 
 ```
-rsync -rt --info=progress2 ~/copia-BACKUP_FOTOS/ /media/lilith/BACKUP_FOTOS/
+rsync -rt --info=progress2 ~/copia-BACKUP_FOTOS/ /media/lilith/FOTOS/
 ```
 
 (`-rt` en vez de `-a`: exFAT no guarda dueños ni permisos de Linux.)
@@ -67,14 +71,14 @@ rsync -rt --info=progress2 ~/copia-BACKUP_FOTOS/ /media/lilith/BACKUP_FOTOS/
 Comprueba de nuevo que todo es idéntico (no debe mostrar ninguna línea):
 
 ```
-rsync -rt --checksum --dry-run --itemize-changes ~/copia-BACKUP_FOTOS/ /media/lilith/BACKUP_FOTOS/
+rsync -rt --checksum --dry-run --itemize-changes ~/copia-BACKUP_FOTOS/ /media/lilith/FOTOS/
 ```
 
 ## 5. Comprobar la biblioteca
 
 ```
-mnemos info /media/lilith/BACKUP_FOTOS/MNEMOS
-mnemos index /media/lilith/BACKUP_FOTOS/MNEMOS
+mnemos info /media/lilith/FOTOS/MNEMOS
+mnemos index /media/lilith/FOTOS/MNEMOS
 ```
 
 `index` debe decir que todas las fotos están «sin cambios». Si es así, puedes
