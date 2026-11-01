@@ -1,6 +1,6 @@
 # 006 · Selección múltiple, favoritos, archivo y título del día
 
-- Estado: borrador
+- Estado: en curso
 - Fase: F2
 
 ## Qué y por qué
@@ -163,7 +163,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
   originales intactos.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Migración con `favorite`, `archived_at`, `day_titles` e índices, y su
+1. [x] Migración con `favorite`, `archived_at`, `day_titles` e índices, y su
    prueba de migración desde una biblioteca v6.
 2. [ ] Núcleo: marcar y desmarcar favoritos y archivar o desarchivar una lista
    de ids en una transacción, con pruebas (incluido el fallo a mitad).
