@@ -13,7 +13,8 @@ Fase **F1 Biblioteca y navegación**, en curso.
 2. Spec 004, fecha de captura (`docs/specs/004-fecha-de-captura.md`): EXIF, nombre del archivo y `.json` de Google Takeout. Salió al importar un Takeout real (1401 fotos, todas en `Originales/2026/10`). Para arreglar una biblioteca ya importada: `mnemos index` y volver a importar la carpeta de Takeout.
 3. Spec 005, versión portátil (`docs/specs/005-version-portatil.md`): modo portátil en la app y zip con los tres ejecutables generado por `.github/workflows/portatil.yml`. Falta probarla en Windows y macOS, y pasar el HDD a exFAT (`docs/guias/pasar-el-disco-a-exfat.md`).
 4. F2 empieza con la spec 006, selección múltiple, favoritos, archivo y título del día (`docs/specs/006-seleccion-favoritos-archivo.md`), en curso: hecha la tarea 1 (migración 0007 con `favorite`, `archived_at`, `day_titles` e índices parciales por vista). Siguiente: tarea 2. Va antes que álbumes porque álbumes, etiquetas y papelera dependen de la selección. F1 sigue sin cerrar formalmente (punto 5).
-5. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
+5. Spec 011, panel de información y fecha a mano (`docs/specs/011-panel-info-y-fecha-manual.md`): sección Cámara con el EXIF en el panel del visor y fecha de captura a mano (`taken_source = 'manual'`, migración 0011) con vuelta a la automática. Falta probar dentro de Tauri que la cuadrícula se recarga al cerrar el visor.
+6. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
 ## Pendientes / ideas aparcadas
 - Revisar e instalar las skills de `docs/skills.md`.

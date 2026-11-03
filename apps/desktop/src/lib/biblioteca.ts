@@ -71,10 +71,39 @@ export interface Detalles {
   size_bytes: number;
   modified_at: number; // segundos desde la época Unix
   taken_at: number | null; // fecha de captura (spec 004)
-  taken_source: string | null; // "exif", "nombre", "takeout", "nombre_dia", "ninguna" o null
+  taken_source: string | null; // "exif", "nombre", "takeout", "nombre_dia", "manual", "ninguna" o null
+  taken_auto_at: number | null; // con fecha a mano, la automática (spec 011)
+  taken_auto_source: string | null;
   format: string; // "JPEG", "PNG", "DNG"…
 }
 
 export function detalles(id: number): Promise<Detalles | null> {
   return invoke("detalles", { id });
+}
+
+// Datos de cámara del EXIF (`mnemos_imaging::CameraInfo`, spec 011).
+export interface Camara {
+  camera: string | null;
+  lens: string | null;
+  exposure_s: number | null;
+  f_number: number | null;
+  iso: number | null;
+  focal_mm: number | null;
+  focal_35mm: number | null;
+  flash: boolean | null;
+  gps: [number, number] | null; // latitud y longitud en grados
+}
+
+export function camara(id: number): Promise<Camara | null> {
+  return invoke("camara", { id });
+}
+
+// Fecha de captura a mano: `fecha` es la hora local "AAAA-MM-DD hh:mm[:ss]".
+// Devuelven false si la foto ya no existe.
+export function ponerFecha(id: number, fecha: string): Promise<boolean> {
+  return invoke("poner_fecha", { id, fecha });
+}
+
+export function quitarFechaManual(id: number): Promise<boolean> {
+  return invoke("quitar_fecha_manual", { id });
 }

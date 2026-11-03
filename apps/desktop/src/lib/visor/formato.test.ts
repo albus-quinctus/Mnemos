@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { dimensiones, fecha, fechaCaptura, tamano } from "./formato";
+import {
+  apertura,
+  camposFecha,
+  coordenadas,
+  dimensiones,
+  exposicion,
+  fecha,
+  fechaCaptura,
+  fechaManual,
+  focal,
+  tamano,
+} from "./formato";
 
 describe("formato", () => {
   it("tamaño del archivo", () => {
@@ -27,5 +38,35 @@ describe("formato", () => {
     expect(fechaCaptura(segundos, "nombre_dia").texto).toBe("12 may 2019");
     expect(fechaCaptura(null, "ninguna")).toEqual({ texto: "Sin fecha de captura", origen: null });
     expect(fechaCaptura(segundos, null).origen).toBeNull();
+  });
+
+  it("fecha puesta a mano", () => {
+    const segundos = new Date(2019, 4, 12, 14, 30).getTime() / 1000;
+    expect(fechaCaptura(segundos, "manual").origen).toBe("Puesta a mano");
+  });
+
+  it("datos de la cámara", () => {
+    expect(exposicion(0.004)).toBe("1/250 s");
+    expect(exposicion(0.5)).toBe("1/2 s");
+    expect(exposicion(2)).toBe("2 s");
+    expect(exposicion(1.5)).toBe("1,5 s");
+    expect(apertura(2.8)).toBe("ƒ/2,8");
+    expect(apertura(8)).toBe("ƒ/8");
+    expect(focal(4.25, 26)).toBe("4,3 mm (26 mm en 35 mm)");
+    expect(focal(50, 50)).toBe("50 mm");
+    expect(focal(50, null)).toBe("50 mm");
+    expect(focal(null, 28)).toBe("28 mm en 35 mm");
+    expect(focal(null, null)).toBeNull();
+    expect(coordenadas([41.3851, -2.1734])).toBe("41,38510° N, 2,17340° O");
+    expect(coordenadas([-33.8688, 151.2093])).toBe("33,86880° S, 151,20930° E");
+  });
+
+  it("campos del formulario de fecha", () => {
+    const segundos = new Date(2019, 4, 2, 9, 5, 7).getTime() / 1000;
+    expect(camposFecha(segundos)).toEqual({ dia: "2019-05-02", hora: "09:05:07" });
+    expect(fechaManual("2019-05-02", "09:05")).toBe("2019-05-02 09:05:00");
+    expect(fechaManual("2019-05-02", "09:05:07")).toBe("2019-05-02 09:05:07");
+    expect(fechaManual("", "09:05")).toBeNull();
+    expect(fechaManual("2019-05-02", "")).toBeNull();
   });
 });
