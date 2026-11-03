@@ -18,7 +18,8 @@ use crate::files::{hash_file, is_hidden, unix_secs, year_month};
 use crate::index::{FileError, NewPhoto, hash_exists, insert_photo, read_orientation};
 use crate::library::{DATA_DIR, Library, ORIGINALS_DIR, TMP_DIR};
 use crate::paths::RelPath;
-use crate::taken::{Sidecars, Taken, improve_taken};
+use crate::taken::{Taken, improve_taken};
+use crate::takeout::{self, Sidecars};
 
 /// Resultado de una importación.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
@@ -150,11 +151,16 @@ fn import_file(
     let meta = fs::metadata(src)?;
     let modified = meta.modified()?;
     let hash = hash_file(src)?;
-    let taken = Taken::of_import(src, seen.sidecars);
+    let takeout_meta = seen.sidecars.photo(src);
+    let album = seen.sidecars.album(src);
+    let taken = Taken::of_import(src, takeout_meta.as_ref().and_then(|m| m.taken_at));
     if seen.imported.contains(&hash) || hash_exists(conn, &hash)? {
-        // Otra copia puede traer una fecha mejor: el .json de Takeout que no
-        // había cuando se importó, o el nombre de la copia de un álbum.
-        improve_taken(conn, &hash, &taken)?;
+        // Otra copia puede traer una fecha mejor y metadatos: el .json de
+        // Takeout que no había cuando se importó, o la copia de un álbum.
+        let tx = conn.unchecked_transaction()?;
+        improve_taken(&tx, &hash, &taken)?;
+        takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref())?;
+        tx.commit()?;
         return Ok(Outcome::Duplicate);
     }
 
@@ -195,6 +201,7 @@ fn import_file(
         taken,
     };
     insert_photo(&tx, &rel, &photo)?;
+    takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref())?;
     tx.commit()?;
     seen.imported.insert(hash);
     Ok(Outcome::Copied)
@@ -598,6 +605,171 @@ mod tests {
         );
         lib.import_from(&src).unwrap();
         assert_eq!(fechas(&lib)[0].2, "takeout");
+    }
+
+    /// Metadatos de cada foto, por ruta: descripción, latitud, favorita,
+    /// archivada y álbumes.
+    type Metadatos = (
+        String,
+        Option<String>,
+        Option<f64>,
+        i64,
+        bool,
+        Option<String>,
+    );
+
+    fn metadatos(lib: &Library) -> Vec<Metadatos> {
+        let mut stmt = lib
+            .connection()
+            .prepare(
+                "SELECT p.rel_path, p.description, p.latitude, p.favorite,
+                        p.archived_at IS NOT NULL,
+                        (SELECT group_concat(a.name, '|') FROM album_photos ap
+                         JOIN albums a ON a.id = ap.album_id WHERE ap.photo_id = p.id)
+                 FROM photos p ORDER BY p.rel_path",
+            )
+            .unwrap();
+        stmt.query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+            ))
+        })
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap()
+    }
+
+    const JSON_COMPLETO: &str = r#"{"title":"a.png","description":"Subida al Naranjo",
+        "photoTakenTime":{"timestamp":"1700000000"},
+        "geoData":{"latitude":43.2,"longitude":-4.8,"altitude":2519.0},
+        "favorited":true,"archived":true}"#;
+
+    const ALBUM_PICOS: &str = r#"{"title":"Picos de Europa","description":"",
+        "access":"protected","date":{"timestamp":"1700000000"}}"#;
+
+    /// Contenido de todos los archivos de una carpeta, para ver que no cambia.
+    fn contenido(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+        let mut files: Vec<_> = WalkDir::new(dir)
+            .into_iter()
+            .map(|e| e.unwrap())
+            .filter(|e| e.file_type().is_file())
+            .map(|e| (e.path().to_owned(), fs::read(e.path()).unwrap()))
+            .collect();
+        files.sort();
+        files
+    }
+
+    #[test]
+    fn importa_descripcion_ubicacion_favorita_archivo_y_album() {
+        let (dir, mut lib, _) = setup();
+        let takeout = dir.path().join("Takeout");
+        let anio = takeout.join("Fotos de 2023");
+        let picos = takeout.join("Picos");
+        // La misma foto en la carpeta del año y en la del álbum.
+        for carpeta in [&anio, &picos] {
+            write_png(&carpeta.join("a.png"), 1, 1, b"a");
+            fs::write(
+                carpeta.join("a.png.supplemental-metadata.json"),
+                JSON_COMPLETO,
+            )
+            .unwrap();
+        }
+        write_png(&picos.join("b.png"), 1, 1, b"b");
+        fs::write(picos.join("metadatos.json"), ALBUM_PICOS).unwrap();
+        write_png(&takeout.join("sin_json.png"), 1, 1, b"c");
+        let antes = contenido(&takeout);
+
+        let report = lib.import_from(&takeout).unwrap();
+        assert_eq!(
+            (report.copied, report.duplicates),
+            (3, 1),
+            "{:?}",
+            report.errors
+        );
+        assert_eq!(contenido(&takeout), antes);
+
+        let fotos = metadatos(&lib);
+        assert_eq!(fotos.len(), 3);
+        let a = fotos.iter().find(|f| f.0.ends_with("/a.png")).unwrap();
+        assert_eq!(
+            (&a.1, a.2, a.3, a.4, &a.5),
+            (
+                &Some("Subida al Naranjo".to_owned()),
+                Some(43.2),
+                1,
+                true,
+                &Some("Picos de Europa".to_owned())
+            )
+        );
+        let b = fotos.iter().find(|f| f.0.ends_with("/b.png")).unwrap();
+        assert_eq!(
+            (&b.1, b.3, b.4, &b.5),
+            (&None, 0, false, &Some("Picos de Europa".to_owned()))
+        );
+        let c = fotos
+            .iter()
+            .find(|f| f.0.ends_with("/sin_json.png"))
+            .unwrap();
+        assert_eq!((&c.1, c.2, c.3, c.4, &c.5), (&None, None, 0, false, &None));
+
+        let albumes: i64 = lib
+            .connection()
+            .query_row("SELECT count(*) FROM albums", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(albumes, 1);
+    }
+
+    #[test]
+    fn reimportar_completa_los_metadatos_sin_deshacer_cambios_ni_duplicar() {
+        let (dir, mut lib, _) = setup();
+        let takeout = dir.path().join("Takeout");
+        let anio = takeout.join("Fotos de 2023");
+        // Primera importación: sin .json, como las 1401 fotos de la spec 004.
+        write_png(&anio.join("a.png"), 1, 1, b"a");
+        lib.import_from(&takeout).unwrap();
+        assert_eq!(metadatos(&lib)[0].1, None);
+        let original = dir.path().join("Biblioteca").join(&metadatos(&lib)[0].0);
+        let bytes = fs::read(&original).unwrap();
+
+        // Ahora con su .json y con la copia del álbum.
+        fs::write(anio.join("a.png.supplemental-metadata.json"), JSON_COMPLETO).unwrap();
+        let picos = takeout.join("Picos");
+        write_png(&picos.join("a.png"), 1, 1, b"a");
+        fs::write(picos.join("metadata.json"), ALBUM_PICOS).unwrap();
+        let report = lib.import_from(&takeout).unwrap();
+        assert_eq!((report.copied, report.duplicates), (0, 2));
+        let a = &metadatos(&lib)[0];
+        assert_eq!(
+            (a.3, a.4, a.5.as_deref()),
+            (1, true, Some("Picos de Europa"))
+        );
+        assert_eq!(fs::read(&original).unwrap(), bytes);
+
+        // El usuario la quita de Favoritos y la desarchiva: reimportar no lo
+        // deshace, ni repite el álbum ni la entrada.
+        lib.connection()
+            .execute("UPDATE photos SET favorite = 0, archived_at = NULL", [])
+            .unwrap();
+        lib.import_from(&takeout).unwrap();
+        let a = &metadatos(&lib)[0];
+        assert_eq!(
+            (a.3, a.4, a.5.as_deref()),
+            (0, false, Some("Picos de Europa"))
+        );
+        let (albumes, entradas): (i64, i64) = lib
+            .connection()
+            .query_row(
+                "SELECT (SELECT count(*) FROM albums), (SELECT count(*) FROM album_photos)",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((albumes, entradas), (1, 1));
     }
 
     #[test]
