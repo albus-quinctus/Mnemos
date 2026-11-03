@@ -26,4 +26,4 @@ pub use library::{Library, LibraryInfo, PhotoDetails, PhotoMedia};
 pub use paths::RelPath;
 pub use search::{DateFilter, SearchQuery};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
-pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage};
+pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage, View};
