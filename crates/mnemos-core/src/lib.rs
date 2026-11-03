@@ -4,6 +4,7 @@
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
 pub mod db;
+pub mod duplicates;
 pub mod error;
 mod files;
 pub mod import;
@@ -15,6 +16,9 @@ mod taken;
 pub mod thumbnails;
 pub mod timeline;
 
+pub use duplicates::{
+    DuplicateCopy, DuplicateCursor, DuplicateGroup, DuplicatePage, DuplicateSummary,
+};
 pub use error::{Error, Result};
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
