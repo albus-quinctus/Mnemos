@@ -16,6 +16,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0005_indice_cronologico.sql"),
     include_str!("migrations/0006_fecha_captura.sql"),
     include_str!("migrations/0007_favoritos_archivo.sql"),
+    include_str!("migrations/0008_metadatos_takeout.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -183,6 +184,44 @@ mod tests {
                 .unwrap();
             assert_eq!(n, 1, "falta el índice {index}");
         }
+    }
+
+    #[test]
+    fn la_migracion_8_anade_los_metadatos_de_takeout_vacios() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        {
+            // Biblioteca en la versión 7 con una foto favorita.
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..7].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at, favorite)
+                 VALUES ('a.jpg', 1, 1, 1, 1)",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        let fila: (i64, Option<String>, Option<f64>, Option<i64>) = conn
+            .query_row(
+                "SELECT favorite, description, latitude, takeout_at FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(fila, (1, None, None, None));
+        // La ubicación tiene que estar en rango.
+        assert!(conn.execute("UPDATE photos SET latitude = 91", []).is_err());
+        assert!(
+            conn.execute("UPDATE photos SET longitude = -181", [])
+                .is_err()
+        );
     }
 
     #[test]

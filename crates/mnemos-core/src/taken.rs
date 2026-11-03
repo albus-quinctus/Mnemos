@@ -1,13 +1,10 @@
 //! Fecha de captura de una foto (spec 004): EXIF, nombre del archivo o el
 //! `.json` que deja Google Takeout.
 
-use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use mnemos_imaging::CaptureTime;
 use rusqlite::{Connection, params};
-use serde::Deserialize;
 
 use crate::error::Result;
 use crate::files::{days_from_civil, year_month};
@@ -129,16 +126,16 @@ impl Taken {
 
     /// Fecha de una foto que ya está en la biblioteca: EXIF o nombre.
     pub(crate) fn of_file(path: &Path) -> Self {
-        Self::find(path, |_| None)
+        Self::find(path, None)
     }
 
     /// Fecha de una foto que se importa: como [`Taken::of_file`], más el
-    /// `.json` de Takeout que tenga al lado.
-    pub(crate) fn of_import(path: &Path, sidecars: &mut Sidecars) -> Self {
-        Self::find(path, |p| sidecars.taken_at(p))
+    /// `photoTakenTime` del `.json` de Takeout que tenga al lado.
+    pub(crate) fn of_import(path: &Path, takeout: Option<i64>) -> Self {
+        Self::find(path, takeout)
     }
 
-    fn find(path: &Path, takeout: impl FnOnce(&Path) -> Option<i64>) -> Self {
+    fn find(path: &Path, takeout: Option<i64>) -> Self {
         if let Some(t) = mnemos_imaging::capture_time(path) {
             return Self::new(When::Local(t), Source::Exif);
         }
@@ -149,7 +146,7 @@ impl Taken {
         let from_name = date_in_name(&name);
         match from_name {
             Some((when, true)) => Self::new(when, Source::Name),
-            _ => match takeout(path) {
+            _ => match takeout {
                 Some(secs) => Self::new(When::Unix(secs), Source::Takeout),
                 None => from_name.map_or(Self::NONE, |(when, _)| Self::new(when, Source::NameDay)),
             },
@@ -341,106 +338,6 @@ fn with_time(date: CaptureTime, hour: &str, minute: &str, second: &str) -> Optio
     t.is_valid().then_some(t)
 }
 
-/// Los `.json` de Google Takeout de cada carpeta del origen, leídos una sola
-/// vez por carpeta.
-#[derive(Debug, Default)]
-pub(crate) struct Sidecars {
-    dirs: HashMap<PathBuf, Vec<String>>,
-}
-
-/// Sufijos que Google Fotos añade a las copias editadas, que no tienen `.json`
-/// propio: se usa el del original.
-const EDITED_SUFFIXES: &[&str] = &["-editada", "-editado", "-edited"];
-
-const SUPPLEMENTAL: &str = ".supplemental-metadata";
-
-impl Sidecars {
-    /// `photoTakenTime` del `.json` de la foto, en segundos Unix.
-    pub(crate) fn taken_at(&mut self, photo: &Path) -> Option<i64> {
-        let dir = photo.parent()?;
-        let name = photo.file_name()?.to_str()?;
-        let jsons = self.dirs.entry(dir.to_owned()).or_insert_with(|| {
-            fs::read_dir(dir)
-                .into_iter()
-                .flatten()
-                .filter_map(|e| e.ok()?.file_name().into_string().ok())
-                .filter(|n| n.to_ascii_lowercase().ends_with(".json"))
-                .collect()
-        });
-        let json = sidecar_for(name, jsons)?;
-        read_photo_taken_time(&dir.join(json))
-    }
-}
-
-/// Nombre del `.json` de `photo` entre los de su carpeta.
-///
-/// Takeout lo llama `foto.jpg.supplemental-metadata.json` (o `foto.jpg.json`
-/// en exportaciones antiguas), lo trunca si es muy largo y, en las copias
-/// `foto(1).jpg`, mueve el número al final: `foto.jpg.supplemental-metadata(1).json`.
-fn sidecar_for<'a>(photo: &str, jsons: &'a [String]) -> Option<&'a str> {
-    let (stem, ext) = match photo.rfind('.') {
-        Some(dot) => (&photo[..dot], &photo[dot..]),
-        None => (photo, ""),
-    };
-    let mut stems = vec![stem];
-    stems.extend(EDITED_SUFFIXES.iter().filter_map(|s| stem.strip_suffix(s)));
-    // Primero el nombre tal cual (`foto (1).jpg.supplemental-metadata.json`),
-    // después sin el número de copia (`foto.jpg.supplemental-metadata(1).json`).
-    let candidates = stems.into_iter().flat_map(|stem| {
-        let (core, copy) = split_copy(stem);
-        [(stem, None), (core.trim_end(), copy)]
-    });
-    for (core, copy) in candidates {
-        let full = format!("{core}{ext}");
-        let long = format!("{full}{SUPPLEMENTAL}");
-        let found = jsons.iter().find(|json| {
-            let base = &json[..json.len() - ".json".len()];
-            let (base, json_copy) = split_copy(base);
-            json_copy == copy
-                && (base == full
-                    || (base.len() > full.len() && long.starts_with(base))
-                    // Nombre tan largo que Takeout lo cortó antes de la extensión.
-                    || (base.len() >= 40 && full.starts_with(base)))
-        });
-        if let Some(json) = found {
-            return Some(json);
-        }
-    }
-    None
-}
-
-/// Separa el número de copia final: `foto(1)` → (`foto`, `Some("1")`).
-fn split_copy(stem: &str) -> (&str, Option<&str>) {
-    if let Some(open) = stem.strip_suffix(')').and_then(|s| s.rfind('(')) {
-        let n = &stem[open + 1..stem.len() - 1];
-        if !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()) {
-            return (&stem[..open], Some(n));
-        }
-    }
-    (stem, None)
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TakeoutJson {
-    photo_taken_time: Option<TakeoutTime>,
-}
-
-#[derive(Deserialize)]
-struct TakeoutTime {
-    timestamp: String,
-}
-
-fn read_photo_taken_time(path: &Path) -> Option<i64> {
-    // Los .json de Takeout ocupan unos cientos de bytes; uno enorme no es suyo.
-    if fs::metadata(path).ok()?.len() > 1 << 20 {
-        return None;
-    }
-    let json: TakeoutJson = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
-    let secs: i64 = json.photo_taken_time?.timestamp.parse().ok()?;
-    (secs > 0).then_some(secs)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -566,66 +463,5 @@ mod tests {
             Taken::new(When::Local(t), Source::Exif).when,
             Some(When::Unix(1_557_664_200))
         );
-    }
-
-    #[test]
-    fn encuentra_el_json_de_takeout() {
-        let jsons: Vec<String> = [
-            "IMG-20181215-WA0003.jpg.supplemental-metadata.json",
-            "IMG20220110212038.jpg.supplemental-metadata(1).json",
-            "IMG20220110212038.jpg.supplemental-metadata.json",
-            "antigua.jpg.json",
-            "nombre muy largo que google takeout corta antes de.json",
-            "foto.png.supplemental-me.json",
-            "metadatos.json",
-            "Untitled (1).png.supplemental-metadata.json",
-        ]
-        .map(String::from)
-        .into();
-        let casos = [
-            ("IMG-20181215-WA0003.jpg", Some(&jsons[0])),
-            ("IMG-20181215-WA0003-editada.jpg", Some(&jsons[0])),
-            ("IMG20220110212038(1).jpg", Some(&jsons[1])),
-            ("IMG20220110212038.jpg", Some(&jsons[2])),
-            ("antigua.jpg", Some(&jsons[3])),
-            (
-                "nombre muy largo que google takeout corta antes de la extension.jpg",
-                Some(&jsons[4]),
-            ),
-            ("foto.png", Some(&jsons[5])),
-            ("Untitled (1).png", Some(&jsons[7])),
-            ("foto.jpg", None),
-            ("otra.jpg", None),
-        ];
-        for (foto, json) in casos {
-            assert_eq!(
-                sidecar_for(foto, &jsons),
-                json.map(String::as_str),
-                "{foto}"
-            );
-        }
-    }
-
-    #[test]
-    fn lee_photo_taken_time_e_ignora_json_raros() {
-        let dir = tempfile::tempdir().unwrap();
-        let foto = dir.path().join("IMG_1.jpg");
-        let json = dir.path().join("IMG_1.jpg.supplemental-metadata.json");
-        fs::write(
-            &json,
-            r#"{"title":"IMG_1.jpg","creationTime":{"timestamp":"1715871078"},
-               "photoTakenTime":{"timestamp":"1679579100","formatted":"23 mar 2023"}}"#,
-        )
-        .unwrap();
-        assert_eq!(Sidecars::default().taken_at(&foto), Some(1_679_579_100));
-
-        for raro in [
-            "{}",
-            "no es json",
-            r#"{"photoTakenTime":{"timestamp":"0"}}"#,
-        ] {
-            fs::write(&json, raro).unwrap();
-            assert_eq!(Sidecars::default().taken_at(&foto), None, "{raro}");
-        }
     }
 }
