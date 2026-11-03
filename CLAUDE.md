@@ -17,6 +17,7 @@ Gestor de fotos portátil, local y de código abierto. Funciona desde un disco e
 3. Las pruebas usan `tests/fixtures/`, nunca una biblioteca real.
 4. Sin servicios en la nube, cuentas ni telemetría.
 5. Sin `unsafe` en Rust sin una nota `// SAFETY:` y una decisión en `docs/decisiones/`.
+6. **No mencionar la participación de la IA en el proyecto.** En ningún commit, PR, descripción, comentario, issue, release ni documento: sin `Co-Authored-By` de asistentes, sin pies "Generated with/by", sin enlaces ni líneas de sesión, y con autor y committer `albus-quinctus`. Si una herramienta añade esas líneas, se borran antes de publicar (o justo después, editando el PR) y se comprueba que no quedan.
 
 ## Cómo trabajar
 - Empieza leyendo `docs/progreso.md`. No leas más documentos de los que la tarea necesite.
@@ -24,7 +25,6 @@ Gestor de fotos portátil, local y de código abierto. Funciona desde un disco e
 - Cada funcionalidad tiene su especificación en `docs/specs/`. Si no existe, escríbela antes de programar.
 - Al terminar: pruebas en verde, actualiza `docs/progreso.md` y abre un PR pequeño contra `develop` (nunca contra `main`).
 - Commits y títulos de PR en [Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/): `feat(core): añade indexado de carpetas`.
-- Sin menciones a la IA en commits ni PR: nada de `Co-Authored-By` de asistentes ni pies "Generated with".
 - Lee archivos por rangos y acota las búsquedas. Responde de forma breve.
 
 ## Más detalle (solo si hace falta)

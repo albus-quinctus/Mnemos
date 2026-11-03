@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
+use mnemos_core::duplicates::MAX_GROUPS_PAGE;
 use mnemos_core::{
     FileError, ImportReport, IndexReport, Library, LibraryInfo, Result, ThumbnailReport,
 };
@@ -12,7 +13,8 @@ const USAGE: &str = "Uso:
   mnemos info <biblioteca>            Muestra el resumen de la biblioteca
   mnemos index <biblioteca>           Registra las fotos que hay en Originales/
   mnemos import <biblioteca> <origen> Copia las fotos de <origen> a la biblioteca
-  mnemos miniaturas <biblioteca>      Genera las miniaturas que faltan";
+  mnemos miniaturas <biblioteca>      Genera las miniaturas que faltan
+  mnemos duplicados <biblioteca>      Lista las fotos repetidas (no borra nada)";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,6 +31,7 @@ fn main() -> ExitCode {
         ["miniaturas", lib] => Library::open(Path::new(lib))
             .and_then(|lib| lib.generate_thumbnails())
             .map(|r| print_thumbnails(&r)),
+        ["duplicados", lib] => Library::open(Path::new(lib)).and_then(|lib| print_duplicates(&lib)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -76,6 +79,68 @@ fn print_thumbnails(r: &ThumbnailReport) -> bool {
     }
     // Un formato sin miniatura no es un error de la orden.
     true
+}
+
+/// Lista los grupos de fotos repetidas. Solo consulta: no toca nada.
+fn print_duplicates(lib: &Library) -> Result<bool> {
+    let s = lib.duplicate_summary()?;
+    if s.groups == 0 {
+        println!("No hay fotos repetidas.");
+        return Ok(true);
+    }
+    println!("Grupos:          {}", s.groups);
+    println!("Copias de más:   {}", s.extra_copies);
+    println!("Espacio de más:  {}", human_bytes(s.extra_bytes));
+    let mut cursor = None;
+    loop {
+        let page = lib.duplicate_groups(cursor.as_ref(), MAX_GROUPS_PAGE)?;
+        for g in &page.groups {
+            let size = g.copies.first().map_or(0, |c| c.size_bytes);
+            println!();
+            println!(
+                "{} copias · {} · {}",
+                g.copies.len(),
+                human_bytes(size),
+                &g.content_hash[..g.content_hash.len().min(12)]
+            );
+            for c in &g.copies {
+                let mut notes = Vec::new();
+                if c.favorite {
+                    notes.push("favorita");
+                }
+                if c.archived {
+                    notes.push("archivada");
+                }
+                if !c.exists {
+                    notes.push("desaparecida");
+                }
+                if notes.is_empty() {
+                    println!("  {}", c.rel_path);
+                } else {
+                    println!("  {} ({})", c.rel_path, notes.join(", "));
+                }
+            }
+        }
+        match page.next {
+            Some(next) => cursor = Some(next),
+            None => return Ok(true),
+        }
+    }
+}
+
+fn human_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes} B")
+    } else {
+        format!("{value:.1} {}", UNITS[unit]).replace('.', ",")
+    }
 }
 
 /// Muestra los errores por archivo. Devuelve `true` si no hubo ninguno.
