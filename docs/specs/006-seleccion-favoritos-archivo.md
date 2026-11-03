@@ -130,10 +130,10 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 ## Criterios de aceptación
 - [x] Marcar y desmarcar favoritos sobre una selección cambia exactamente esas
   fotos y nada más (prueba automática).
-- [ ] La línea de tiempo y la barra de meses de Fotos no incluyen fotos
+- [x] La línea de tiempo y la barra de meses de Fotos no incluyen fotos
   archivadas; Archivo solo incluye archivadas; Favoritos incluye favoritas
   archivadas o no (prueba automática).
-- [ ] La búsqueda devuelve las fotos archivadas (prueba automática).
+- [x] La búsqueda devuelve las fotos archivadas (prueba automática).
 - [ ] El rango de `Mayús` + clic incluye las fotos de páginas no cargadas, en
   el orden de la cuadrícula (prueba automática del núcleo y de la interfaz).
 - [x] Si la escritura falla a mitad de una selección, ninguna foto cambia
@@ -141,7 +141,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 - [ ] Favoritos, archivo y títulos sobreviven a cerrar la app y abrir la
   biblioteca desde otro equipo (prueba automática con copia de la biblioteca a
   otra ruta).
-- [ ] Marcar o archivar 10 000 fotos sintéticas tarda menos de 1 s y paginar
+- [x] Marcar o archivar 10 000 fotos sintéticas tarda menos de 1 s y paginar
   Fotos, Favoritos y Archivo sigue por debajo de lo medido en
   `docs/rendimiento.md`.
 - [ ] Deshacer devuelve las fotos a su estado anterior.
@@ -167,7 +167,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
    prueba de migración desde una biblioteca v6.
 2. [x] Núcleo: marcar y desmarcar favoritos y archivar o desarchivar una lista
    de ids en una transacción, con pruebas (incluido el fallo a mitad).
-3. [ ] Núcleo: filtro de vista (Fotos sin archivadas, Favoritos, Archivo) en
+3. [x] Núcleo: filtro de vista (Fotos sin archivadas, Favoritos, Archivo) en
    meses y páginas de la línea de tiempo, con la búsqueda incluyendo
    archivadas. Medición con 10 000 fotos.
 4. [ ] Núcleo: ids de un día, de toda la vista y de un rango entre dos fotos,

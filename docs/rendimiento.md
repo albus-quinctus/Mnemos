@@ -40,12 +40,14 @@ Cada tiempo es lo que tarda la interfaz en tener los meses con resultados y la p
 Las palabras que casan con todas las fotos son el peor caso, porque se cuentan todas para la barra de meses.
 
 ### Favoritos y archivo en el núcleo, 10 000 fotos (2026-11-03)
-Spec 006, tarea 2. Mismo equipo. El objetivo es menos de 1 s.
+Spec 006, tareas 2 y 3. Mismo equipo. El objetivo es menos de 1 s.
 
 | Acción sobre las 10 000 fotos | Tiempo |
 |---|---|
 | Añadir a Favoritos | 35 ms |
 | Archivar | 36 ms |
+
+Con las 10 000 en Favoritos y archivadas (el peor caso para esas vistas), los meses y la primera página de 500 de Favoritos tardan 13 ms y los de Archivo 12 ms. La vista Fotos sigue en 7 ms para los meses y 1,5 ms la página más lenta.
 
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
@@ -75,3 +77,11 @@ La miniatura reducida y la completa difieren en unos 44 dB de PSNR: no se distin
 ## Pendiente
 - Repetir el indexado y las miniaturas desde un HDD externo con fotos reales de cámara de 12 a 24 MP. Las sintéticas son pequeñas y el disco del contenedor es rápido, así que las miniaturas reales tardarán más por foto.
 - Medir el visor dentro de la aplicación Tauri (WebView2, WKWebView, WebKitGTK) y no solo en Chromium.
+
+## Duplicados exactos (spec 010, 2026-11-03)
+`cargo test --release -p mnemos-core --test rendimiento duplicados -- --ignored --nocapture`. Filas insertadas directamente en la base de datos, una de cada diez con la huella repetida (1000 grupos). Mismo contenedor.
+
+| Paso | Tiempo |
+|---|---|
+| Resumen y primera página de 50 grupos | 4,5 ms |
+| Recorrer los 1000 grupos de 50 en 50 | 49 ms en total |
