@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
 use mnemos_core::{
-    ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso, SearchQuery, ThumbnailQueue,
-    TimelineCursor, TimelinePage,
+    ExportSize, ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso, SearchQuery,
+    ThumbnailQueue, TimelineCursor, TimelinePage,
 };
 use serde::Serialize;
 use tauri::http::{Method, StatusCode, header};
@@ -208,6 +208,27 @@ fn detalles(id: i64, estado: State<'_, OpenLibrary>) -> Result<Option<PhotoDetai
     with_library(&estado, |lib| lib.photo_details(id))
 }
 
+/// Exporta la foto `id` a la carpeta `carpeta` (spec 008) y devuelve la ruta
+/// del archivo creado. La biblioteca solo se bloquea para traducir el id: la
+/// copia o la reducción se hacen fuera, en un hilo aparte.
+#[tauri::command(async)]
+fn exportar(
+    id: i64,
+    carpeta: String,
+    tamano: ExportSize,
+    estado: State<'_, OpenLibrary>,
+) -> Result<String, String> {
+    let (root, media) = with_library(&estado, |lib| {
+        let media = lib
+            .photo_media(id)?
+            .ok_or(mnemos_core::Error::PhotoNotFound(id))?;
+        Ok((lib.root().to_path_buf(), media))
+    })?;
+    mnemos_core::export::export(&root, &media, Path::new(&carpeta), tamano)
+        .map(|ruta| ruta.display().to_string())
+        .map_err(|e| e.to_string())
+}
+
 /// Lo que la interfaz recibe sobre una importación. `estado` puede ser
 /// `en_curso`, `terminada`, `cancelada` o `fallida`.
 #[derive(Serialize, Clone, Default)]
@@ -397,6 +418,7 @@ pub fn run() {
             buscar_meses,
             buscar_fotos,
             detalles,
+            exportar,
             priorizar_miniaturas,
             importar,
             cancelar_importacion,

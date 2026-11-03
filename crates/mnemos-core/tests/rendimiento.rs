@@ -1,4 +1,4 @@
-//! Prueba de rendimiento de las specs 002 y 003 con una biblioteca sintética.
+//! Prueba de rendimiento de las specs 002, 003 y 006 con una biblioteca sintética.
 //!
 //! No corre con `cargo test` normal porque tarda. Se lanza en modo release:
 //!
@@ -168,6 +168,21 @@ fn biblioteca_de_10000_fotos() {
         lib.photo_details(total as i64 / 2).unwrap().unwrap()
     });
 
+    // Spec 006: marcar y archivar la biblioteca entera de una vez.
+    let todas: Vec<i64> = lib
+        .connection()
+        .prepare("SELECT id FROM photos")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    let (_, tiempo_favoritos) = medir("añadir todas a Favoritos", || {
+        lib.set_favorite(&todas, true).unwrap()
+    });
+    let (_, tiempo_archivar) = medir("archivar todas", || lib.set_archived(&todas, true).unwrap());
+    lib.set_archived(&todas, false).unwrap();
+
     let miniaturas = raiz.join(".mnemos/miniaturas");
     let ocupado: u64 = walk_size(&miniaturas);
     println!(
@@ -189,6 +204,10 @@ fn biblioteca_de_10000_fotos() {
     assert!(
         tiempo_detalles < Duration::from_millis(20),
         "{tiempo_detalles:?}"
+    );
+    assert!(
+        tiempo_favoritos.max(tiempo_archivar) < Duration::from_secs(1),
+        "{tiempo_favoritos:?} {tiempo_archivar:?}"
     );
 }
 

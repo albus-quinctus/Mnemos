@@ -39,6 +39,14 @@ Cada tiempo es lo que tarda la interfaz en tener los meses con resultados y la p
 
 Las palabras que casan con todas las fotos son el peor caso, porque se cuentan todas para la barra de meses.
 
+### Favoritos y archivo en el núcleo, 10 000 fotos (2026-11-03)
+Spec 006, tarea 2. Mismo equipo. El objetivo es menos de 1 s.
+
+| Acción sobre las 10 000 fotos | Tiempo |
+|---|---|
+| Añadir a Favoritos | 35 ms |
+| Archivar | 36 ms |
+
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
 |---|---|---|
