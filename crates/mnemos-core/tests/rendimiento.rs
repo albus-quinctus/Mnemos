@@ -17,7 +17,9 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
-use mnemos_core::{Library, SearchQuery, ThumbnailEvent, ThumbnailQueue, View};
+use mnemos_core::{
+    Library, Scope, SearchQuery, ThumbnailEvent, ThumbnailQueue, TimelineCursor, View,
+};
 
 const PAGINA: u32 = 500;
 // Tres años hacia atrás desde el 26-10-2026.
@@ -201,6 +203,36 @@ fn biblioteca_de_10000_fotos() {
     }
     lib.set_archived(&todas, false).unwrap();
 
+    // Selección sin cargar páginas: Ctrl + A y un rango de punta a punta.
+    let fotos = Scope::View(View::Photos);
+    let (seleccion, tiempo_todo) = medir("seleccionar todo (Ctrl + A)", || {
+        lib.select_all(fotos).unwrap()
+    });
+    assert_eq!(seleccion.len(), total);
+    let primera = lib.timeline_page(None, 1).unwrap().photos[0].clone();
+    let ultima = {
+        let mut cursor = None;
+        let mut ultima = None;
+        loop {
+            let pagina = lib.timeline_page(cursor, 1000).unwrap();
+            ultima = pagina.photos.last().cloned().or(ultima);
+            match pagina.next {
+                Some(siguiente) => cursor = Some(siguiente),
+                None => break,
+            }
+        }
+        ultima.unwrap()
+    };
+    let extremo = |p: &mnemos_core::GridPhoto| TimelineCursor {
+        date: p.date,
+        id: p.id,
+    };
+    let (rango, tiempo_rango) = medir("seleccionar de la primera a la última", || {
+        lib.select_range(fotos, extremo(&primera), extremo(&ultima))
+            .unwrap()
+    });
+    assert_eq!(rango, seleccion);
+
     let miniaturas = raiz.join(".mnemos/miniaturas");
     let ocupado: u64 = walk_size(&miniaturas);
     println!(
@@ -228,6 +260,10 @@ fn biblioteca_de_10000_fotos() {
         "{tiempo_favoritos:?} {tiempo_archivar:?}"
     );
     assert!(peor_vista < Duration::from_millis(200), "{peor_vista:?}");
+    assert!(
+        tiempo_todo.max(tiempo_rango) < Duration::from_millis(200),
+        "{tiempo_todo:?} {tiempo_rango:?}"
+    );
 }
 
 fn walk_size(dir: &Path) -> u64 {

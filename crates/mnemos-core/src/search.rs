@@ -144,7 +144,7 @@ impl Library {
 
     /// Condición SQL de la consulta, o nada si no puede tener resultados: un
     /// mes o un día sin año del que no hay ninguna foto.
-    fn search_filter(&self, query: &SearchQuery) -> Result<Option<Filter>> {
+    pub(crate) fn search_filter(&self, query: &SearchQuery) -> Result<Option<Filter>> {
         let mut filter = Filter::default();
         if let Some(expr) = query.fts_match() {
             filter
