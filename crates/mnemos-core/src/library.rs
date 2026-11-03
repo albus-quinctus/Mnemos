@@ -1,12 +1,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 use crate::db;
 use crate::error::{Error, Result};
 use crate::paths::RelPath;
+use crate::taken;
 
 /// Carpeta con las fotos originales. MNEMOS nunca modifica su contenido.
 pub const ORIGINALS_DIR: &str = "Originales";
@@ -53,9 +54,13 @@ pub struct PhotoDetails {
     pub modified_at: i64,
     /// Fecha de captura (spec 004), si se encontró.
     pub taken_at: Option<i64>,
-    /// De dónde salió: `exif`, `nombre`, `takeout` o `nombre_dia`; `ninguna`
-    /// si se buscó y no hay; `None` si aún no se ha buscado.
+    /// De dónde salió: `exif`, `nombre`, `takeout` o `nombre_dia`; `manual`
+    /// si se puso a mano (spec 011); `ninguna` si se buscó y no hay; `None` si
+    /// aún no se ha buscado.
     pub taken_source: Option<String>,
+    /// Con fecha a mano, la automática a la que se puede volver y su fuente.
+    pub taken_auto_at: Option<i64>,
+    pub taken_auto_source: Option<String>,
     /// Formato según la extensión, en mayúsculas: "JPEG", "PNG", "DNG"…
     pub format: String,
 }
@@ -132,7 +137,7 @@ impl Library {
             .conn
             .query_row(
                 "SELECT rel_path, width, height, size_bytes, modified_at, coalesce(orientation, 1),
-                        taken_at, taken_source
+                        taken_at, taken_source, taken_auto_at, taken_auto_source
                  FROM photos WHERE id = ?1",
                 [id],
                 |r| {
@@ -145,12 +150,25 @@ impl Library {
                         r.get::<_, u16>(5)?,
                         r.get::<_, Option<i64>>(6)?,
                         r.get::<_, Option<String>>(7)?,
+                        r.get::<_, Option<i64>>(8)?,
+                        r.get::<_, Option<String>>(9)?,
                     ))
                 },
             )
             .optional()?;
         Ok(row.map(
-            |(rel_path, w, h, size_bytes, modified_at, orientation, taken_at, taken_source)| {
+            |(
+                rel_path,
+                w,
+                h,
+                size_bytes,
+                modified_at,
+                orientation,
+                taken_at,
+                taken_source,
+                taken_auto_at,
+                taken_auto_source,
+            )| {
                 let (width, height) = if mnemos_imaging::swaps_dimensions(orientation) {
                     (h, w)
                 } else {
@@ -165,9 +183,53 @@ impl Library {
                     modified_at,
                     taken_at,
                     taken_source,
+                    taken_auto_at,
+                    taken_auto_source,
                 }
             },
         ))
+    }
+
+    /// Pone a mano la fecha de captura de la foto `id` (spec 011). `local` es
+    /// la hora local `AAAA-MM-DD hh:mm[:ss]`, que se pasa a UTC con la zona del
+    /// equipo, como el EXIF sin desfase. La fecha automática que tenía se
+    /// guarda para poder volver a ella. Solo cambia la base de datos.
+    /// Devuelve `false` si la foto no existe.
+    pub fn set_manual_taken(&self, id: i64, local: &str) -> Result<bool> {
+        let local =
+            taken::parse_manual(local).ok_or_else(|| Error::InvalidDate(local.to_owned()))?;
+        // En un UPDATE, la derecha de cada asignación ve la fila de antes.
+        let changed = self.conn.execute(
+            &format!(
+                "UPDATE photos SET
+                    taken_auto_at = CASE WHEN taken_source = '{m}' THEN taken_auto_at
+                                         ELSE taken_at END,
+                    taken_auto_source = CASE WHEN taken_source = '{m}' THEN taken_auto_source
+                                             ELSE taken_source END,
+                    taken_at = unixepoch(?2, 'utc'),
+                    taken_source = '{m}'
+                 WHERE id = ?1",
+                m = taken::MANUAL
+            ),
+            params![id, local],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// Quita la fecha a mano de la foto `id` y vuelve a la automática que
+    /// tenía. Devuelve `false` si la foto no existe o no tenía fecha a mano.
+    pub fn clear_manual_taken(&self, id: i64) -> Result<bool> {
+        let changed = self.conn.execute(
+            &format!(
+                "UPDATE photos SET
+                    taken_at = taken_auto_at, taken_source = taken_auto_source,
+                    taken_auto_at = NULL, taken_auto_source = NULL
+                 WHERE id = ?1 AND taken_source = '{}'",
+                taken::MANUAL
+            ),
+            [id],
+        )?;
+        Ok(changed > 0)
     }
 
     pub fn info(&self) -> Result<LibraryInfo> {
@@ -261,10 +323,115 @@ mod tests {
                 modified_at: 1_791_892_800,
                 taken_at: Some(1_557_664_200),
                 taken_source: Some("exif".to_owned()),
+                taken_auto_at: None,
+                taken_auto_source: None,
                 format: "JPEG".to_owned(),
             }
         );
         assert_eq!(lib.photo_details(id + 1).unwrap(), None);
+    }
+
+    /// Fecha (en hora local), fuente y fecha automática de reserva de `id`.
+    fn fecha(
+        lib: &Library,
+        id: i64,
+    ) -> (
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) {
+        lib.connection()
+            .query_row(
+                "SELECT strftime('%Y-%m-%d %H:%M:%S', taken_at, 'unixepoch', 'localtime'),
+                        taken_source,
+                        strftime('%Y-%m-%d %H:%M:%S', taken_auto_at, 'unixepoch', 'localtime'),
+                        taken_auto_source
+                 FROM photos WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn pone_y_quita_una_fecha_a_mano_sin_tocar_el_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lib = Library::create(dir.path()).unwrap();
+        let original = dir.path().join("Originales/2026/10/camara.jpg");
+        fs::create_dir_all(original.parent().unwrap()).unwrap();
+        fs::write(
+            &original,
+            include_bytes!("../../../tests/fixtures/fecha-exif.jpg"),
+        )
+        .unwrap();
+        let antes = fs::read(&original).unwrap();
+        lib.index().unwrap();
+        let id: i64 = lib
+            .connection()
+            .query_row("SELECT id FROM photos", [], |r| r.get(0))
+            .unwrap();
+        let s = |v: &str| Some(v.to_owned());
+        let exif = (s("2015-06-01 10:20:30"), s("exif"), None, None);
+        assert_eq!(fecha(&lib, id), exif);
+
+        assert!(lib.set_manual_taken(id, "1987-03-04 05:06").unwrap());
+        assert_eq!(
+            fecha(&lib, id),
+            (
+                s("1987-03-04 05:06:00"),
+                s("manual"),
+                s("2015-06-01 10:20:30"),
+                s("exif")
+            )
+        );
+        let details = lib.photo_details(id).unwrap().unwrap();
+        assert_eq!(details.taken_source.as_deref(), Some("manual"));
+        assert_eq!(details.taken_auto_source.as_deref(), Some("exif"));
+
+        // Cambiarla otra vez no pierde la automática.
+        assert!(lib.set_manual_taken(id, "1988-01-01 00:00:00").unwrap());
+        assert_eq!(fecha(&lib, id).2, s("2015-06-01 10:20:30"));
+
+        assert!(lib.clear_manual_taken(id).unwrap());
+        assert_eq!(fecha(&lib, id), exif);
+        // Sin fecha a mano no hay nada que quitar.
+        assert!(!lib.clear_manual_taken(id).unwrap());
+
+        assert_eq!(fs::read(&original).unwrap(), antes);
+    }
+
+    #[test]
+    fn rechaza_fechas_imposibles_y_fotos_que_no_existen() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = Library::create(dir.path()).unwrap();
+        lib.connection()
+            .execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at, taken_source)
+                 VALUES ('Originales/a.png', 1, 1, 1, 'ninguna')",
+                [],
+            )
+            .unwrap();
+        let id = lib.connection().last_insert_rowid();
+        for mala in ["2019-02-30 10:00", "1850-01-01 00:00", "ayer"] {
+            assert!(matches!(
+                lib.set_manual_taken(id, mala),
+                Err(Error::InvalidDate(_))
+            ));
+        }
+        assert_eq!(
+            fecha(&lib, id),
+            (None, Some("ninguna".to_owned()), None, None)
+        );
+        assert!(!lib.set_manual_taken(id + 1, "2019-02-28 10:00").unwrap());
+
+        // Sin fecha automática, volver deja la foto como estaba.
+        assert!(lib.set_manual_taken(id, "2019-02-28 10:00").unwrap());
+        assert!(lib.clear_manual_taken(id).unwrap());
+        assert_eq!(
+            fecha(&lib, id),
+            (None, Some("ninguna".to_owned()), None, None)
+        );
     }
 
     #[test]

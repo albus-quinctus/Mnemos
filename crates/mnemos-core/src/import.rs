@@ -551,6 +551,44 @@ mod tests {
     }
 
     #[test]
+    fn reimportar_takeout_no_pisa_una_fecha_a_mano() {
+        let (dir, mut lib, src) = setup();
+        let foto = src.join("sin_fecha.png");
+        write_png(&foto, 1, 1, b"a");
+        lib.import_from(&src).unwrap();
+        let id: i64 = lib
+            .connection()
+            .query_row("SELECT id FROM photos", [], |r| r.get(0))
+            .unwrap();
+        lib.set_manual_taken(id, "2001-01-01 12:00").unwrap();
+
+        let album = dir.path().join("Takeout/Album");
+        fs::create_dir_all(&album).unwrap();
+        fs::copy(&foto, album.join("sin_fecha.png")).unwrap();
+        takeout_json(
+            &album.join("sin_fecha.png.supplemental-metadata.json"),
+            NOV_2023 as i64,
+        );
+        lib.import_from(&dir.path().join("Takeout")).unwrap();
+
+        let (_, fecha, fuente) = &fechas(&lib)[0];
+        assert_eq!(
+            (fecha.as_deref(), fuente.as_str()),
+            (Some("2001-01-01 12:00:00"), "manual")
+        );
+        // La fecha del .json queda como la automática a la que volver.
+        let reserva: (i64, String) = lib
+            .connection()
+            .query_row(
+                "SELECT taken_auto_at, taken_auto_source FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(reserva, (NOV_2023 as i64, "takeout".to_owned()));
+    }
+
+    #[test]
     fn usa_el_json_del_original_en_las_copias_editadas() {
         let (_dir, mut lib, src) = setup();
         write_png(&src.join("foto-editada.png"), 1, 1, b"a");

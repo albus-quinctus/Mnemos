@@ -523,4 +523,36 @@ pub(crate) mod tests {
             ]
         );
     }
+
+    #[test]
+    fn no_pisa_una_fecha_a_mano_aunque_el_archivo_cambie() {
+        let (dir, mut lib) = library();
+        let foto = dir.path().join("Originales/IMG_20190512_143000.png");
+        write_png(&foto, 1, 1, b"a");
+        lib.index().unwrap();
+        let id: i64 = lib
+            .connection()
+            .query_row("SELECT id FROM photos", [], |r| r.get(0))
+            .unwrap();
+        lib.set_manual_taken(id, "2001-01-01 12:00").unwrap();
+
+        // Otro programa cambia el archivo (sin pasar por MNEMOS).
+        write_png(&foto, 2, 2, b"b");
+        set_mtime(&foto, 1_800_000_000);
+        assert_eq!(lib.index().unwrap().updated, 1);
+        let fila: (String, String, String) = lib
+            .connection()
+            .query_row(
+                "SELECT strftime('%Y-%m-%d %H:%M', taken_at, 'unixepoch', 'localtime'),
+                        taken_source, taken_auto_source
+                 FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            fila,
+            ("2001-01-01 12:00".into(), "manual".into(), "nombre".into())
+        );
+    }
 }

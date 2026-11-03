@@ -49,15 +49,15 @@ línea de tiempo.
   equipo, igual que el EXIF sin desfase.
 
 ## Criterios de aceptación
-- [ ] El panel muestra cámara, objetivo, exposición, apertura, ISO, focal, flash
+- [x] El panel muestra cámara, objetivo, exposición, apertura, ISO, focal, flash
       y GPS de una foto con EXIF, y nada de eso en una sin EXIF.
-- [ ] Guardar una fecha a mano cambia `taken_at` a esa hora local y
+- [x] Guardar una fecha a mano cambia `taken_at` a esa hora local y
       `taken_source` a `manual`.
-- [ ] Volver a la fecha automática deja `taken_at` y `taken_source` como estaban.
-- [ ] `index` con el archivo cambiado y reimportar un Takeout no pisan la fecha a mano.
-- [ ] Una fecha imposible se rechaza sin cambiar nada.
-- [ ] La cuadrícula refleja el nuevo orden al cerrar el visor.
-- [ ] Los originales no se modifican (prueba automática).
+- [x] Volver a la fecha automática deja `taken_at` y `taken_source` como estaban.
+- [x] `index` con el archivo cambiado y reimportar un Takeout no pisan la fecha a mano.
+- [x] Una fecha imposible se rechaza sin cambiar nada.
+- [ ] La cuadrícula refleja el nuevo orden al cerrar el visor (falta probarlo dentro de Tauri).
+- [x] Los originales no se modifican (prueba automática).
 
 ## Fuera de alcance
 - Cambiar la fecha de varias fotos a la vez o desplazarlas un número de horas
@@ -80,8 +80,8 @@ línea de tiempo.
 - Tauri: comandos `camara`, `poner_fecha` y `quitar_fecha_manual`.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Migración 0011 y fecha a mano en el núcleo, con pruebas.
-2. [ ] Lectura de los datos de cámara en `mnemos-imaging`, con pruebas.
-3. [ ] Comandos de Tauri.
-4. [ ] Sección Cámara y formulario de fecha en el panel del visor.
-5. [ ] Recargar las cuadrículas al cerrar el visor si cambió alguna fecha.
+1. [x] Migración 0011 y fecha a mano en el núcleo, con pruebas.
+2. [x] Lectura de los datos de cámara en `mnemos-imaging`, con pruebas.
+3. [x] Comandos de Tauri.
+4. [x] Sección Cámara y formulario de fecha en el panel del visor.
+5. [x] Recargar las cuadrículas al cerrar el visor si cambió alguna fecha.

@@ -36,6 +36,9 @@ pub enum Error {
     #[error("no se puede importar desde {0}: está dentro de la biblioteca")]
     SourceInsideLibrary(PathBuf),
 
+    #[error("fecha no válida: {0}. Usa AAAA-MM-DD hh:mm, entre 1900 y 2200")]
+    InvalidDate(String),
+
     #[error("la biblioteca usa el esquema {found}, más nuevo que el soportado ({supported})")]
     SchemaTooNew { found: u32, supported: u32 },
 }

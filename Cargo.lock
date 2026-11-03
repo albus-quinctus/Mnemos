@@ -2019,6 +2019,7 @@ dependencies = [
  "imagesize",
  "jpeg-decoder",
  "kamadak-exif",
+ "serde",
  "thiserror 2.0.21",
 ]
 
