@@ -40,12 +40,14 @@ Cada tiempo es lo que tarda la interfaz en tener los meses con resultados y la p
 Las palabras que casan con todas las fotos son el peor caso, porque se cuentan todas para la barra de meses.
 
 ### Favoritos y archivo en el núcleo, 10 000 fotos (2026-11-03)
-Spec 006, tarea 2. Mismo equipo. El objetivo es menos de 1 s.
+Spec 006, tareas 2 y 3. Mismo equipo. El objetivo es menos de 1 s.
 
 | Acción sobre las 10 000 fotos | Tiempo |
 |---|---|
 | Añadir a Favoritos | 35 ms |
 | Archivar | 36 ms |
+
+Con las 10 000 en Favoritos y archivadas (el peor caso para esas vistas), los meses y la primera página de 500 de Favoritos tardan 13 ms y los de Archivo 12 ms. La vista Fotos sigue en 7 ms para los meses y 1,5 ms la página más lenta.
 
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |

@@ -503,6 +503,29 @@ mod tests {
 
     /// Biblioteca indexada de verdad con fotos en `Originales/` y la fecha de
     /// modificación dada en hora local («2024-03-15 12:00»).
+    #[test]
+    fn la_busqueda_incluye_las_archivadas() {
+        let (_dir, mut lib) = biblioteca(&[
+            ("Playa/a.png", "2024-07-01 12:00:00"),
+            ("Playa/b.png", "2024-07-02 12:00:00"),
+        ]);
+        let ids: Vec<i64> = lib
+            .connection()
+            .prepare("SELECT id FROM photos")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        lib.set_archived(&ids, true).unwrap();
+        assert!(lib.timeline_months().unwrap().is_empty());
+        assert_eq!(resultados(&lib, "playa").len(), 2);
+        let page = lib
+            .search_page(&SearchQuery::parse("playa"), None, 10)
+            .unwrap();
+        assert!(page.photos.iter().all(|p| p.archived));
+    }
+
     fn biblioteca(fotos: &[(&str, &str)]) -> (tempfile::TempDir, Library) {
         use crate::index::tests::{set_mtime, write_png};
         let dir = tempfile::tempdir().unwrap();

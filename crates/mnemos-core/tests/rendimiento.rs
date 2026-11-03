@@ -17,7 +17,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
-use mnemos_core::{Library, SearchQuery, ThumbnailEvent, ThumbnailQueue};
+use mnemos_core::{Library, SearchQuery, ThumbnailEvent, ThumbnailQueue, View};
 
 const PAGINA: u32 = 500;
 // Tres años hacia atrás desde el 26-10-2026.
@@ -181,6 +181,24 @@ fn biblioteca_de_10000_fotos() {
         lib.set_favorite(&todas, true).unwrap()
     });
     let (_, tiempo_archivar) = medir("archivar todas", || lib.set_archived(&todas, true).unwrap());
+    // Con todas archivadas y en Favoritos, las vistas Archivo y Favoritos son
+    // el peor caso: tienen que contar y ordenar la biblioteca entera.
+    let mut peor_vista = Duration::ZERO;
+    for vista in [View::Favorites, View::Archive] {
+        let ((meses, pagina), tiempo) =
+            medir(&format!("vista {vista:?}: meses y 1.ª página"), || {
+                (
+                    lib.view_months(vista).unwrap(),
+                    lib.view_page(vista, None, PAGINA).unwrap(),
+                )
+            });
+        assert_eq!(
+            meses.iter().map(|m| m.photos as usize).sum::<usize>(),
+            total
+        );
+        assert_eq!(pagina.photos.len(), PAGINA as usize);
+        peor_vista = peor_vista.max(tiempo);
+    }
     lib.set_archived(&todas, false).unwrap();
 
     let miniaturas = raiz.join(".mnemos/miniaturas");
@@ -209,6 +227,7 @@ fn biblioteca_de_10000_fotos() {
         tiempo_favoritos.max(tiempo_archivar) < Duration::from_secs(1),
         "{tiempo_favoritos:?} {tiempo_archivar:?}"
     );
+    assert!(peor_vista < Duration::from_millis(200), "{peor_vista:?}");
 }
 
 fn walk_size(dir: &Path) -> u64 {
