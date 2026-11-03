@@ -1,4 +1,5 @@
 mod configuracion;
+mod duplicados;
 mod media;
 mod portatil;
 
@@ -420,7 +421,9 @@ pub fn run() {
             exportar,
             priorizar_miniaturas,
             importar,
-            cancelar_importacion
+            cancelar_importacion,
+            duplicados::duplicados_resumen,
+            duplicados::duplicados_grupos
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");

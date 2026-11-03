@@ -224,3 +224,63 @@ fn walk_size(dir: &Path) -> u64 {
         })
         .unwrap_or(0)
 }
+
+/// Spec 010: resumen y primera página de duplicados. Las filas se insertan
+/// directamente en la base de datos (una de cada diez repite huella), sin
+/// generar imágenes: la consulta solo mira `photos` y si existe cada archivo.
+#[test]
+#[ignore = "lenta: se lanza a mano en modo release"]
+fn duplicados_en_10000_fotos() {
+    let total: i64 = std::env::var("MNEMOS_FOTOS")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(10_000);
+    let dir = tempfile::tempdir().unwrap();
+    let lib = Library::create(dir.path()).unwrap();
+    {
+        let conn = lib.connection();
+        conn.execute_batch("BEGIN").unwrap();
+        let mut stmt = conn
+            .prepare(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, content_hash, imported_at)
+                 VALUES (?1, 3000000, ?2, ?3, 0)",
+            )
+            .unwrap();
+        for i in 0..total {
+            let huella = if i % 10 == 0 { i / 10 * 10 + 1 } else { i };
+            stmt.execute(rusqlite::params![
+                format!("Originales/{:03}/IMG_{i:05}.jpg", i / 1000),
+                AHORA as i64 - (i * 7919) % TRES_ANOS as i64,
+                format!("{huella:064x}")
+            ])
+            .unwrap();
+        }
+        conn.execute_batch("COMMIT").unwrap();
+    }
+
+    println!("\n{total} fotos, duplicados");
+    let (resumen, tiempo) = medir("resumen y primera página de 50", || {
+        (
+            lib.duplicate_summary().unwrap(),
+            lib.duplicate_groups(None, 50).unwrap(),
+        )
+    });
+    println!("{:<40} {:>10}", "  grupos", resumen.0.groups);
+    assert_eq!(resumen.0.groups as i64, total / 10);
+    assert_eq!(resumen.1.groups.len(), 50);
+
+    let mut cursor = None;
+    let mut grupos = 0;
+    let ((), _) = medir("recorrer todos los grupos de 50 en 50", || {
+        loop {
+            let pagina = lib.duplicate_groups(cursor.as_ref(), 50).unwrap();
+            grupos += pagina.groups.len();
+            match pagina.next {
+                Some(c) => cursor = Some(c),
+                None => break,
+            }
+        }
+    });
+    assert_eq!(grupos as u64, resumen.0.groups);
+    assert!(tiempo < Duration::from_millis(100), "{tiempo:?}");
+}

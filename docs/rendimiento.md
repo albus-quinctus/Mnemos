@@ -75,3 +75,11 @@ La miniatura reducida y la completa difieren en unos 44 dB de PSNR: no se distin
 ## Pendiente
 - Repetir el indexado y las miniaturas desde un HDD externo con fotos reales de cámara de 12 a 24 MP. Las sintéticas son pequeñas y el disco del contenedor es rápido, así que las miniaturas reales tardarán más por foto.
 - Medir el visor dentro de la aplicación Tauri (WebView2, WKWebView, WebKitGTK) y no solo en Chromium.
+
+## Duplicados exactos (spec 010, 2026-11-03)
+`cargo test --release -p mnemos-core --test rendimiento duplicados -- --ignored --nocapture`. Filas insertadas directamente en la base de datos, una de cada diez con la huella repetida (1000 grupos). Mismo contenedor.
+
+| Paso | Tiempo |
+|---|---|
+| Resumen y primera página de 50 grupos | 4,5 ms |
+| Recorrer los 1000 grupos de 50 en 50 | 49 ms en total |
