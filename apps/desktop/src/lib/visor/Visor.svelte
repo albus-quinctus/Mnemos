@@ -1,16 +1,24 @@
+<script lang="ts" module>
+  // Última carpeta a la que se exportó en esta sesión: el selector la propone.
+  let ultimaCarpeta: string | undefined;
+</script>
+
 <script lang="ts">
   // Visor a pantalla completa, estilo Cuarto oscuro (decisión 003). Muestra al
   // instante la miniatura ampliada y la cambia por la foto completa en cuanto
   // carga. La anterior y la siguiente se precargan en memoria.
+  import { open } from "@tauri-apps/plugin-dialog";
   import { onDestroy } from "svelte";
   import {
     camara as pedirCamara,
     detalles as pedirDetalles,
+    exportar,
     ponerFecha,
     quitarFechaManual,
     type Camara,
     type Detalles,
     type FotoCuadricula,
+    type TamanoExportacion,
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
@@ -214,6 +222,49 @@
     cambiarFecha(() => quitarFechaManual(id));
   }
 
+  // Exportar (spec 008): menú con los dos tamaños, selector de carpeta y un
+  // aviso con el resultado.
+  let menuExportar = $state(false);
+  let exportando = $state(false);
+  let mensaje = $state<{ texto: string; error: boolean } | null>(null);
+  let menu = $state<HTMLDivElement>();
+  let temporizador: ReturnType<typeof setTimeout> | undefined;
+
+  function avisar(texto: string, error: boolean) {
+    clearTimeout(temporizador);
+    mensaje = { texto, error };
+    temporizador = setTimeout(() => (mensaje = null), error ? 8000 : 5000);
+  }
+
+  async function exportarComo(tamano: TamanoExportacion) {
+    menuExportar = false;
+    if (!foto || exportando) return;
+    const id = foto.id;
+    const carpeta = await open({
+      directory: true,
+      multiple: false,
+      title: "Elige dónde guardar la foto",
+      defaultPath: ultimaCarpeta,
+    });
+    if (typeof carpeta !== "string") return;
+    ultimaCarpeta = carpeta;
+    exportando = true;
+    try {
+      avisar(`Guardada en ${await exportar(id, carpeta, tamano)}`, false);
+    } catch (e) {
+      const texto = String(e);
+      avisar(texto.charAt(0).toUpperCase() + texto.slice(1), true);
+    } finally {
+      exportando = false;
+    }
+  }
+
+  function alPulsarFuera(e: PointerEvent) {
+    if (menuExportar && menu && !menu.contains(e.target as Node)) menuExportar = false;
+  }
+
+  onDestroy(() => clearTimeout(temporizador));
+
   function alPulsar(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     // Mientras se escribe la fecha, las teclas son del formulario.
@@ -224,7 +275,8 @@
       }
       return;
     }
-    if (e.key === "Escape") onCerrar();
+    if (e.key === "Escape" && menuExportar) menuExportar = false;
+    else if (e.key === "Escape") onCerrar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
     else if (e.key === "ArrowRight") ir(1);
     else if (e.key === "ArrowLeft") ir(-1);
@@ -249,7 +301,7 @@
   $effect(() => visor?.focus());
 </script>
 
-<svelte:window onkeydown={alPulsar} />
+<svelte:window onkeydown={alPulsar} onpointerdown={alPulsarFuera} />
 
 <div
   class="visor"
@@ -265,6 +317,33 @@
       <Icono nombre="cerrar" />
     </button>
     <span class="nombre">{foto?.name}</span>
+    <div class="exportar" bind:this={menu}>
+      <button
+        type="button"
+        class="boton"
+        class:activo={menuExportar}
+        aria-label="Exportar"
+        aria-haspopup="menu"
+        aria-expanded={menuExportar}
+        title="Exportar"
+        disabled={exportando}
+        onclick={() => (menuExportar = !menuExportar)}
+      >
+        <Icono nombre="exportar" />
+      </button>
+      {#if menuExportar}
+        <div class="menu" role="menu" aria-label="Exportar">
+          <button type="button" role="menuitem" onclick={() => exportarComo("original")}>
+            Tamaño original
+            <span>El archivo tal cual, con sus datos</span>
+          </button>
+          <button type="button" role="menuitem" onclick={() => exportarComo("reducida")}>
+            Tamaño reducido (2048 px)
+            <span>JPEG para compartir, sin ubicación</span>
+          </button>
+        </div>
+      {/if}
+    </div>
     <button
       type="button"
       class="boton info"
@@ -290,6 +369,13 @@
       {#if completa?.estado === "error"}
         <p class="aviso" role="status">{completa.aviso}</p>
       {/if}
+    {/if}
+    {#if exportando}
+      <p class="aviso mensaje" role="status">Exportando…</p>
+    {:else if mensaje}
+      <p class="aviso mensaje" class:error={mensaje.error} role={mensaje.error ? "alert" : "status"}>
+        {mensaje.texto}
+      </p>
     {/if}
 
     {#if indice > 0}
@@ -538,8 +624,51 @@
     font-size: 0.8rem;
   }
 
-  .info {
+  .exportar {
+    position: relative;
     margin-left: auto;
+  }
+
+  .menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 1;
+    display: grid;
+    min-width: 260px;
+    padding: 6px;
+    border-radius: var(--radio);
+    background: var(--visor-superficie);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+  }
+
+  .menu button {
+    display: grid;
+    gap: 2px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: calc(var(--radio) - 2px);
+    background: transparent;
+    color: var(--visor-texto);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .menu button:hover,
+  .menu button:focus-visible {
+    background: var(--visor-fondo);
+    outline: none;
+  }
+
+  .menu span {
+    color: var(--visor-texto-suave);
+    font-size: 0.8rem;
+  }
+
+  .boton:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   .boton.activo {
@@ -602,6 +731,17 @@
     border-radius: var(--radio);
     background: var(--visor-superficie);
     transform: translateX(-50%);
+  }
+
+  .mensaje {
+    top: 16px;
+    bottom: auto;
+    max-width: calc(100% - 160px);
+    overflow-wrap: anywhere;
+  }
+
+  .mensaje.error {
+    color: var(--visor-error);
   }
 
   .flecha {

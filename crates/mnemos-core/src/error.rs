@@ -39,6 +39,18 @@ pub enum Error {
     #[error("fecha no válida: {0}. Usa AAAA-MM-DD hh:mm, entre 1900 y 2200")]
     InvalidDate(String),
 
+    #[error("no hay ninguna foto con el id {0}")]
+    PhotoNotFound(i64),
+
+    #[error("el archivo {0} no está en el disco")]
+    OriginalMissing(String),
+
+    #[error("no se puede exportar en {0}: está dentro de la biblioteca; elige una carpeta fuera")]
+    DestinationInsideLibrary(PathBuf),
+
+    #[error("{0} solo se puede exportar en tamaño original")]
+    CannotReduce(String),
+
     #[error("la biblioteca usa el esquema {found}, más nuevo que el soportado ({supported})")]
     SchemaTooNew { found: u32, supported: u32 },
 }
