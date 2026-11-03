@@ -12,6 +12,7 @@ pub mod library;
 pub mod paths;
 pub mod search;
 mod taken;
+mod takeout;
 pub mod thumbnails;
 pub mod timeline;
 
