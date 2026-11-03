@@ -28,6 +28,7 @@
   --visor-superficie: #18181a;
   --visor-texto: #ececee;
   --visor-texto-suave: #a0a1a7;
+  --visor-error: #f2938c;
 
   --radio: 8px;
   --objetivo: 44px; /* tamaño mínimo de clic */
