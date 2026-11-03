@@ -14,7 +14,8 @@ Fase **F1 Biblioteca y navegación**, en curso.
 3. Spec 005, versión portátil (`docs/specs/005-version-portatil.md`): modo portátil en la app y zip con los tres ejecutables generado por `.github/workflows/portatil.yml`. Falta probarla en Windows y macOS, y pasar el HDD a exFAT (`docs/guias/pasar-el-disco-a-exfat.md`).
 4. F2 empieza con la spec 006, selección múltiple, favoritos, archivo y título del día (`docs/specs/006-seleccion-favoritos-archivo.md`), en curso: hechas la tarea 1 (migración 0007 con `favorite`, `archived_at`, `day_titles` e índices parciales por vista) y la 2 (`Library::set_favorite` y `set_archived`, en una transacción y devolviendo los ids que cambian para «Deshacer»; 35 ms con 10 000 fotos). Siguiente: tarea 3, filtros de vista en la línea de tiempo. Va antes que álbumes porque álbumes, etiquetas y papelera dependen de la selección. F1 sigue sin cerrar formalmente (último punto).
 5. Spec 007, metadatos de Google Takeout (`docs/specs/007-metadatos-takeout.md`), en curso: el núcleo ya guarda descripción, ubicación, favorita, archivada y álbumes del `.json` al importar y al reimportar (migración 0008). Falta contrastarlo con el Takeout real (tarea 1). Para aplicarlo a la biblioteca del HDD: volver a importar la carpeta del Takeout.
-6. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
+6. Spec 008, exportar una foto desde el visor (`docs/specs/008-exportar.md`): tamaño original (copia verificada) o reducido (JPEG de 2048 px sin metadatos), sin sobrescribir nada y nunca dentro de la biblioteca. Falta probarlo en la app real. Exportar varias fotos espera a la selección de la spec 006.
+7. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
 ## Pendientes / ideas aparcadas
 - Revisar e instalar las skills de `docs/skills.md`.

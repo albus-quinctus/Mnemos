@@ -5,6 +5,7 @@
 
 pub mod db;
 pub mod error;
+pub mod export;
 mod files;
 pub mod import;
 pub mod index;
@@ -18,6 +19,7 @@ pub mod thumbnails;
 pub mod timeline;
 
 pub use error::{Error, Result};
+pub use export::ExportSize;
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, PhotoDetails, PhotoMedia};
