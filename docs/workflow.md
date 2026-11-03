@@ -54,4 +54,6 @@ Se sigue [Conventional Commits 1.0.0](https://www.conventionalcommits.org/es/v1.
 - Cambios incompatibles: `!` tras el tipo (`feat(db)!: ...`) o pie `BREAKING CHANGE:`.
 - Ejemplos: `feat(core): añade indexado de carpetas`, `fix(ui): corrige el zoom del visor`.
 - El título de cada PR sigue el mismo formato.
-- Commits y PR sin menciones a herramientas de IA (sin `Co-Authored-By` de asistentes ni pies tipo "Generated with").
+- No se menciona la participación de la IA en el proyecto (regla 6 de `CLAUDE.md`). Antes de abrir o actualizar un PR:
+  - `git log --format='%an %ae %cn%n%B' develop..` no muestra otro autor que `albus-quinctus` ni pies `Co-Authored-By`, "Generated with/by" o enlaces de sesión.
+  - La descripción y los comentarios del PR tampoco los llevan; si una herramienta los añade, se editan y se vuelve a comprobar.
