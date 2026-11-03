@@ -1987,6 +1987,7 @@ version = "0.0.1"
 dependencies = [
  "blake3",
  "image",
+ "kamadak-exif",
  "mnemos-imaging",
  "rusqlite",
  "serde",

@@ -78,3 +78,16 @@ export interface Detalles {
 export function detalles(id: number): Promise<Detalles | null> {
   return invoke("detalles", { id });
 }
+
+// Exportar una foto (spec 008). "original" copia el archivo tal cual;
+// "reducida" guarda un JPEG de 2048 px como mucho, sin metadatos. Devuelve la
+// ruta del archivo creado; nunca sobrescribe nada en `carpeta`.
+export type TamanoExportacion = "original" | "reducida";
+
+export function exportar(
+  id: number,
+  carpeta: string,
+  tamano: TamanoExportacion,
+): Promise<string> {
+  return invoke("exportar", { id, carpeta, tamano });
+}

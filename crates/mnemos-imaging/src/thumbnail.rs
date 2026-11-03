@@ -92,14 +92,40 @@ pub fn display_image(path: &Path, orientation: u16) -> Result<Thumbnail, Thumbna
 /// Tamaño de la imagen del visor: el lado mayor se limita a
 /// [`DISPLAY_MAX_SIDE`] y nunca se amplía.
 pub fn display_size(width: u32, height: u32) -> (u32, u32) {
+    fit_long_side(width, height, DISPLAY_MAX_SIDE)
+}
+
+/// Lado mayor, en píxeles, de una foto exportada en tamaño reducido (spec 008).
+pub const EXPORT_MAX_SIDE: u32 = 2048;
+/// Calidad JPEG de las fotos exportadas en tamaño reducido.
+pub const EXPORT_QUALITY: u8 = 90;
+
+/// Foto exportada en tamaño reducido (spec 008): ya girada, con el lado mayor
+/// de [`EXPORT_MAX_SIDE`] como mucho, en JPEG y sin metadatos.
+pub fn export_image(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
+    render(
+        decode(path, orientation, export_size)?,
+        orientation,
+        export_size,
+        EXPORT_QUALITY,
+    )
+}
+
+/// Tamaño de una foto exportada en tamaño reducido: el lado mayor se limita a
+/// [`EXPORT_MAX_SIDE`] y nunca se amplía.
+pub fn export_size(width: u32, height: u32) -> (u32, u32) {
+    fit_long_side(width, height, EXPORT_MAX_SIDE)
+}
+
+/// Limita el lado mayor a `max` conservando la proporción, sin ampliar.
+fn fit_long_side(width: u32, height: u32, max: u32) -> (u32, u32) {
     let (width, height) = (width.max(1), height.max(1));
     let long = width.max(height);
-    if long <= DISPLAY_MAX_SIDE {
+    if long <= max {
         return (width, height);
     }
     let scale = |side: u32| {
-        ((u64::from(side) * u64::from(DISPLAY_MAX_SIDE) + u64::from(long) / 2) / u64::from(long))
-            .max(1) as u32
+        ((u64::from(side) * u64::from(max) + u64::from(long) / 2) / u64::from(long)).max(1) as u32
     };
     (scale(width), scale(height))
 }
@@ -544,6 +570,21 @@ mod tests {
         write_image(&path, 3000, 2000, ImageFormat::Tiff);
         let img = display_image(&path, 6).unwrap();
         assert_eq!(decoded_size(&img), (1707, 2560));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn la_foto_exportada_reducida_se_limita_sin_ampliar() {
+        assert_eq!(export_size(6000, 4000), (2048, 1365));
+        assert_eq!(export_size(3000, 6000), (1024, 2048));
+        assert_eq!(export_size(800, 600), (800, 600));
+
+        let dir = tempdir("exportar");
+        let path = dir.join("foto.jpg");
+        write_image(&path, 3000, 2000, ImageFormat::Jpeg);
+        let img = export_image(&path, 6).unwrap();
+        assert_eq!((img.width, img.height), (1365, 2048));
+        assert_eq!(decoded_size(&img), (1365, 2048));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
