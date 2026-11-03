@@ -9,6 +9,7 @@ mod files;
 pub mod import;
 pub mod index;
 pub mod library;
+mod organize;
 pub mod paths;
 pub mod search;
 mod taken;

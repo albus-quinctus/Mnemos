@@ -128,7 +128,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
   maneja ids.
 
 ## Criterios de aceptación
-- [ ] Marcar y desmarcar favoritos sobre una selección cambia exactamente esas
+- [x] Marcar y desmarcar favoritos sobre una selección cambia exactamente esas
   fotos y nada más (prueba automática).
 - [ ] La línea de tiempo y la barra de meses de Fotos no incluyen fotos
   archivadas; Archivo solo incluye archivadas; Favoritos incluye favoritas
@@ -136,7 +136,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 - [ ] La búsqueda devuelve las fotos archivadas (prueba automática).
 - [ ] El rango de `Mayús` + clic incluye las fotos de páginas no cargadas, en
   el orden de la cuadrícula (prueba automática del núcleo y de la interfaz).
-- [ ] Si la escritura falla a mitad de una selección, ninguna foto cambia
+- [x] Si la escritura falla a mitad de una selección, ninguna foto cambia
   (prueba automática).
 - [ ] Favoritos, archivo y títulos sobreviven a cerrar la app y abrir la
   biblioteca desde otro equipo (prueba automática con copia de la biblioteca a
@@ -165,7 +165,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 ## Tareas (≤1 h cada una)
 1. [x] Migración con `favorite`, `archived_at`, `day_titles` e índices, y su
    prueba de migración desde una biblioteca v6.
-2. [ ] Núcleo: marcar y desmarcar favoritos y archivar o desarchivar una lista
+2. [x] Núcleo: marcar y desmarcar favoritos y archivar o desarchivar una lista
    de ids en una transacción, con pruebas (incluido el fallo a mitad).
 3. [ ] Núcleo: filtro de vista (Fotos sin archivadas, Favoritos, Archivo) en
    meses y páginas de la línea de tiempo, con la búsqueda incluyendo
