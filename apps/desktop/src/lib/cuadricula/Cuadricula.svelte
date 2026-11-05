@@ -1,6 +1,6 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import {
     buscarFotos,
     buscarMeses,
@@ -13,11 +13,22 @@
     type Mes,
     type PaginaFotos,
   } from "$lib/biblioteca";
+  import Icono from "$lib/componentes/Icono.svelte";
   import { miniaturaUrl } from "$lib/media";
+  import {
+    alternarDia,
+    avisarFallo,
+    cambiarAmbito,
+    clicEnFoto,
+    haySeleccion,
+    seleccion,
+    teclaSeleccion,
+    todasSeleccionadas,
+  } from "$lib/seleccion/seleccion.svelte";
   import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
   import BarraMeses from "./BarraMeses.svelte";
-  import { disponer, nombreDia, visibles, type Opciones } from "./disposicion";
+  import { diaDe, disponer, nombreDia, visibles, type Opciones } from "./disposicion";
 
   // Con `texto`, la cuadrícula muestra solo los resultados de esa búsqueda.
   // `onSalir` se llama con Esc cuando el visor no está abierto.
@@ -62,6 +73,43 @@
   const enPantalla = $derived(
     visibles(disposicion.bloques, desplazamiento - MARGEN, desplazamiento + altoVista + MARGEN),
   );
+
+  // La selección es de esta vista o de esta búsqueda: cambiarla la pierde.
+  $effect(() => {
+    const ambito = texto ? { busqueda: texto } : { vista: "fotos" as const };
+    untrack(() => cambiarAmbito(ambito));
+  });
+
+  // Ids cargados de cada día, para marcar la casilla de su cabecera.
+  const idsPorDia = $derived.by(() => {
+    const porDia = new Map<string, number[]>();
+    for (const foto of fotos) {
+      const dia = diaDe(foto);
+      const ids = porDia.get(dia);
+      if (ids) ids.push(foto.id);
+      else porDia.set(dia, [foto.id]);
+    }
+    return porDia;
+  });
+
+  function alPulsarFoto(e: MouseEvent, indice: number) {
+    const mods = { ctrl: e.ctrlKey || e.metaKey, mayus: e.shiftKey };
+    if (!clicEnFoto(fotos[indice], mods)) abierta = indice;
+  }
+
+  function alPulsarCasilla(e: MouseEvent, indice: number) {
+    clicEnFoto(fotos[indice], { ctrl: true, mayus: e.shiftKey });
+  }
+
+  // Ctrl + A y Esc, salvo con el visor abierto o escribiendo en un campo.
+  function alPulsarTecla(e: KeyboardEvent) {
+    if (abierta !== null) return;
+    const destino = e.target as HTMLElement | null;
+    if (destino?.closest("input, textarea, [contenteditable]")) return;
+    if (teclaSeleccion(e.key, { ctrl: e.ctrlKey || e.metaKey, mayus: e.shiftKey })) {
+      e.preventDefault();
+    }
+  }
 
   // Foto abierta en el visor, por su posición en `fotos`.
   let abierta = $state<number | null>(null);
@@ -222,11 +270,14 @@
   });
 </script>
 
+<svelte:window onkeydown={alPulsarTecla} />
+
 <div
   class="vista"
   role="presentation"
   onkeydown={(e) => {
-    if (e.key === "Escape" && abierta === null) onSalir?.();
+    // Con selección, Esc solo la quita (lo hace `alPulsarTecla`).
+    if (e.key === "Escape" && abierta === null && !haySeleccion()) onSalir?.();
   }}
 >
 {#if texto && listo && !error && total > 0}
@@ -260,23 +311,38 @@
     {/if}
   {/if}
 
-  <div class="lienzo" style:height="{disposicion.alto}px">
+  <div class="lienzo" class:seleccionando={seleccion.ids.size > 0} style:height="{disposicion.alto}px">
     {#each enPantalla as bloque (bloque.tipo === "fila" ? `f${fotos[bloque.celdas[0].indice].id}` : `p${bloque.mes}`)}
       {#if bloque.tipo === "fila"}
         <div class="fila" style:transform="translateY({bloque.y}px)" style:height="{bloque.alto}px">
           {#each bloque.titulos as titulo (titulo.dia)}
+            {@const completo = todasSeleccionadas(idsPorDia.get(titulo.dia) ?? [])}
             <h2 class="dia" style:left="{titulo.x}px" style:height="{bloque.altoTitulo}px">
+              <button
+                type="button"
+                class="casilla-dia"
+                class:marcada={completo}
+                role="checkbox"
+                aria-checked={completo}
+                aria-label="Seleccionar el día {nombreDia(titulo.dia)}"
+                onclick={() => alternarDia(titulo.dia).catch(avisarFallo)}
+              >
+                {#if completo}<Icono nombre="marca" tamano={14} grosor={3} />{/if}
+              </button>
               {nombreDia(titulo.dia)}
             </h2>
           {/each}
           {#each bloque.celdas as celda (fotos[celda.indice].id)}
             {@const foto = fotos[celda.indice]}
+            {@const marcada = seleccion.ids.has(foto.id)}
             <button
               type="button"
               class="celda"
+              class:marcada
               data-indice={celda.indice}
               aria-label={foto.name}
-              onclick={() => (abierta = celda.indice)}
+              aria-pressed={seleccion.ids.size > 0 ? marcada : undefined}
+              onclick={(e) => alPulsarFoto(e, celda.indice)}
               style:left="{celda.x}px"
               style:top="{bloque.altoTitulo}px"
               style:width="{celda.ancho}px"
@@ -299,6 +365,31 @@
                   />
                 {/key}
               {/if}
+              {#if foto.favorite}
+                <span class="insignia favorita" title="En Favoritos">
+                  <Icono nombre="estrella" tamano={18} relleno />
+                </span>
+              {/if}
+              {#if texto && foto.archived}
+                <span class="insignia archivada" title="Archivada">
+                  <Icono nombre="archivo" tamano={16} />
+                </span>
+              {/if}
+            </button>
+            <!-- Fuera del botón de la celda: un botón no puede ir dentro de otro. -->
+            <button
+              type="button"
+              class="casilla"
+              class:marcada
+              tabindex="-1"
+              role="checkbox"
+              aria-checked={marcada}
+              aria-label="Seleccionar {foto.name}"
+              onclick={(e) => alPulsarCasilla(e, celda.indice)}
+              style:left="{celda.x + 8}px"
+              style:top="{bloque.altoTitulo + 8}px"
+            >
+              {#if marcada}<Icono nombre="marca" tamano={16} grosor={3} />{/if}
             </button>
           {/each}
         </div>
@@ -414,6 +505,109 @@
 
   .celda:focus-visible {
     outline-offset: -2px;
+  }
+
+  /* Seleccionada: miniatura algo reducida dentro de un marco de acento. */
+  .celda.marcada {
+    background: var(--acento-suave);
+  }
+
+  .celda.marcada img,
+  .celda.marcada .sin-vista {
+    transform: scale(0.88);
+    border-radius: 6px;
+  }
+
+  .celda.marcada::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 3px solid var(--acento);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  /* El círculo sale al pasar el ratón y siempre mientras hay selección. */
+  .casilla {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.18);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    color: var(--acento-texto);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 80ms ease-out;
+  }
+
+  .celda:hover + .casilla,
+  .casilla:hover,
+  .seleccionando .casilla {
+    opacity: 1;
+  }
+
+  .casilla.marcada {
+    border-color: var(--acento);
+    background: var(--acento);
+  }
+
+  .insignia {
+    position: absolute;
+    bottom: 8px;
+    display: flex;
+    color: #fff;
+    pointer-events: none;
+  }
+
+  .favorita {
+    left: 8px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  }
+
+  .archivada {
+    right: 8px;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .casilla-dia {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 0.5rem;
+    padding: 0;
+    border: 2px solid var(--texto-suave);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--acento-texto);
+    cursor: pointer;
+    /* Oculta no ocupa sitio: la fecha queda alineada con las fotos. */
+    display: none;
+  }
+
+  .dia:hover .casilla-dia,
+  .casilla-dia:focus-visible,
+  .casilla-dia.marcada,
+  .seleccionando .casilla-dia {
+    display: inline-flex;
+  }
+
+  .casilla-dia.marcada {
+    border-color: var(--acento);
+    background: var(--acento);
   }
 
   img {

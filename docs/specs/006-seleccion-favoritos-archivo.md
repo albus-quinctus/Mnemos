@@ -145,7 +145,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
   Fotos, Favoritos y Archivo sigue por debajo de lo medido en
   `docs/rendimiento.md`.
 - [ ] Deshacer devuelve las fotos a su estado anterior.
-- [ ] Capturas de la barra de selección, la estrella, Archivo y el título del
+- [x] Capturas de la barra de selección, la estrella, Archivo y el título del
   día aprobadas por Paulo antes de cerrar la interfaz.
 - [ ] Los originales no se modifican: huella BLAKE3 y fecha de modificación
   iguales antes y después de cada acción (prueba automática).
@@ -174,11 +174,11 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
    para seleccionar sin cargar páginas.
 5. [x] Núcleo: leer y guardar títulos de día, con pruebas de textos raros.
 6. [x] Comandos de Tauri para las tareas 2 a 5.
-7. [ ] Capturas del diseño (casillas, barra de selección, estrella, aviso de
+7. [x] Capturas del diseño (casillas, barra de selección, estrella, aviso de
    deshacer, título del día) en claro y oscuro para que Paulo las apruebe.
 8. [x] Estado de selección en la interfaz con pruebas: clic, `Ctrl`, `Mayús`,
    `Ctrl` + `A`, por día y `Esc`.
-9. [ ] Casillas y cabeceras de día seleccionables en la cuadrícula.
+9. [x] Casillas y cabeceras de día seleccionables en la cuadrícula.
 10. [ ] Barra de selección con favoritos y archivar, y aviso con deshacer.
 11. [ ] Estrella y archivar en el visor, teclas `F` y `Mayús` + `A`.
 12. [ ] Vistas Favoritos y Archivo en el menú lateral, con sus mensajes vacíos.
