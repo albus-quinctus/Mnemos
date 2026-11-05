@@ -46,8 +46,12 @@ la spec 004). Los campos que se leen:
   En un Takeout la misma foto aparece en la carpeta del año y en la de cada
   álbum, con el mismo contenido.
 
-**Pendiente:** contrastar estos nombres y campos con el Takeout real de Paulo
-antes de dar la spec por aprobada (tarea 1).
+**Contrastado** el 2026-11-05 con el Takeout real de Paulo: el `.json` del
+álbum se llama `metadatos.json` y trae `title`, `description`, `access` y
+`date`; las carpetas por año se llaman `Fotos del AAAA`. En una muestra de 49
+fotos, 10 traían `archived: true`, 4 `geoDataExif` y 34 ubicación; ninguna
+traía `favorited` ni descripción. Las claves `appSource` y
+`removeResultReason` se ignoran.
 
 ## Comportamiento
 - Al importar, cada foto con `.json` de Takeout guarda además de la fecha:
@@ -85,6 +89,10 @@ antes de dar la spec por aprobada (tarea 1).
 - Varios álbumes de Google con el mismo nombre: acaban en un solo álbum de
   MNEMOS. Takeout no da un identificador estable del álbum.
 - Una foto en dos álbumes: entra en los dos.
+- Una foto archivada sigue en sus álbumes: el álbum tiene las mismas fotos que
+  en Google Fotos, archivadas incluidas, y la vista de álbumes las mostrará
+  (decidido por Paulo el 2026-11-05).
+- Altitud `0.0`: Google la escribe cuando no la conoce; se guarda vacía.
 - Fotos que no son de Takeout (sin `.json`): todo igual que antes.
 
 ## Criterios de aceptación
@@ -113,7 +121,7 @@ antes de dar la spec por aprobada (tarea 1).
   información).
 
 ## Tareas (≤1 h cada una)
-1. [ ] Contrastar el formato con el Takeout real y ajustar esta spec.
+1. [x] Contrastar el formato con el Takeout real y ajustar esta spec.
 2. [x] Migración 0008: `description`, `latitude`, `longitude`, `altitude`,
        `takeout_at` en `photos`.
 3. [x] Leer el `.json` completo de cada foto y el del álbum de cada carpeta
