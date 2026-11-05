@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
 use mnemos_imaging::recipe::{Geometry, OriginalRef, Recipe, RecipeError};
-use rusqlite::OptionalExtension;
+use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 
 use crate::error::{Error, Result};
@@ -177,6 +177,7 @@ impl Library {
         };
         let version = recipe.add_version(geometry, unix_secs(SystemTime::now()))?;
         write_recipe(&self.root, &hash, &recipe)?;
+        set_cached_version(&self.conn, &hash, Some(version))?;
         Ok(version)
     }
 
@@ -199,7 +200,8 @@ impl Library {
                     .into());
                 }
                 recipe.set_current(version)?;
-                write_recipe(&self.root, &hash, &recipe)
+                write_recipe(&self.root, &hash, &recipe)?;
+                set_cached_version(&self.conn, &hash, version)
             }
             // Sin receta (o dañada) ya se ve el original.
             _ if version.is_none() => Ok(()),
@@ -209,6 +211,39 @@ impl Library {
             ))
             .into()),
         }
+    }
+
+    /// Vuelve a calcular `photos.edit_version` a partir de las recetas que
+    /// hay en `.mnemos/ediciones/`. Lo llama el indexado, para que una
+    /// biblioteca copiada o con la base de datos regenerada recupere sus
+    /// ediciones. Solo recorre la carpeta de recetas, no lee cada foto.
+    pub(crate) fn sync_edit_versions(conn: &Connection, root: &Path) -> Result<()> {
+        let mut versions = Vec::new();
+        let dir = root.join(EDITS_DIR);
+        for prefix in read_dir_or_empty(&dir)? {
+            for entry in read_dir_or_empty(&prefix)? {
+                let Some(hash) = entry
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(|n| n.strip_suffix(".json"))
+                    .filter(|h| !h.is_empty() && h.bytes().all(|b| b.is_ascii_hexdigit()))
+                    .map(str::to_owned)
+                else {
+                    continue;
+                };
+                if let StoredRecipe::Valid(recipe) = read_recipe(root, &hash)? {
+                    versions.push((hash, recipe.current));
+                }
+            }
+        }
+        conn.execute(
+            "UPDATE photos SET edit_version = NULL WHERE edit_version IS NOT NULL",
+            [],
+        )?;
+        for (hash, version) in versions {
+            set_cached_version(conn, &hash, version)?;
+        }
+        Ok(())
     }
 
     fn edit_target(&self, id: i64) -> Result<EditTarget> {
@@ -238,6 +273,24 @@ impl Library {
                 })
             })
             .ok_or(Error::PhotoNotFound(id))?
+    }
+}
+
+/// Apunta en la base de datos qué versión se ve en las fotos con esta huella.
+fn set_cached_version(conn: &Connection, hash: &str, version: Option<u32>) -> Result<()> {
+    conn.execute(
+        "UPDATE photos SET edit_version = ?2 WHERE content_hash = ?1",
+        rusqlite::params![hash, version],
+    )?;
+    Ok(())
+}
+
+/// Entradas de una carpeta; ninguna si no existe.
+fn read_dir_or_empty(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    match fs::read_dir(dir) {
+        Ok(entries) => entries.map(|e| e.map(|e| e.path())).collect(),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(err) => Err(err),
     }
 }
 
@@ -558,6 +611,86 @@ mod tests {
         s.lib.save_edit(s.id, giro()).unwrap();
         assert_eq!(s.hash(), hash);
         assert!(s.root().join(recipe_rel_path(&hash)).is_file());
+    }
+
+    fn cached(s: &Setup) -> Option<u32> {
+        s.lib
+            .connection()
+            .query_row(
+                "SELECT edit_version FROM photos WHERE id = ?1",
+                [s.id],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn la_base_de_datos_apunta_la_version_que_se_ve() {
+        let mut s = setup();
+        assert_eq!(cached(&s), None);
+        s.lib.save_edit(s.id, giro()).unwrap();
+        s.lib.save_edit(s.id, recorte()).unwrap();
+        assert_eq!(cached(&s), Some(2));
+        s.lib.set_edit_version(s.id, Some(1)).unwrap();
+        assert_eq!(cached(&s), Some(1));
+        s.lib.set_edit_version(s.id, None).unwrap();
+        assert_eq!(cached(&s), None);
+    }
+
+    #[test]
+    fn al_indexar_se_recupera_la_version_desde_las_recetas() {
+        let mut s = setup();
+        s.lib.save_edit(s.id, giro()).unwrap();
+        s.lib.save_edit(s.id, recorte()).unwrap();
+        // Base de datos desfasada: el indexado la corrige.
+        s.lib
+            .connection()
+            .execute("UPDATE photos SET edit_version = NULL", [])
+            .unwrap();
+        s.lib.index().unwrap();
+        assert_eq!(cached(&s), Some(2));
+
+        // Una receta dañada no cuenta.
+        fs::write(s.recipe_path(), b"{ roto").unwrap();
+        s.lib.index().unwrap();
+        assert_eq!(cached(&s), None);
+    }
+
+    #[test]
+    fn una_biblioteca_copiada_o_sin_base_de_datos_conserva_sus_ediciones() {
+        let mut s = setup();
+        s.lib.save_edit(s.id, recorte()).unwrap();
+        let before = original(&s);
+
+        // Copia de la biblioteca a otra ruta, sin la base de datos.
+        let copia = tempfile::tempdir().unwrap();
+        copy_dir(s.root(), copia.path());
+        fs::remove_file(copia.path().join(DATA_DIR).join("mnemos.db")).unwrap();
+        let mut lib = Library::create(copia.path()).unwrap();
+        lib.index().unwrap();
+        let id: i64 = lib
+            .connection()
+            .query_row("SELECT id FROM photos", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(lib.photo_recipe(id).unwrap().geometry(), recorte());
+        let version: Option<u32> = lib
+            .connection()
+            .query_row("SELECT edit_version FROM photos", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, Some(1));
+        assert_eq!(original(&s), before);
+    }
+
+    fn copy_dir(src: &Path, dest: &Path) {
+        for entry in walkdir::WalkDir::new(src) {
+            let entry = entry.unwrap();
+            let target = dest.join(entry.path().strip_prefix(src).unwrap());
+            if entry.file_type().is_dir() {
+                fs::create_dir_all(&target).unwrap();
+            } else {
+                fs::copy(entry.path(), &target).unwrap();
+            }
+        }
     }
 
     #[test]

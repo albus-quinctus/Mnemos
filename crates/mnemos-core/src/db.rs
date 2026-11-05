@@ -18,6 +18,9 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0007_favoritos_archivo.sql"),
     include_str!("migrations/0008_metadatos_takeout.sql"),
     include_str!("migrations/0011_fecha_manual.sql"),
+    // Se llama 0009 porque se reservó ese número para la spec 009, pero se
+    // fusionó después de la 0011 y por eso va al final.
+    include_str!("migrations/0009_edicion.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -223,6 +226,43 @@ mod tests {
             conn.execute("UPDATE photos SET longitude = -181", [])
                 .is_err()
         );
+    }
+
+    #[test]
+    fn la_migracion_10_anade_la_version_de_edicion_vacia() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        {
+            // Biblioteca en la versión 9 (con la fecha a mano) y una foto.
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..9].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at, taken_source)
+                 VALUES ('a.jpg', 1, 1, 1, 'manual')",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), 10);
+        let fila: (Option<i64>, String) = conn
+            .query_row("SELECT edit_version, taken_source FROM photos", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(fila, (None, "manual".to_owned()));
+        assert!(
+            conn.execute("UPDATE photos SET edit_version = 0", [])
+                .is_err()
+        );
+        conn.execute("UPDATE photos SET edit_version = 3", [])
+            .unwrap();
     }
 
     #[test]
