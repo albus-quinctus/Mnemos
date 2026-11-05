@@ -1,12 +1,15 @@
 //! Tratamiento de imágenes de MNEMOS.
 //!
 //! Reconoce los formatos de imagen, lee sus dimensiones y su orientación, y
-//! genera miniaturas. Lee la fecha de captura del EXIF. El resto del EXIF y las recetas de edición llegan después.
+//! genera miniaturas. Lee del EXIF la fecha de captura y los datos de cámara
+//! para el panel de información. Las recetas de edición llegan después.
 
+mod camera;
 mod capture;
 mod raw;
 mod thumbnail;
 
+pub use camera::{CameraInfo, camera_info};
 pub use capture::{CaptureTime, capture_time};
 pub use raw::raw_preview;
 pub use thumbnail::{DISPLAY_MAX_SIDE, DISPLAY_QUALITY, display_image, display_size, web_mime};

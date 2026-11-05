@@ -13,6 +13,7 @@ image.workspace = true
 imagesize.workspace = true
 jpeg-decoder.workspace = true
 kamadak-exif.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 
 [lints]

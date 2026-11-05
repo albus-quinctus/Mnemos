@@ -208,6 +208,35 @@ fn detalles(id: i64, estado: State<'_, OpenLibrary>) -> Result<Option<PhotoDetai
     with_library(&estado, |lib| lib.photo_details(id))
 }
 
+/// Datos de cámara del EXIF de una foto (spec 011), o `None` si no tiene. Es
+/// asíncrono para leer el disco fuera del hilo de la interfaz, y el archivo se
+/// lee sin bloquear la biblioteca.
+#[tauri::command]
+async fn camara(
+    id: i64,
+    estado: State<'_, OpenLibrary>,
+) -> Result<Option<mnemos_imaging::CameraInfo>, String> {
+    let ruta = with_library(&estado, |lib| {
+        Ok(lib
+            .photo_media(id)?
+            .map(|media| media.rel_path.to_path(lib.root())))
+    })?;
+    Ok(ruta.and_then(|ruta| mnemos_imaging::camera_info(&ruta)))
+}
+
+/// Pone a mano la fecha de captura (`AAAA-MM-DD hh:mm[:ss]`, hora local).
+/// Devuelve `false` si la foto ya no existe.
+#[tauri::command]
+fn poner_fecha(id: i64, fecha: String, estado: State<'_, OpenLibrary>) -> Result<bool, String> {
+    with_library(&estado, |lib| lib.set_manual_taken(id, &fecha))
+}
+
+/// Quita la fecha a mano y vuelve a la automática.
+#[tauri::command]
+fn quitar_fecha_manual(id: i64, estado: State<'_, OpenLibrary>) -> Result<bool, String> {
+    with_library(&estado, |lib| lib.clear_manual_taken(id))
+}
+
 /// Exporta la foto `id` a la carpeta `carpeta` (spec 008) y devuelve la ruta
 /// del archivo creado. La biblioteca solo se bloquea para traducir el id: la
 /// copia o la reducción se hacen fuera, en un hilo aparte.
@@ -418,6 +447,9 @@ pub fn run() {
             buscar_meses,
             buscar_fotos,
             detalles,
+            camara,
+            poner_fecha,
+            quitar_fecha_manual,
             exportar,
             priorizar_miniaturas,
             importar,

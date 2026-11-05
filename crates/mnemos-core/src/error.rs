@@ -36,6 +36,9 @@ pub enum Error {
     #[error("no se puede importar desde {0}: está dentro de la biblioteca")]
     SourceInsideLibrary(PathBuf),
 
+    #[error("fecha no válida: {0}. Usa AAAA-MM-DD hh:mm, entre 1900 y 2200")]
+    InvalidDate(String),
+
     #[error("no hay ninguna foto con el id {0}")]
     PhotoNotFound(i64),
 
