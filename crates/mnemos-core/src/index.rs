@@ -86,6 +86,9 @@ impl Library {
             }
             seen.insert(rel.as_str().to_owned());
         }
+        // Las ediciones viven en `.mnemos/ediciones/`; la base de datos solo
+        // guarda qué versión se ve, y se recalcula aquí (spec 009).
+        Library::sync_edit_versions(&tx, &self.root)?;
         tx.commit()?;
 
         report.missing = known.keys().filter(|k| !seen.contains(*k)).count() as u64;

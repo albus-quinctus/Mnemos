@@ -240,7 +240,7 @@ Petición de Paulo (2026-11-05).
 3. [x] Núcleo: leer y guardar recetas en `.mnemos/ediciones/` con escritura
    segura, versiones, `current` y volver al original, con pruebas de corte a
    mitad y de recetas dañadas.
-4. [ ] Migración 0009 con `edit_version` y recálculo al indexar, con prueba
+4. [x] Migración 0009 con `edit_version` y recálculo al indexar, con prueba
    de migración desde una biblioteca v9 y de biblioteca copiada. Va al
    final de la lista de `db.rs`, detrás de la 0011 (que ocupa el puesto 9).
 5. [ ] Núcleo: miniaturas editadas y limpieza de las de versiones viejas.
