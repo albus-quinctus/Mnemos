@@ -2,11 +2,13 @@
 //!
 //! Reconoce los formatos de imagen, lee sus dimensiones y su orientación, y
 //! genera miniaturas. Lee del EXIF la fecha de captura y los datos de cámara
-//! para el panel de información. Las recetas de edición llegan después.
+//! para el panel de información, y define las recetas de edición no
+//! destructiva (spec 009).
 
 mod camera;
 mod capture;
 mod raw;
+pub mod recipe;
 mod thumbnail;
 
 pub use camera::{CameraInfo, camera_info};
