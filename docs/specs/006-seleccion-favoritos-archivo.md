@@ -138,7 +138,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
   el orden de la cuadrícula (prueba automática del núcleo y de la interfaz).
 - [x] Si la escritura falla a mitad de una selección, ninguna foto cambia
   (prueba automática).
-- [ ] Favoritos, archivo y títulos sobreviven a cerrar la app y abrir la
+- [x] Favoritos, archivo y títulos sobreviven a cerrar la app y abrir la
   biblioteca desde otro equipo (prueba automática con copia de la biblioteca a
   otra ruta).
 - [x] Marcar o archivar 10 000 fotos sintéticas tarda menos de 1 s y paginar
@@ -172,7 +172,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
    archivadas. Medición con 10 000 fotos.
 4. [x] Núcleo: ids de un día, de toda la vista y de un rango entre dos fotos,
    para seleccionar sin cargar páginas.
-5. [ ] Núcleo: leer y guardar títulos de día, con pruebas de textos raros.
+5. [x] Núcleo: leer y guardar títulos de día, con pruebas de textos raros.
 6. [ ] Comandos de Tauri para las tareas 2 a 5.
 7. [ ] Capturas del diseño (casillas, barra de selección, estrella, aviso de
    deshacer, título del día) en claro y oscuro para que Paulo las apruebe.

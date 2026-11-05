@@ -53,6 +53,9 @@ pub enum Error {
 
     #[error("la biblioteca usa el esquema {found}, más nuevo que el soportado ({supported})")]
     SchemaTooNew { found: u32, supported: u32 },
+
+    #[error("«{0}» no es un día válido; se espera AAAA-MM-DD")]
+    InvalidDay(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
