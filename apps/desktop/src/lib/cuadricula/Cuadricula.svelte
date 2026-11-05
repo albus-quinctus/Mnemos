@@ -25,6 +25,8 @@
     teclaSeleccion,
     todasSeleccionadas,
   } from "$lib/seleccion/seleccion.svelte";
+  import { cambios } from "$lib/cambios.svelte";
+  import { registrarFotos } from "$lib/seleccion/acciones.svelte";
   import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
   import BarraMeses from "./BarraMeses.svelte";
@@ -195,12 +197,19 @@
 
   // Al cambiar alguna fecha a mano, se recarga. La primera vez solo se anota
   // la versión: la carga inicial ya la hace `onMount`.
+  // Lo mismo al marcar favoritos o archivar (spec 006).
   let versionFechas = fechas.version;
+  let versionCambios = cambios.version;
   $effect(() => {
-    if (fechas.version === versionFechas) return;
+    if (fechas.version === versionFechas && cambios.version === versionCambios) return;
     versionFechas = fechas.version;
+    versionCambios = cambios.version;
     if (listo) recargar();
   });
+
+  // La barra de selección pregunta si las seleccionadas ya son favoritas.
+  const porId = $derived(new Map(fotos.map((f) => [f.id, f])));
+  onMount(() => registrarFotos((id) => porId.get(id)));
 
   // Mientras haya un tramo sin cargar a la vista, se piden más páginas.
   $effect(() => {

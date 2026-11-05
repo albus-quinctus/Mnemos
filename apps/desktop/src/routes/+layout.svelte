@@ -4,6 +4,9 @@
   import MenuLateral from "$lib/componentes/MenuLateral.svelte";
   import { escucharImportacion } from "$lib/importacion/importacion.svelte";
   import ProgresoImportacion from "$lib/importacion/ProgresoImportacion.svelte";
+  import Aviso from "$lib/seleccion/Aviso.svelte";
+  import BarraSeleccion from "$lib/seleccion/BarraSeleccion.svelte";
+  import { haySeleccion } from "$lib/seleccion/seleccion.svelte";
   import { onMount } from "svelte";
 
   let { children } = $props();
@@ -14,7 +17,11 @@
 <div class="galeria">
   <MenuLateral />
   <div class="columna">
-    <BarraSuperior />
+    {#if haySeleccion()}
+      <BarraSeleccion />
+    {:else}
+      <BarraSuperior />
+    {/if}
     <main>
       {@render children()}
     </main>
@@ -22,6 +29,7 @@
 </div>
 
 <ProgresoImportacion />
+<Aviso />
 
 <style>
   .galeria {
