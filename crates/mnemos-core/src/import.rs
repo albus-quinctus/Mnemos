@@ -227,19 +227,26 @@ fn copy_verified(
 }
 
 /// Primer nombre libre en `dir`: `foto.jpg`, `foto (1).jpg`, `foto (2).jpg`…
-fn free_name(dir: &Path, name: &str) -> Result<PathBuf> {
+pub(crate) fn free_name(dir: &Path, name: &str) -> Result<PathBuf> {
     let candidate = dir.join(name);
     if !candidate.exists() {
         return Ok(candidate);
     }
     let (stem, ext) = match name.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => (stem, format!(".{ext}")),
-        _ => (name, String::new()),
+        Some((stem, ext)) if !stem.is_empty() => (stem, ext),
+        _ => (name, ""),
     };
+    Ok(numbered_name(dir, stem, ext))
+}
+
+/// Primer nombre libre en `dir` con número: `foto (1).jpg`, `foto (2).jpg`…
+/// `ext` va sin punto; si está vacía, el nombre no lleva extensión.
+pub(crate) fn numbered_name(dir: &Path, stem: &str, ext: &str) -> PathBuf {
+    let dot = if ext.is_empty() { "" } else { "." };
     for i in 1.. {
-        let candidate = dir.join(format!("{stem} ({i}){ext}"));
+        let candidate = dir.join(format!("{stem} ({i}){dot}{ext}"));
         if !candidate.exists() {
-            return Ok(candidate);
+            return candidate;
         }
     }
     unreachable!("el rango 1.. no termina")

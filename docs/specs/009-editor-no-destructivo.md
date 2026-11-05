@@ -53,6 +53,14 @@ Petición de Paulo (2026-11-05).
     la copia.
   - Formato: JPEG de calidad 95 a tamaño completo si el original es JPEG, RAW,
     TIFF o WebP; PNG si el original es PNG (para no perder la transparencia).
+    Si el formato cambia, cambia la extensión: `IMG_1234.CR2` da
+    `IMG_1234 (1).jpg`. Si no, se conserva tal cual (`DSC_0001.JPG` da
+    `DSC_0001 (1).JPG`). Un PNG de 16 bits por canal queda en 8.
+  - Del EXIF del original no pasan la miniatura, los datos del fabricante
+    (`MakerNote`) ni los campos que describen cómo estaban guardados sus
+    píxeles. Si el original no tiene EXIF o no se puede escribir, la copia
+    sale sin él: sus datos están en la base de datos igualmente.
+  - No pasan los álbumes ni el archivado: la copia empieza fuera de ellos.
   - El original y su receta no cambian. En el visor se pasa a la copia.
 
 ### Recortar
@@ -244,7 +252,7 @@ Petición de Paulo (2026-11-05).
    de migración desde una biblioteca v9 y de biblioteca copiada. Va al
    final de la lista de `db.rs`, detrás de la 0011 (que ocupa el puesto 9).
 5. [x] Núcleo: miniaturas editadas y limpieza de las de versiones viejas.
-6. [ ] Núcleo: guardar como copia (render a tamaño completo, nombre
+6. [x] Núcleo: guardar como copia (render a tamaño completo, nombre
    `(N)`, EXIF y datos copiados, escritura en `tmp/` e indexado), con
    pruebas de originales intactos y de fallo a mitad.
 7. [ ] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la

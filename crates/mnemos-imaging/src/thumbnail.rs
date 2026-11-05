@@ -25,13 +25,13 @@ type Size = fn(u32, u32) -> (u32, u32);
 
 /// Tamaño de la imagen ya girada que hace falta decodificar como mínimo, a
 /// partir de su tamaño completo ya girado.
-type Cover<'a> = &'a dyn Fn(u32, u32) -> (u32, u32);
+pub(crate) type Cover<'a> = &'a dyn Fn(u32, u32) -> (u32, u32);
 
 /// Imagen decodificada, quizá ya reducida, junto con el tamaño completo del
 /// original (sin girar), del que sale el tamaño final.
-struct Decoded {
-    img: DynamicImage,
-    full: (u32, u32),
+pub(crate) struct Decoded {
+    pub(crate) img: DynamicImage,
+    pub(crate) full: (u32, u32),
 }
 
 impl From<DynamicImage> for Decoded {
@@ -221,7 +221,11 @@ pub fn web_mime(path: &Path) -> std::io::Result<Option<&'static str>> {
 /// menor tamaño que sigue cubriendo el que pide `size`; si no se puede, se
 /// decodifican enteros como el resto de formatos. El archivo se lee una sola
 /// vez.
-fn decode(path: &Path, orientation: u16, size: Cover) -> Result<Decoded, ThumbnailError> {
+pub(crate) fn decode(
+    path: &Path,
+    orientation: u16,
+    size: Cover,
+) -> Result<Decoded, ThumbnailError> {
     let is_raw = crate::is_raw(path);
     let bytes = if is_raw {
         crate::raw_preview(path)?.ok_or(ThumbnailError::Unsupported)?
@@ -354,11 +358,16 @@ fn resize(img: &DynamicImage, width: u32, height: u32) -> RgbImage {
     } else {
         img.resize_exact(width, height, FilterType::Triangle)
     };
-    if !resized.color().has_alpha() {
-        return resized.into_rgb8();
+    flatten(resized)
+}
+
+/// Pasa la imagen a RGB, con la transparencia sobre fondo blanco.
+pub(crate) fn flatten(img: DynamicImage) -> RgbImage {
+    if !img.color().has_alpha() {
+        return img.into_rgb8();
     }
-    let rgba = resized.into_rgba8();
-    RgbImage::from_fn(width, height, |x, y| {
+    let rgba = img.into_rgba8();
+    RgbImage::from_fn(rgba.width(), rgba.height(), |x, y| {
         let [r, g, b, a] = rgba.get_pixel(x, y).0;
         let over_white = |c: u8| {
             let (c, a) = (u16::from(c), u16::from(a));

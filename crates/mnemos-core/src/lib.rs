@@ -3,6 +3,7 @@
 //! Gestiona la biblioteca portátil: su estructura en disco, la base de datos
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
+mod copies;
 pub mod day_titles;
 pub mod db;
 pub mod duplicates;
