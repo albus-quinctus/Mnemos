@@ -16,7 +16,10 @@ use std::thread::JoinHandle;
 use rusqlite::{Connection, params};
 use serde::Serialize;
 
+use mnemos_imaging::recipe::Geometry;
+
 use crate::db;
+use crate::edits::StoredRecipe;
 use crate::error::Result;
 use crate::library::{DATA_DIR, DB_FILE, Library, TMP_DIR};
 use crate::paths::RelPath;
@@ -35,6 +38,16 @@ pub struct ThumbnailJob {
     pub rel_path: RelPath,
     pub content_hash: String,
     pub orientation: u16,
+    /// Versión de la receta de edición que se ve (spec 009), o `None` si se
+    /// ve el original. Cada versión tiene su propia miniatura.
+    pub edit_version: Option<u32>,
+}
+
+impl ThumbnailJob {
+    /// Ruta relativa de la miniatura que genera este trabajo.
+    pub fn rel_path_of_thumbnail(&self) -> String {
+        thumbnail_rel_path_for(&self.content_hash, self.edit_version)
+    }
 }
 
 /// Lo que pasa con cada trabajo de la cola.
@@ -64,8 +77,18 @@ pub enum Outcome {
 
 /// Ruta relativa de la miniatura de una foto con esta huella.
 pub fn thumbnail_rel_path(content_hash: &str) -> String {
+    thumbnail_rel_path_for(content_hash, None)
+}
+
+/// Ruta relativa de la miniatura de una huella tal como se ve: la del
+/// original, o `<huella>-e<versión>.jpg` si se ve una versión editada (spec
+/// 009). La del original se conserva siempre.
+pub fn thumbnail_rel_path_for(content_hash: &str, edit_version: Option<u32>) -> String {
     let prefix = content_hash.get(..2).unwrap_or("00");
-    format!("{THUMBNAILS_DIR}/{prefix}/{content_hash}.jpg")
+    match edit_version {
+        Some(v) => format!("{THUMBNAILS_DIR}/{prefix}/{content_hash}-e{v}.jpg"),
+        None => format!("{THUMBNAILS_DIR}/{prefix}/{content_hash}.jpg"),
+    }
 }
 
 impl Library {
@@ -79,7 +102,7 @@ impl Library {
     /// huella, solo sale una.
     pub fn pending_thumbnails(&self) -> Result<Vec<ThumbnailJob>> {
         let mut stmt = self.conn.prepare(
-            "SELECT p.id, p.rel_path, p.content_hash, coalesce(p.orientation, 1)
+            "SELECT p.id, p.rel_path, p.content_hash, coalesce(p.orientation, 1), p.edit_version
              FROM photos p
              LEFT JOIN thumbnail_failures f ON f.content_hash = p.content_hash
              WHERE p.content_hash IS NOT NULL AND f.content_hash IS NULL
@@ -91,13 +114,19 @@ impl Library {
                 r.get::<_, String>(1)?,
                 r.get::<_, String>(2)?,
                 r.get::<_, u16>(3)?,
+                r.get::<_, Option<u32>>(4)?,
             ))
         })?;
         let mut seen = HashSet::new();
         let mut jobs = Vec::new();
         for row in rows {
-            let (photo_id, rel_path, content_hash, orientation) = row?;
-            if !seen.insert(content_hash.clone()) || self.thumbnail_path(&content_hash).is_file() {
+            let (photo_id, rel_path, content_hash, orientation, edit_version) = row?;
+            if !seen.insert((content_hash.clone(), edit_version))
+                || self
+                    .root
+                    .join(thumbnail_rel_path_for(&content_hash, edit_version))
+                    .is_file()
+            {
                 continue;
             }
             jobs.push(ThumbnailJob {
@@ -105,6 +134,7 @@ impl Library {
                 rel_path: RelPath::new(&rel_path)?,
                 content_hash,
                 orientation,
+                edit_version,
             });
         }
         Ok(jobs)
@@ -119,7 +149,9 @@ impl Library {
                 Ok(Outcome::Written) => report.written += 1,
                 Ok(Outcome::AlreadyThere) => {}
                 Ok(Outcome::Failed(message)) => {
-                    record_failure(&self.conn, &job.content_hash, &message)?;
+                    if job.edit_version.is_none() {
+                        record_failure(&self.conn, &job.content_hash, &message)?;
+                    }
                     report.failed.push((path, message));
                 }
                 // La biblioteca ya no está (disco desconectado): se para todo.
@@ -144,12 +176,28 @@ pub struct ThumbnailReport {
 /// Genera y guarda la miniatura de un trabajo. Un error de lectura o escritura
 /// se devuelve como `Err` (puede ser un disco desconectado); un formato sin
 /// miniatura o una imagen dañada, como [`Outcome::Failed`].
+///
+/// Si el trabajo es de una versión editada, la geometría sale de la receta de
+/// `.mnemos/ediciones/`; si esa versión ya no existe o la receta está dañada,
+/// el trabajo falla (y no se anota: la miniatura del original sigue).
 pub fn make_thumbnail(root: &Path, job: &ThumbnailJob) -> io::Result<Outcome> {
-    let dest = root.join(thumbnail_rel_path(&job.content_hash));
+    let dest = root.join(job.rel_path_of_thumbnail());
     if dest.is_file() {
         return Ok(Outcome::AlreadyThere);
     }
-    let thumb = match mnemos_imaging::thumbnail(&job.rel_path.to_path(root), job.orientation) {
+    let geometry = match job.edit_version {
+        None => Geometry::default(),
+        Some(version) => match crate::edits::read_recipe(root, &job.content_hash)? {
+            StoredRecipe::Valid(recipe) => match recipe.versions.iter().find(|v| v.id == version) {
+                Some(v) => v.geometry,
+                None => return Ok(Outcome::Failed(format!("no existe la versión {version}"))),
+            },
+            StoredRecipe::Damaged(reason) => return Ok(Outcome::Failed(reason)),
+            StoredRecipe::None => return Ok(Outcome::Failed("falta la receta".into())),
+        },
+    };
+    let path = job.rel_path.to_path(root);
+    let thumb = match mnemos_imaging::thumbnail_edited(&path, job.orientation, &geometry) {
         Ok(thumb) => thumb,
         Err(mnemos_imaging::ThumbnailError::Io(err)) => return Err(err),
         Err(err) => return Ok(Outcome::Failed(err.to_string())),
@@ -194,13 +242,17 @@ fn photos_with_hash(conn: &Connection, content_hash: &str) -> rusqlite::Result<V
 #[derive(Default)]
 struct Jobs {
     queue: VecDeque<ThumbnailJob>,
-    hashes: HashSet<String>,
+    /// Huella y versión de cada trabajo en la cola, para no repetirlos.
+    hashes: HashSet<(String, Option<u32>)>,
     stopped: bool,
 }
 
 impl Jobs {
     fn push(&mut self, job: ThumbnailJob) {
-        if self.hashes.insert(job.content_hash.clone()) {
+        if self
+            .hashes
+            .insert((job.content_hash.clone(), job.edit_version))
+        {
             self.queue.push_back(job);
         }
     }
@@ -218,7 +270,8 @@ impl Jobs {
 
     fn pop(&mut self) -> Option<ThumbnailJob> {
         let job = self.queue.pop_front()?;
-        self.hashes.remove(&job.content_hash);
+        self.hashes
+            .remove(&(job.content_hash.clone(), job.edit_version));
         Some(job)
     }
 }
@@ -335,7 +388,9 @@ fn work(shared: &Shared) {
                 photo_ids: sharing(shared, &job),
             },
             Ok(Outcome::Failed(message)) => {
-                let _ = record_failure(&lock(&shared.conn), &job.content_hash, &message);
+                if job.edit_version.is_none() {
+                    let _ = record_failure(&lock(&shared.conn), &job.content_hash, &message);
+                }
                 ThumbnailEvent::Failed {
                     photo_ids: sharing(shared, &job),
                     message,
@@ -396,6 +451,7 @@ mod tests {
             rel_path: RelPath::new("Originales/x.png").unwrap(),
             content_hash: hash.to_owned(),
             orientation: 1,
+            edit_version: None,
         }
     }
 
