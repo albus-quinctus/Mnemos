@@ -34,9 +34,9 @@ Petición de Paulo (2026-11-05).
   nueva de la receta y la hace actual: en la cuadrícula, el visor, la búsqueda
   y los álbumes se ve solo la editada, con su fecha, su nombre y sus datos de
   siempre. El archivo de `Originales/` no se reescribe: queda oculto dentro de
-  MNEMOS y se recupera con «Volver al original». *(Pendiente de que Paulo
-  confirme este comportamiento frente a sobrescribir el archivo de verdad, que
-  sería una excepción a la regla 1 de `CLAUDE.md`.)*
+  MNEMOS y se recupera con «Volver al original». Decidido por Paulo el
+  2026-11-05 frente a sobrescribir el archivo, que habría sido una excepción a
+  la regla 1 de `CLAUDE.md`.
 - **Guardar como copia:** se conservan la original y la editada como dos fotos
   independientes.
   - La copia es un archivo nuevo, generado a partir del original y la receta,
