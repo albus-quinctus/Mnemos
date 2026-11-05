@@ -243,7 +243,7 @@ Petición de Paulo (2026-11-05).
 4. [x] Migración 0009 con `edit_version` y recálculo al indexar, con prueba
    de migración desde una biblioteca v9 y de biblioteca copiada. Va al
    final de la lista de `db.rs`, detrás de la 0011 (que ocupa el puesto 9).
-5. [ ] Núcleo: miniaturas editadas y limpieza de las de versiones viejas.
+5. [x] Núcleo: miniaturas editadas y limpieza de las de versiones viejas.
 6. [ ] Núcleo: guardar como copia (render a tamaño completo, nombre
    `(N)`, EXIF y datos copiados, escritura en `tmp/` e indexado), con
    pruebas de originales intactos y de fallo a mitad.

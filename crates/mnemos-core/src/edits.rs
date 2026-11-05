@@ -178,6 +178,7 @@ impl Library {
         let version = recipe.add_version(geometry, unix_secs(SystemTime::now()))?;
         write_recipe(&self.root, &hash, &recipe)?;
         set_cached_version(&self.conn, &hash, Some(version))?;
+        remove_stale_thumbnails(&self.root, &hash, Some(version));
         Ok(version)
     }
 
@@ -201,7 +202,9 @@ impl Library {
                 }
                 recipe.set_current(version)?;
                 write_recipe(&self.root, &hash, &recipe)?;
-                set_cached_version(&self.conn, &hash, version)
+                set_cached_version(&self.conn, &hash, version)?;
+                remove_stale_thumbnails(&self.root, &hash, version);
+                Ok(())
             }
             // Sin receta (o dañada) ya se ve el original.
             _ if version.is_none() => Ok(()),
@@ -285,6 +288,31 @@ fn set_cached_version(conn: &Connection, hash: &str, version: Option<u32>) -> Re
     Ok(())
 }
 
+/// Borra las miniaturas de versiones editadas de esta huella que ya no se ven
+/// (`<huella>-e<n>.jpg` con `n` distinto de `keep`). Son una caché: si vuelven
+/// a hacer falta, se regeneran. La del original no se toca nunca. Un fallo al
+/// borrar no importa.
+fn remove_stale_thumbnails(root: &Path, hash: &str, keep: Option<u32>) {
+    let dir = root
+        .join(crate::thumbnails::thumbnail_rel_path(hash))
+        .with_file_name("");
+    let Ok(entries) = read_dir_or_empty(&dir) else {
+        return;
+    };
+    let prefix = format!("{hash}-e");
+    for path in entries {
+        let version = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| n.strip_prefix(&prefix))
+            .and_then(|n| n.strip_suffix(".jpg"))
+            .and_then(|n| n.parse::<u32>().ok());
+        if version.is_some() && version != keep {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
 /// Entradas de una carpeta; ninguna si no existe.
 fn read_dir_or_empty(dir: &Path) -> io::Result<Vec<PathBuf>> {
     match fs::read_dir(dir) {
@@ -314,7 +342,7 @@ fn original_ref(target: &EditTarget, path: &Path, hash: &str) -> OriginalRef {
 
 /// Lee la receta de una huella. Solo un fallo de lectura del disco es un
 /// error; un archivo que no se entiende es [`StoredRecipe::Damaged`].
-fn read_recipe(root: &Path, hash: &str) -> io::Result<StoredRecipe> {
+pub(crate) fn read_recipe(root: &Path, hash: &str) -> io::Result<StoredRecipe> {
     let bytes = match fs::read(root.join(recipe_rel_path(hash))) {
         Ok(bytes) => bytes,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(StoredRecipe::None),
@@ -691,6 +719,61 @@ mod tests {
                 fs::copy(entry.path(), &target).unwrap();
             }
         }
+    }
+
+    #[test]
+    fn la_miniatura_editada_se_genera_aparte_y_las_viejas_se_borran() {
+        use crate::thumbnails::{thumbnail_rel_path, thumbnail_rel_path_for};
+        let mut s = setup();
+        s.lib.generate_thumbnails().unwrap();
+        let hash = s.hash();
+        let original_thumb = s.root().join(thumbnail_rel_path(&hash));
+        let (w, h) = image::image_dimensions(&original_thumb).unwrap();
+        assert_eq!((w, h), (540, 360));
+
+        // Girada: la miniatura de la versión 1 sale vertical.
+        assert_eq!(s.lib.save_edit(s.id, giro()).unwrap(), 1);
+        let jobs = s.lib.pending_thumbnails().unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].edit_version, Some(1));
+        s.lib.generate_thumbnails().unwrap();
+        let v1 = s.root().join(thumbnail_rel_path_for(&hash, Some(1)));
+        assert_eq!(image::image_dimensions(&v1).unwrap(), (240, 360));
+        assert!(s.lib.pending_thumbnails().unwrap().is_empty());
+
+        // Al guardar la versión 2, la de la 1 sobra; la del original no.
+        s.lib.save_edit(s.id, recorte()).unwrap();
+        assert!(!v1.exists());
+        s.lib.generate_thumbnails().unwrap();
+        let v2 = s.root().join(thumbnail_rel_path_for(&hash, Some(2)));
+        assert!(v2.is_file());
+
+        // Volver al original borra la editada y usa la de siempre.
+        s.lib.set_edit_version(s.id, None).unwrap();
+        assert!(!v2.exists());
+        assert!(original_thumb.is_file());
+        assert!(s.lib.pending_thumbnails().unwrap().is_empty());
+    }
+
+    #[test]
+    fn una_miniatura_editada_que_falla_no_bloquea_la_del_original() {
+        let mut s = setup();
+        s.lib.save_edit(s.id, giro()).unwrap();
+        fs::write(s.recipe_path(), b"{ roto").unwrap();
+        // La base de datos aún cree que se ve la versión 1.
+        let report = s.lib.generate_thumbnails().unwrap();
+        assert_eq!(report.failed.len(), 1);
+        let fallos: i64 = s
+            .lib
+            .connection()
+            .query_row("SELECT count(*) FROM thumbnail_failures", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fallos, 0);
+        // Al indexar se corrige y sale la del original.
+        s.lib.index().unwrap();
+        let jobs = s.lib.pending_thumbnails().unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].edit_version, None);
     }
 
     #[test]
