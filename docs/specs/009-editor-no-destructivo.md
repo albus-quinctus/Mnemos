@@ -22,11 +22,38 @@ más se usan: recortar y girar.
 - Barra inferior del editor, de izquierda a derecha: girar 90° a la izquierda,
   voltear en horizontal, proporción del recorte (Libre, Original, Cuadrado,
   4:3, 3:2, 16:9, con su versión vertical) y «Restablecer». Arriba a la
-  derecha, «Cancelar» y «Guardar».
+  derecha, «Cancelar» y «Guardar», que despliega dos opciones: «Guardar como
+  original» y «Guardar como copia» (ver abajo).
 - `Esc` o «Cancelar» salen sin guardar. Si hay cambios sin guardar se pide
   confirmación: «¿Descartar los cambios?».
-- «Guardar» crea una versión nueva de la receta y vuelve al visor, que ya
-  muestra la foto editada.
+- Al guardar se vuelve al visor, que ya muestra la foto editada.
+
+### Guardar como original o como copia
+Petición de Paulo (2026-11-05).
+- **Guardar como original:** solo queda la foto editada. Crea una versión
+  nueva de la receta y la hace actual: en la cuadrícula, el visor, la búsqueda
+  y los álbumes se ve solo la editada, con su fecha, su nombre y sus datos de
+  siempre. El archivo de `Originales/` no se reescribe: queda oculto dentro de
+  MNEMOS y se recupera con «Volver al original». *(Pendiente de que Paulo
+  confirme este comportamiento frente a sobrescribir el archivo de verdad, que
+  sería una excepción a la regla 1 de `CLAUDE.md`.)*
+- **Guardar como copia:** se conservan la original y la editada como dos fotos
+  independientes.
+  - La copia es un archivo nuevo, generado a partir del original y la receta,
+    en la misma carpeta `Originales/AAAA/MM/` que el original.
+  - Toma el nombre del original añadiendo un número: `IMG_1234.jpg` da
+    `IMG_1234 (1).jpg`, y si ya existe, `IMG_1234 (2).jpg`, con la misma regla
+    que la importación.
+  - Toma sus datos: fecha y hora de captura (y su origen), fecha de
+    modificación del archivo, descripción, ubicación y favorito. Así sale en la
+    cuadrícula justo al lado del original. El EXIF del original se copia en la
+    copia, con la orientación puesta a 1 y las dimensiones nuevas.
+  - A partir de ahí es independiente: editarla, archivarla o borrarla no
+    afecta al original, y viceversa. Sus propias ediciones son recetas sobre
+    la copia.
+  - Formato: JPEG de calidad 95 a tamaño completo si el original es JPEG, RAW,
+    TIFF o WebP; PNG si el original es PNG (para no perder la transparencia).
+  - El original y su receta no cambian. En el visor se pasa a la copia.
 
 ### Recortar
 - Al entrar, la foto ocupa el área de trabajo con un marco de recorte que la
@@ -66,8 +93,8 @@ más se usan: recortar y girar.
   se guarda en disco.
 - Detalles: las dimensiones muestran las de la foto editada y, debajo, las del
   original.
-- Exportar la foto editada como un archivo nuevo va con la spec 008
-  (exportar), que leerá esta receta.
+- Exportar la foto editada fuera de la biblioteca va con la spec 008
+  (exportar), que leerá esta receta. «Guardar como copia» la deja dentro.
 
 ### Formato de la receta
 - Una receta por contenido, en `.mnemos/ediciones/<2 primeros>/<huella>.json`,
@@ -135,6 +162,12 @@ más se usan: recortar y girar.
   muestre la imagen anterior a la edición.
 
 ## Casos límite
+- Guardar como copia sin espacio en el disco o con el disco desconectado: la
+  copia se escribe en `.mnemos/tmp/` y solo se mueve a `Originales/` y se
+  indexa cuando está completa; si falla, no queda ni archivo a medias ni
+  registro en la base de datos.
+- Guardar como copia de un GIF animado: la copia es un JPEG del primer
+  fotograma.
 - Disco desconectado al guardar: la receta anterior queda intacta (escritura
   en `tmp/` y renombrado), sale un error y el editor sigue abierto con los
   cambios para reintentar.
@@ -168,6 +201,9 @@ más se usan: recortar y girar.
   cuadrantes de colores).
 - [ ] Las ocho orientaciones EXIF combinadas con los cuatro giros, el volteo y
   un recorte dan la imagen esperada (prueba automática).
+- [ ] Guardar como copia crea un archivo nuevo `nombre (N).ext` en la misma
+  carpeta, con la fecha de captura y los datos del original, indexado como
+  otra foto, y el original no cambia (prueba automática).
 - [ ] Volver al original y luego a la versión 2 muestra exactamente la versión
   2 (prueba automática).
 - [ ] Un corte a mitad de guardar deja la receta anterior intacta (prueba
@@ -186,7 +222,7 @@ más se usan: recortar y girar.
   siguiente del editor.
 - Brillo, contraste, color y filtros: spec siguiente del editor.
 - Dibujo, texto y anotaciones: spec propia después de los ajustes.
-- Exportar la foto editada: spec 008.
+- Exportar la foto editada fuera de la biblioteca: spec 008.
 - Volteo vertical como botón (se consigue con volteo y giro de 180°).
 - Editar varias fotos a la vez.
 - Escribir la edición en el EXIF o en un XMP del original: nunca, por la regla
@@ -194,7 +230,7 @@ más se usan: recortar y girar.
 - Leer recetas de otros programas (XMP de Lightroom o darktable).
 
 ## Tareas (≤1 h cada una)
-1. [ ] Imagen: tipos de la receta (formato 1) con su validación y lectura
+1. [x] Imagen: tipos de la receta (formato 1) con su validación y lectura
    tolerante, y aplicar la geometría (giro, volteo, recorte) a una imagen ya
    orientada, con pruebas de cuadrantes, orientaciones y redondeos.
 2. [ ] Imagen: miniatura y vista del visor con receta, reutilizando la
@@ -206,15 +242,19 @@ más se usan: recortar y girar.
    de migración desde una biblioteca v9 y de biblioteca copiada. Va al
    final de la lista de `db.rs`, detrás de la 0011 (que ocupa el puesto 9).
 5. [ ] Núcleo: miniaturas editadas y limpieza de las de versiones viejas.
-6. [ ] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la
-   receta, guardar, listar versiones y elegir versión.
-7. [ ] Capturas del diseño del editor (marco de recorte, barra inferior,
+6. [ ] Núcleo: guardar como copia (render a tamaño completo, nombre
+   `(N)`, EXIF y datos copiados, escritura en `tmp/` e indexado), con
+   pruebas de originales intactos y de fallo a mitad.
+7. [ ] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la
+   receta, guardar como original o como copia, listar versiones y elegir
+   versión.
+8. [ ] Capturas del diseño del editor (marco de recorte, barra inferior,
    sección Ediciones, icono en la cuadrícula) en claro y oscuro para que Paulo
    las apruebe.
-8. [ ] Estado del editor en la interfaz con pruebas: arrastrar esquinas y
+9. [ ] Estado del editor en la interfaz con pruebas: arrastrar esquinas y
    lados, proporciones, giro con el recorte, teclado, cambios sin guardar.
-9. [ ] Modo edición en el visor con el marco de recorte y la barra inferior.
-10. [ ] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
+10. [ ] Modo edición en el visor con el marco de recorte y la barra inferior.
+11. [ ] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
     en la cuadrícula.
-11. [ ] Prueba de originales intactos de punta a punta; actualizar
+12. [ ] Prueba de originales intactos de punta a punta; actualizar
     `docs/progreso.md` y `docs/arquitectura.md`.
