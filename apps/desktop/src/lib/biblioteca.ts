@@ -15,6 +15,8 @@ export interface FotoCuadricula {
   width: number | null; // ya girada según la orientación
   height: number | null;
   thumbnail_failed: boolean; // sin miniatura posible: se muestra el marcador
+  favorite: boolean; // en Favoritos: estrella (spec 006)
+  archived: boolean; // archivada: caja en la búsqueda (spec 006)
 }
 
 export interface Cursor {
@@ -36,6 +38,73 @@ export function fotos(
   limite: number,
 ): Promise<PaginaFotos> {
   return invoke("fotos", { despues, limite });
+}
+
+// Vistas, selección, favoritos, archivo y títulos de día (spec 006). Reflejan
+// `mnemos_core::{View, Scope, DayTitle}`.
+export type Vista = "fotos" | "favoritos" | "archivo";
+
+// Dónde se selecciona: una vista o los resultados de una búsqueda.
+export type Ambito = { vista: Vista } | { busqueda: string };
+
+export interface TituloDia {
+  day: string; // "2024-10-12", en hora local
+  title: string;
+}
+
+export function vistaMeses(vista: Vista): Promise<Mes[]> {
+  return invoke("vista_meses", { vista });
+}
+
+export function vistaFotos(
+  vista: Vista,
+  despues: Cursor | null,
+  limite: number,
+): Promise<PaginaFotos> {
+  return invoke("vista_fotos", { vista, despues, limite });
+}
+
+// Devuelven los ids que han cambiado de verdad: aplicar lo contrario solo a
+// esos es «Deshacer».
+export function marcarFavoritos(
+  ids: number[],
+  favorito: boolean,
+): Promise<number[]> {
+  return invoke("marcar_favoritos", { ids, favorito });
+}
+
+export function archivar(ids: number[], archivar: boolean): Promise<number[]> {
+  return invoke("archivar", { ids, archivar });
+}
+
+// Ids en el orden de la cuadrícula, sin cargar páginas.
+export function seleccionarTodo(ambito: Ambito): Promise<number[]> {
+  return invoke("seleccionar_todo", { ambito });
+}
+
+export function seleccionarDia(ambito: Ambito, dia: string): Promise<number[]> {
+  return invoke("seleccionar_dia", { ambito, dia });
+}
+
+export function seleccionarRango(
+  ambito: Ambito,
+  desde: Cursor,
+  hasta: Cursor,
+): Promise<number[]> {
+  return invoke("seleccionar_rango", { ambito, desde, hasta });
+}
+
+export function titulosDia(): Promise<TituloDia[]> {
+  return invoke("titulos_dia");
+}
+
+// Devuelve el título como ha quedado (limpio y cortado a 100 caracteres), o
+// null si se ha borrado.
+export function ponerTituloDia(
+  dia: string,
+  titulo: string,
+): Promise<string | null> {
+  return invoke("poner_titulo_dia", { dia, titulo });
 }
 
 // Búsqueda (spec 003): los mismos tipos que la cuadrícula, solo con los

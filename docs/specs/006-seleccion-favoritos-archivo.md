@@ -173,7 +173,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 4. [x] Núcleo: ids de un día, de toda la vista y de un rango entre dos fotos,
    para seleccionar sin cargar páginas.
 5. [x] Núcleo: leer y guardar títulos de día, con pruebas de textos raros.
-6. [ ] Comandos de Tauri para las tareas 2 a 5.
+6. [x] Comandos de Tauri para las tareas 2 a 5.
 7. [ ] Capturas del diseño (casillas, barra de selección, estrella, aviso de
    deshacer, título del día) en claro y oscuro para que Paulo las apruebe.
 8. [ ] Estado de selección en la interfaz con pruebas: clic, `Ctrl`, `Mayús`,
