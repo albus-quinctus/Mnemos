@@ -203,7 +203,8 @@ más se usan: recortar y girar.
    segura, versiones, `current` y volver al original, con pruebas de corte a
    mitad y de recetas dañadas.
 4. [ ] Migración 0009 con `edit_version` y recálculo al indexar, con prueba
-   de migración desde una biblioteca v8 y de biblioteca copiada.
+   de migración desde una biblioteca v9 y de biblioteca copiada. Va al
+   final de la lista de `db.rs`, detrás de la 0011 (que ocupa el puesto 9).
 5. [ ] Núcleo: miniaturas editadas y limpieza de las de versiones viejas.
 6. [ ] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la
    receta, guardar, listar versiones y elegir versión.
