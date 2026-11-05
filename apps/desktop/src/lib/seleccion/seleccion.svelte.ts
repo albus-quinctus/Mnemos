@@ -163,3 +163,8 @@ let avisarError: (error: unknown) => void = (error) => console.error(error);
 export function alFallar(avisar: (error: unknown) => void) {
   avisarError = avisar;
 }
+
+/** Para las acciones que la cuadrícula lanza sin esperar su resultado. */
+export function avisarFallo(error: unknown) {
+  avisarError(error);
+}
