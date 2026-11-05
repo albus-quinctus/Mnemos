@@ -179,7 +179,10 @@ fn geo(value: &Value) -> Option<Geo> {
     valid.then(|| Geo {
         latitude,
         longitude,
-        altitude: value["altitude"].as_f64().filter(|a| a.is_finite()),
+        // Google escribe 0.0 cuando no conoce la altitud.
+        altitude: value["altitude"]
+            .as_f64()
+            .filter(|a| a.is_finite() && *a != 0.0),
     })
 }
 
@@ -385,6 +388,9 @@ mod tests {
 
         let meta = meta_of(&format!(r#"{{"geoData":{cero},"geoDataExif":{cero}}}"#)).unwrap();
         assert_eq!(meta.geo, None);
+
+        let sin_altitud = r#"{"geoData":{"latitude":40.4,"longitude":-3.7,"altitude":0.0}}"#;
+        assert_eq!(meta_of(sin_altitud).unwrap().geo.unwrap().altitude, None);
 
         let fuera = r#"{"geoData":{"latitude":95.0,"longitude":10.0}}"#;
         assert_eq!(meta_of(fuera).unwrap().geo, None);
