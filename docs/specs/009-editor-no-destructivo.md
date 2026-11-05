@@ -237,7 +237,7 @@ Petición de Paulo (2026-11-05).
    orientada, con pruebas de cuadrantes, orientaciones y redondeos.
 2. [x] Imagen: miniatura y vista del visor con receta, reutilizando la
    decodificación reducida de los JPEG. Medición con 24 MP.
-3. [ ] Núcleo: leer y guardar recetas en `.mnemos/ediciones/` con escritura
+3. [x] Núcleo: leer y guardar recetas en `.mnemos/ediciones/` con escritura
    segura, versiones, `current` y volver al original, con pruebas de corte a
    mitad y de recetas dañadas.
 4. [ ] Migración 0009 con `edit_version` y recálculo al indexar, con prueba

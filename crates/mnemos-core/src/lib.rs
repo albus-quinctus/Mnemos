@@ -6,6 +6,7 @@
 pub mod day_titles;
 pub mod db;
 pub mod duplicates;
+pub mod edits;
 pub mod error;
 pub mod export;
 mod files;
@@ -25,6 +26,7 @@ pub use day_titles::{DayTitle, MAX_DAY_TITLE};
 pub use duplicates::{
     DuplicateCopy, DuplicateCursor, DuplicateGroup, DuplicatePage, DuplicateSummary,
 };
+pub use edits::{EditSummary, EditVersion, StoredRecipe};
 pub use error::{Error, Result};
 pub use export::ExportSize;
 pub use import::{ImportReport, Progreso};
