@@ -10,8 +10,12 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { onDestroy } from "svelte";
   import {
+    camara as pedirCamara,
     detalles as pedirDetalles,
     exportar,
+    ponerFecha,
+    quitarFechaManual,
+    type Camara,
     type Detalles,
     type FotoCuadricula,
     type TamanoExportacion,
@@ -19,7 +23,19 @@
   import Icono from "$lib/componentes/Icono.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
   import { CacheImagenes, vecinas } from "./cache";
-  import { dimensiones, fecha, fechaCaptura, tamano } from "./formato";
+  import { fechas } from "./fechas.svelte";
+  import {
+    apertura,
+    camposFecha,
+    coordenadas,
+    dimensiones,
+    exposicion,
+    fecha,
+    fechaCaptura,
+    fechaManual,
+    focal,
+    tamano,
+  } from "./formato";
 
   let {
     fotos,
@@ -98,7 +114,12 @@
     if (quedan && indice >= fotos.length - 3) onPedirMas();
   });
 
-  onDestroy(() => cache.vaciar());
+  onDestroy(() => {
+    cache.vaciar();
+    // Las cuadrículas se recargan al cerrar, no antes: así la foto no se
+    // mueve de la tira mientras se mira.
+    if (fechaCambiada) fechas.version++;
+  });
 
   function ir(paso: number) {
     const destino = indice + paso;
@@ -109,10 +130,19 @@
   // pasar de foto.
   let panel = $state(false);
   let info = $state<Detalles | null>(null);
+  let camaraInfo = $state<Camara | null>(null);
+  // Sube al guardar una fecha, para volver a pedir los detalles.
+  let recarga = $state(0);
   const captura = $derived(info ? fechaCaptura(info.taken_at, info.taken_source) : null);
+  const automatica = $derived(
+    info?.taken_source === "manual"
+      ? fechaCaptura(info.taken_auto_at, info.taken_auto_source)
+      : null,
+  );
   $effect(() => {
     if (!panel || !foto) return;
     const id = foto.id;
+    void recarga;
     let vigente = true;
     pedirDetalles(id)
       .then((d) => {
@@ -121,10 +151,76 @@
       .catch(() => {
         if (vigente) info = null;
       });
+    // El EXIF se lee del original: si el disco no está, solo falta la sección.
+    pedirCamara(id)
+      .then((c) => {
+        if (vigente) camaraInfo = c;
+      })
+      .catch(() => {
+        if (vigente) camaraInfo = null;
+      });
     return () => {
       vigente = false;
     };
   });
+
+  // Fecha a mano (spec 011). Solo cambia la base de datos.
+  let editando = $state(false);
+  let dia = $state("");
+  let hora = $state("");
+  let guardando = $state(false);
+  let errorFecha = $state("");
+  let fechaCambiada = false;
+
+  // Al pasar de foto se cierra el formulario sin guardar.
+  $effect(() => {
+    void foto?.id;
+    editando = false;
+    errorFecha = "";
+  });
+
+  function empezarEdicion() {
+    if (!info) return;
+    ({ dia, hora } = camposFecha(info.taken_at ?? info.modified_at));
+    errorFecha = "";
+    editando = true;
+  }
+
+  async function cambiarFecha(accion: () => Promise<boolean>) {
+    guardando = true;
+    errorFecha = "";
+    try {
+      if (!(await accion())) {
+        errorFecha = "Esta foto ya no está en la biblioteca.";
+        return;
+      }
+      fechaCambiada = true;
+      editando = false;
+      recarga++;
+    } catch (e) {
+      errorFecha = String(e);
+    } finally {
+      guardando = false;
+    }
+  }
+
+  function guardarFecha(e: SubmitEvent) {
+    e.preventDefault();
+    if (!foto) return;
+    const valor = fechaManual(dia, hora);
+    if (!valor) {
+      errorFecha = "Escribe el día y la hora.";
+      return;
+    }
+    const id = foto.id;
+    cambiarFecha(() => ponerFecha(id, valor));
+  }
+
+  function volverAAutomatica() {
+    if (!foto) return;
+    const id = foto.id;
+    cambiarFecha(() => quitarFechaManual(id));
+  }
 
   // Exportar (spec 008): menú con los dos tamaños, selector de carpeta y un
   // aviso con el resultado.
@@ -171,6 +267,14 @@
 
   function alPulsar(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Mientras se escribe la fecha, las teclas son del formulario.
+    if (editando && e.target instanceof HTMLElement && e.target.closest(".editar-fecha")) {
+      if (e.key === "Escape") {
+        editando = false;
+        e.preventDefault();
+      }
+      return;
+    }
     if (e.key === "Escape" && menuExportar) menuExportar = false;
     else if (e.key === "Escape") onCerrar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
@@ -313,14 +417,74 @@
           <dd>{tamano(info.size_bytes)}</dd>
           <dt>Fecha</dt>
           <dd>
-            {captura?.texto}
-            {#if captura?.origen}<span class="origen">{captura?.origen}</span>{/if}
+            {#if editando}
+              <form class="editar-fecha" onsubmit={guardarFecha}>
+                <label>
+                  <span>Día</span>
+                  <input type="date" min="1900-01-01" max="2200-12-31" bind:value={dia} required />
+                </label>
+                <label>
+                  <span>Hora</span>
+                  <input type="time" step="1" bind:value={hora} required />
+                </label>
+                <div class="acciones-fecha">
+                  <button type="submit" class="texto principal" disabled={guardando}>Guardar</button>
+                  <button type="button" class="texto" onclick={() => (editando = false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            {:else}
+              {captura?.texto}
+              {#if captura?.origen}<span class="origen">{captura?.origen}</span>{/if}
+              <div class="acciones-fecha">
+                <button type="button" class="texto" onclick={empezarEdicion}>Cambiar fecha</button>
+                {#if info.taken_source === "manual"}
+                  <button
+                    type="button"
+                    class="texto"
+                    disabled={guardando}
+                    title={automatica
+                      ? `${automatica.texto}${automatica.origen ? ` · ${automatica.origen}` : ""}`
+                      : undefined}
+                    onclick={volverAAutomatica}
+                  >
+                    Volver a la fecha automática
+                  </button>
+                {/if}
+              </div>
+            {/if}
+            {#if errorFecha}<span class="error-fecha" role="alert">{errorFecha}</span>{/if}
           </dd>
           <dt>Modificada</dt>
           <dd>{fecha(info.modified_at)}</dd>
           <dt>Formato</dt>
           <dd>{info.format || "Desconocido"}</dd>
         </dl>
+        {#if camaraInfo}
+          {@const c = camaraInfo}
+          {@const distancia = focal(c.focal_mm, c.focal_35mm)}
+          <h3>Cámara</h3>
+          <dl>
+            {#if c.camera}<dt>Cámara</dt><dd>{c.camera}</dd>{/if}
+            {#if c.lens}<dt>Objetivo</dt><dd>{c.lens}</dd>{/if}
+            {#if c.exposure_s !== null || c.f_number !== null || c.iso !== null}
+              <dt>Exposición</dt>
+              <dd>
+                {[
+                  c.exposure_s !== null ? exposicion(c.exposure_s) : null,
+                  c.f_number !== null ? apertura(c.f_number) : null,
+                  c.iso !== null ? `ISO ${c.iso}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </dd>
+            {/if}
+            {#if distancia}<dt>Distancia focal</dt><dd>{distancia}</dd>{/if}
+            {#if c.flash !== null}<dt>Flash</dt><dd>{c.flash ? "Saltó" : "No saltó"}</dd>{/if}
+            {#if c.gps}<dt>Ubicación</dt><dd class="mono">{coordenadas(c.gps)}</dd>{/if}
+          </dl>
+        {/if}
         <p class="nota">El original no se modifica nunca.</p>
       {/if}
     </aside>
@@ -374,6 +538,73 @@
   dd {
     margin: 0;
     overflow-wrap: anywhere;
+  }
+
+  .panel h3 {
+    margin: 28px 0 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .acciones-fecha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 6px;
+  }
+
+  .texto {
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: var(--visor-texto);
+    font: inherit;
+    font-size: 0.85rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .texto.principal {
+    padding: 4px 12px;
+    border-radius: var(--radio);
+    background: var(--visor-superficie);
+    text-decoration: none;
+  }
+
+  .texto:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .editar-fecha {
+    display: grid;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .editar-fecha label {
+    display: grid;
+    gap: 2px;
+    font-size: 0.8rem;
+    color: var(--visor-texto-suave);
+  }
+
+  .editar-fecha input {
+    padding: 6px 8px;
+    border: 1px solid var(--visor-texto-suave);
+    border-radius: var(--radio);
+    background: transparent;
+    color: var(--visor-texto);
+    font: inherit;
+    color-scheme: dark;
+  }
+
+  .error-fecha {
+    display: block;
+    margin-top: 6px;
+    color: #f2938c; /* --error del tema oscuro: el visor siempre es oscuro */
+    font-size: 0.8rem;
   }
 
   .mono {

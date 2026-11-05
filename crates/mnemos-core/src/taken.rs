@@ -36,11 +36,16 @@ impl Source {
         }
     }
 
-    /// Expresión SQL con el orden de `taken_source`: las fuentes que no
-    /// conoce (o `NULL`, sin buscar todavía) valen lo mismo que `ninguna`.
-    pub(crate) const RANK_SQL: &str = "CASE taken_source
-        WHEN 'exif' THEN 4 WHEN 'nombre' THEN 3 WHEN 'takeout' THEN 2 WHEN 'nombre_dia' THEN 1
-        ELSE 0 END";
+    /// Expresión SQL con el orden de la fuente guardada en `column`: las que
+    /// no conoce (o `NULL`, sin buscar todavía) valen lo mismo que `ninguna`.
+    /// La fecha a mano (spec 011) está por encima de todas.
+    pub(crate) fn rank_sql(column: &str) -> String {
+        format!(
+            "CASE {column} WHEN '{MANUAL}' THEN 5
+                WHEN 'exif' THEN 4 WHEN 'nombre' THEN 3 WHEN 'takeout' THEN 2
+                WHEN 'nombre_dia' THEN 1 ELSE 0 END"
+        )
+    }
 
     pub(crate) fn rank(self) -> i64 {
         self as i64
@@ -70,13 +75,27 @@ pub(crate) fn taken_at_sql(exact: usize, local: usize) -> String {
     format!("coalesce(?{exact}, unixepoch(?{local}, 'utc'))")
 }
 
-/// Guarda la fecha de captura de la foto `rel_path`.
+/// `taken_source` de una fecha puesta a mano (spec 011). No es una [`Source`]:
+/// ningún proceso automático la encuentra ni la reemplaza.
+pub(crate) const MANUAL: &str = "manual";
+
+/// Guarda la fecha de captura de la foto `rel_path`. Si tiene una fecha a mano
+/// (spec 011), la deja y guarda esta como la automática de reserva.
 pub(crate) fn set_taken(conn: &Connection, rel_path: &str, taken: &Taken) -> Result<()> {
     let (exact, local) = taken.sql_params();
     conn.execute(
         &format!(
-            "UPDATE photos SET taken_at = {}, taken_source = ?4 WHERE rel_path = ?1",
-            taken_at_sql(2, 3)
+            "UPDATE photos SET taken_at = {at}, taken_source = ?4
+             WHERE rel_path = ?1 AND taken_source IS NOT '{MANUAL}'",
+            at = taken_at_sql(2, 3)
+        ),
+        params![rel_path, exact, local, taken.source.as_str()],
+    )?;
+    conn.execute(
+        &format!(
+            "UPDATE photos SET taken_auto_at = {at}, taken_auto_source = ?4
+             WHERE rel_path = ?1 AND taken_source = '{MANUAL}'",
+            at = taken_at_sql(2, 3)
         ),
         params![rel_path, exact, local, taken.source.as_str()],
     )?;
@@ -84,24 +103,73 @@ pub(crate) fn set_taken(conn: &Connection, rel_path: &str, taken: &Taken) -> Res
 }
 
 /// Mejora la fecha de las fotos con esta huella si `taken` sale de una fuente
-/// más fiable que la que tienen. Devuelve cuántas cambió.
+/// más fiable que la que tienen. En las que tienen fecha a mano mejora la
+/// automática de reserva. Devuelve cuántas cambió.
 pub(crate) fn improve_taken(conn: &Connection, hash: &str, taken: &Taken) -> Result<usize> {
     let (exact, local) = taken.sql_params();
-    Ok(conn.execute(
+    let args = params![
+        hash,
+        exact,
+        local,
+        taken.source.as_str(),
+        taken.source.rank()
+    ];
+    let mut changed = conn.execute(
         &format!(
-            "UPDATE photos SET taken_at = {}, taken_source = ?4
-             WHERE content_hash = ?1 AND {} < ?5",
-            taken_at_sql(2, 3),
-            Source::RANK_SQL
+            "UPDATE photos SET taken_at = {at}, taken_source = ?4
+             WHERE content_hash = ?1 AND {rank} < ?5",
+            at = taken_at_sql(2, 3),
+            rank = Source::rank_sql("taken_source")
         ),
-        params![
-            hash,
-            exact,
-            local,
-            taken.source.as_str(),
-            taken.source.rank()
-        ],
-    )?)
+        args,
+    )?;
+    changed += conn.execute(
+        &format!(
+            "UPDATE photos SET taken_auto_at = {at}, taken_auto_source = ?4
+             WHERE content_hash = ?1 AND taken_source = '{MANUAL}' AND {rank} < ?5",
+            at = taken_at_sql(2, 3),
+            rank = Source::rank_sql("taken_auto_source")
+        ),
+        args,
+    )?;
+    Ok(changed)
+}
+
+/// Hora local escrita a mano (`AAAA-MM-DD hh:mm[:ss]`), validada como una
+/// fecha del EXIF (de 1900 a 2200). Devuelve el texto normalizado con segundos.
+pub(crate) fn parse_manual(text: &str) -> Option<String> {
+    let (date, time) = text.trim().split_once([' ', 'T'])?;
+    let date: Vec<&str> = date.split('-').collect();
+    let mut time: Vec<&str> = time.split(':').collect();
+    if time.len() == 2 {
+        time.push("00");
+    }
+    let lens = [4, 2, 2, 2, 2, 2];
+    let parts: Vec<&str> = date.into_iter().chain(time).collect();
+    if parts.len() != lens.len()
+        || parts
+            .iter()
+            .zip(lens)
+            .any(|(p, n)| p.len() != n || !p.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return None;
+    }
+    let num = |i: usize| parts[i].parse::<u8>().ok();
+    let t = CaptureTime {
+        year: parts[0].parse().ok()?,
+        month: num(1)?,
+        day: num(2)?,
+        hour: num(3)?,
+        minute: num(4)?,
+        second: num(5)?,
+        offset_minutes: None,
+    };
+    t.is_valid().then(|| {
+        format!(
+            "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+            t.year, t.month, t.day, t.hour, t.minute, t.second
+        )
+    })
 }
 
 impl Taken {
@@ -463,5 +531,30 @@ mod tests {
             Taken::new(When::Local(t), Source::Exif).when,
             Some(When::Unix(1_557_664_200))
         );
+    }
+
+    #[test]
+    fn valida_la_fecha_escrita_a_mano() {
+        assert_eq!(
+            parse_manual("2019-05-12 14:30").as_deref(),
+            Some("2019-05-12 14:30:00")
+        );
+        assert_eq!(
+            parse_manual(" 1905-02-28T08:09:10 ").as_deref(),
+            Some("1905-02-28 08:09:10")
+        );
+        for mala in [
+            "2019-02-30 10:00",
+            "1899-12-31 23:59",
+            "2201-01-01 00:00",
+            "2019-05-12 24:00",
+            "2019-05-12",
+            "2019-5-12 14:30",
+            "2019-05-12 +1:30",
+            "12/05/2019 14:30",
+            "",
+        ] {
+            assert_eq!(parse_manual(mala), None, "{mala}");
+        }
     }
 }

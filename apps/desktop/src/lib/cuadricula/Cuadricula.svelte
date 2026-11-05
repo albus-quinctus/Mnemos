@@ -11,8 +11,10 @@
     type EventoMiniaturas,
     type FotoCuadricula,
     type Mes,
+    type PaginaFotos,
   } from "$lib/biblioteca";
   import { miniaturaUrl } from "$lib/media";
+  import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
   import BarraMeses from "./BarraMeses.svelte";
   import { disponer, nombreDia, visibles, type Opciones } from "./disposicion";
@@ -67,6 +69,7 @@
   /** Al cerrar el visor, la cuadrícula muestra y enfoca la última foto vista. */
   async function cerrarVisor() {
     const indice = abierta;
+    vista = indice === null ? null : (fotos[indice]?.id ?? null);
     abierta = null;
     if (indice === null || !contenedor) return;
     const bloque = disposicion.bloques.find(
@@ -97,6 +100,59 @@
       cargando = false;
     }
   }
+
+  // Última foto vista en el visor, para enfocarla tras recargar.
+  let vista: number | null = null;
+
+  /**
+   * Vuelve a pedir los meses y las fotos ya cargadas sin mover el
+   * desplazamiento, cuando cambia la fecha de alguna foto (spec 011).
+   */
+  async function recargar() {
+    while (cargando) await new Promise((r) => setTimeout(r, 50));
+    cargando = true;
+    const cuantas = Math.max(fotos.length, 1);
+    try {
+      const nuevosMeses = texto ? await buscarMeses(texto) : await pedirMeses();
+      let nuevas: FotoCuadricula[] = [];
+      let cursor: Cursor | null = null;
+      do {
+        const pagina: PaginaFotos = texto
+          ? await buscarFotos(texto, cursor, PAGINA)
+          : await pedirFotos(cursor, PAGINA);
+        nuevas = nuevas.concat(pagina.photos);
+        cursor = pagina.next;
+      } while (cursor !== null && nuevas.length < cuantas);
+      const arriba = contenedor?.scrollTop ?? 0;
+      meses = nuevosMeses;
+      fotos = nuevas;
+      siguiente = cursor;
+      quedan = cursor !== null;
+      await tick();
+      if (contenedor) {
+        contenedor.scrollTop = arriba;
+        desplazamiento = contenedor.scrollTop;
+      }
+    } catch (e) {
+      error = String(e);
+    } finally {
+      cargando = false;
+    }
+    const indice = fotos.findIndex((f) => f.id === vista);
+    if (indice >= 0 && abierta === null) {
+      await tick();
+      contenedor?.querySelector<HTMLElement>(`[data-indice="${indice}"]`)?.focus();
+    }
+  }
+
+  // Al cambiar alguna fecha a mano, se recarga. La primera vez solo se anota
+  // la versión: la carga inicial ya la hace `onMount`.
+  let versionFechas = fechas.version;
+  $effect(() => {
+    if (fechas.version === versionFechas) return;
+    versionFechas = fechas.version;
+    if (listo) recargar();
+  });
 
   // Mientras haya un tramo sin cargar a la vista, se piden más páginas.
   $effect(() => {

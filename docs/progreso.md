@@ -17,7 +17,8 @@ Fase **F1 Biblioteca y navegación**, en curso.
 6. Spec 008, exportar una foto desde el visor (`docs/specs/008-exportar.md`): tamaño original (copia verificada) o reducido (JPEG de 2048 px sin metadatos), sin sobrescribir nada y nunca dentro de la biblioteca. Falta probarlo en la app real. Exportar varias fotos espera a la selección de la spec 006.
 7. F3 empieza con la spec 009, editor no destructivo: recortar y girar (`docs/specs/009-editor-no-destructivo.md`), en borrador. Fija el formato de las recetas JSON en `.mnemos/ediciones/` (una por huella, con versiones y vuelta al original). Hecha la tarea 1: tipos de la receta y geometría (giro, volteo, recorte) en `mnemos-imaging`. Siguiente: tarea 2. La migración 0009 (`edit_version`) va en la tarea 4, después de la 0008 de Takeout.
 8. Spec 010, duplicados exactos (`docs/specs/010-duplicados-exactos.md`): hechas las tareas 1 a 3 (consulta en el núcleo, `mnemos duplicados` y comandos de Tauri). Solo enseña las fotos repetidas, no borra nada. Falta la vista en la aplicación, que espera a la navegación lateral de la spec 006.
-9. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
+9. Spec 011, panel de información y fecha a mano (`docs/specs/011-panel-info-y-fecha-manual.md`): sección Cámara con el EXIF en el panel del visor y fecha de captura a mano (`taken_source = 'manual'`, migración 0011) con vuelta a la automática. Falta probar dentro de Tauri que la cuadrícula se recarga al cerrar el visor.
+10. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
 ## Pendientes / ideas aparcadas
 - Revisar e instalar las skills de `docs/skills.md`.
