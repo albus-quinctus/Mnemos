@@ -275,6 +275,117 @@ impl Geometry {
     }
 }
 
+/// Giro o reflejo de una imagen (uno de los ocho del cuadrado): primero se
+/// transpone si `transpose`, y luego se refleja en horizontal y en vertical.
+/// Sirve para juntar la orientación EXIF, el giro y el volteo de una receta en
+/// una sola operación y aplicarla sobre la imagen ya reducida, que es mucho
+/// más barato que girar la foto completa.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct Transform {
+    pub transpose: bool,
+    pub flip_x: bool,
+    pub flip_y: bool,
+}
+
+impl Transform {
+    const fn new(transpose: bool, flip_x: bool, flip_y: bool) -> Self {
+        Self {
+            transpose,
+            flip_x,
+            flip_y,
+        }
+    }
+
+    /// Orientación EXIF (1 a 8); un valor fuera de rango no transforma nada.
+    pub fn from_exif(orientation: u16) -> Self {
+        match orientation {
+            2 => Self::new(false, true, false),
+            3 => Self::new(false, true, true),
+            4 => Self::new(false, false, true),
+            5 => Self::new(true, false, false),
+            6 => Self::new(true, true, false),
+            7 => Self::new(true, true, true),
+            8 => Self::new(true, false, true),
+            _ => Self::default(),
+        }
+    }
+
+    /// Orientación EXIF seguida del giro y el volteo de `geometry`.
+    pub fn of(orientation: u16, geometry: &Geometry) -> Self {
+        let rotate = match geometry.rotate {
+            90 => Self::new(true, true, false),
+            180 => Self::new(false, true, true),
+            270 => Self::new(true, false, true),
+            _ => Self::default(),
+        };
+        let flip = Self::new(false, geometry.flip_horizontal, false);
+        Self::from_exif(orientation).then(rotate).then(flip)
+    }
+
+    /// `self` y después `next`.
+    fn then(self, next: Self) -> Self {
+        // Transponer después de reflejar equivale a reflejar el otro eje
+        // después de transponer.
+        let (fx, fy) = if next.transpose {
+            (self.flip_y, self.flip_x)
+        } else {
+            (self.flip_x, self.flip_y)
+        };
+        Self::new(
+            self.transpose != next.transpose,
+            fx != next.flip_x,
+            fy != next.flip_y,
+        )
+    }
+
+    /// Recorte en fracciones de la imagen original (sin transformar) que,
+    /// tras aplicar `self`, da el recorte `crop` de la imagen transformada.
+    pub fn source_crop(&self, crop: &Crop) -> Crop {
+        let flip = |start: f64, len: f64, flip: bool| {
+            if flip {
+                (1.0 - start - len, len)
+            } else {
+                (start, len)
+            }
+        };
+        let (x, width) = flip(crop.x, crop.width, self.flip_x);
+        let (y, height) = flip(crop.y, crop.height, self.flip_y);
+        if self.transpose {
+            Crop {
+                x: y,
+                y: x,
+                width: height,
+                height: width,
+            }
+        } else {
+            Crop {
+                x,
+                y,
+                width,
+                height,
+            }
+        }
+    }
+
+    /// Aplica la transformación a una imagen.
+    pub fn apply(&self, img: image::RgbImage) -> image::RgbImage {
+        use image::imageops::{flip_horizontal, flip_vertical, rotate90};
+        // Transponer es girar 90° y reflejar en horizontal; los dos reflejos
+        // horizontales seguidos se anulan.
+        let (img, flip_x) = if self.transpose {
+            (rotate90(&img), !self.flip_x)
+        } else {
+            (img, self.flip_x)
+        };
+        let img = if flip_x { flip_horizontal(&img) } else { img };
+        if self.flip_y {
+            flip_vertical(&img)
+        } else {
+            img
+        }
+    }
+}
+
 /// Rectángulo en píxeles (x, y, ancho, alto) de un recorte sobre una imagen
 /// de `width` × `height`. Los bordes se redondean al píxel más cercano, se
 /// ajustan a la imagen y el resultado mide al menos 1 × 1.
@@ -352,6 +463,55 @@ mod tests {
             width,
             height,
         })
+    }
+
+    #[test]
+    fn la_transformacion_junta_da_lo_mismo_que_paso_a_paso() {
+        use image::metadata::Orientation;
+        let base = cuadrantes(40, 20);
+        for exif in 1..=8u16 {
+            for rotate in [0, 90, 180, 270] {
+                for flip_horizontal in [false, true] {
+                    let g = Geometry {
+                        rotate,
+                        flip_horizontal,
+                        crop: None,
+                    };
+                    let mut paso = base.clone();
+                    paso.apply_orientation(Orientation::from_exif(exif as u8).unwrap());
+                    let paso = g.apply(paso).to_rgb8();
+                    let junta = Transform::of(exif, &g).apply(base.to_rgb8());
+                    assert_eq!(
+                        junta, paso,
+                        "exif {exif}, giro {rotate}, volteo {flip_horizontal}"
+                    );
+
+                    // Recortar antes en el original da lo mismo que recortar después.
+                    let c = Crop {
+                        x: 0.25,
+                        y: 0.0,
+                        width: 0.5,
+                        height: 0.5,
+                    };
+                    let g = Geometry { crop: Some(c), ..g };
+                    let despues = g
+                        .apply({
+                            let mut i = base.clone();
+                            i.apply_orientation(Orientation::from_exif(exif as u8).unwrap());
+                            i
+                        })
+                        .to_rgb8();
+                    let t = Transform::of(exif, &g);
+                    let s = t.source_crop(&c);
+                    let (x, y, w, h) = crop_rect(40, 20, &s);
+                    let antes = t.apply(base.crop_imm(x, y, w, h).to_rgb8());
+                    assert_eq!(
+                        antes, despues,
+                        "recorte: exif {exif}, giro {rotate}, volteo {flip_horizontal}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

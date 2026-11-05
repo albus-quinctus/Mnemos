@@ -213,7 +213,9 @@ Petición de Paulo (2026-11-05).
 - [ ] Una biblioteca copiada a otra ruta, o con la base de datos borrada y
   vuelta a indexar, conserva sus ediciones (prueba automática).
 - [ ] Aplicar la receta para el visor a una foto de 24 MP tarda menos de
-  400 ms (medición en `docs/rendimiento.md`).
+  400 ms con giro o volteo, y como mucho el doble que sin editar con un
+  recorte grande; mientras tanto el visor enseña la miniatura editada
+  ampliada (medición en `docs/rendimiento.md`).
 - [ ] Capturas del editor en claro y oscuro aprobadas por Paulo antes de
   cerrar la interfaz.
 
@@ -233,7 +235,7 @@ Petición de Paulo (2026-11-05).
 1. [x] Imagen: tipos de la receta (formato 1) con su validación y lectura
    tolerante, y aplicar la geometría (giro, volteo, recorte) a una imagen ya
    orientada, con pruebas de cuadrantes, orientaciones y redondeos.
-2. [ ] Imagen: miniatura y vista del visor con receta, reutilizando la
+2. [x] Imagen: miniatura y vista del visor con receta, reutilizando la
    decodificación reducida de los JPEG. Medición con 24 MP.
 3. [ ] Núcleo: leer y guardar recetas en `.mnemos/ediciones/` con escritura
    segura, versiones, `current` y volver al original, con pruebas de corte a

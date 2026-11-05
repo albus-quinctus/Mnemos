@@ -74,6 +74,20 @@ Los JPEG y las vistas previas RAW se decodifican ya reducidos a 1/2, 1/4 o 1/8 e
 
 La miniatura reducida y la completa difieren en unos 44 dB de PSNR: no se distinguen a simple vista. Para repetirlo con fotos reales: `cargo run --release -p mnemos-imaging --example medir_miniaturas -- <carpeta> [repeticiones] [carpeta_salida]`.
 
+## Fotos editadas (spec 009, 2026-11-05)
+Imagen del visor (lado mayor de 2560 px) y miniatura de una foto sintética de 24 MP (6000 × 4000) con la receta aplicada. Mediana de 5 repeticiones, un hilo, en el contenedor de 4 núcleos. Para repetirlo: `cargo run --release -p mnemos-imaging --example medir_ediciones -- [foto] [repeticiones]`.
+
+| Edición | Visor, primera versión | Visor | Miniatura |
+|---|---|---|---|
+| Sin editar | 411 ms | 370 ms | 59 ms |
+| Giro de 90° | 483 ms | 407 ms | 64 ms |
+| Giro y recorte del 80 % | 877 ms | 616 ms | 54 ms |
+| Recorte del 25 % | 147 ms | 134 ms | 61 ms |
+
+- La orientación EXIF, el giro y el volteo se juntan en una sola transformación que se aplica después de recortar y reducir, sobre la imagen pequeña: girar no cuesta casi nada.
+- Un recorte pequeño se decodifica a más resolución que la foto entera, porque tiene que cubrir el tamaño final. Con un recorte del 80 % el JPEG ya no se puede decodificar a la mitad y se lee entero.
+- Casi todo el tiempo se va en el filtro de reducción de `image` (unos 200 ms para pasar de 3000 a 2560 px). Si hace falta bajar más, la opción es una librería de reducción con SIMD (como `fast_image_resize`), que sería una dependencia nueva a revisar.
+
 ## Pendiente
 - Repetir el indexado y las miniaturas desde un HDD externo con fotos reales de cámara de 12 a 24 MP. Las sintéticas son pequeñas y el disco del contenedor es rápido, así que las miniaturas reales tardarán más por foto.
 - Medir el visor dentro de la aplicación Tauri (WebView2, WKWebView, WebKitGTK) y no solo en Chromium.
