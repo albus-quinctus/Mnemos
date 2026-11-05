@@ -4,6 +4,8 @@
   import { onMount } from "svelte";
   import { busqueda, limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
+  import Duplicados from "$lib/duplicados/Duplicados.svelte";
+  import { navegacion } from "$lib/navegacion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
 
   type LibraryInfo = {
@@ -71,10 +73,20 @@
     <!-- Se monta de nuevo con cada biblioteca para empezar desde cero. Durante
          una búsqueda queda oculta debajo, para volver al mismo punto. -->
     {#key `${info.root}#${importacion.version}`}
-      <div class="capa" class:oculta={busqueda.consulta !== ""}>
+      <div
+        class="capa"
+        class:oculta={busqueda.consulta !== "" || navegacion.seccion === "duplicados"}
+      >
         <Cuadricula />
       </div>
     {/key}
+    {#if navegacion.seccion === "duplicados" && !busqueda.consulta}
+      {#key `${info.root}#${importacion.version}`}
+        <div class="capa encima">
+          <Duplicados />
+        </div>
+      {/key}
+    {/if}
     {#if busqueda.consulta}
       {#key `${busqueda.consulta}#${importacion.version}`}
         <div class="capa resultados">
@@ -124,8 +136,13 @@
     visibility: hidden;
   }
 
-  .resultados {
+  .resultados,
+  .encima {
     background: var(--fondo);
+  }
+
+  .encima {
+    overflow: auto;
   }
 
   .abrir {
