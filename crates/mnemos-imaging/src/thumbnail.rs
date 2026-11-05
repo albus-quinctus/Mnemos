@@ -5,9 +5,10 @@ use std::path::Path;
 
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::metadata::Orientation;
 use image::{DynamicImage, GrayImage, ImageFormat, ImageReader, Limits, RgbImage};
 use jpeg_decoder::PixelFormat;
+
+use crate::recipe::{Geometry, Transform, crop_rect};
 
 /// Alto de una miniatura, en píxeles.
 pub const THUMBNAIL_HEIGHT: u32 = 360;
@@ -21,6 +22,10 @@ const MAX_DECODE_ALLOC: u64 = 512 * 1024 * 1024;
 
 /// Tamaño de salida a partir del tamaño de la imagen ya girada.
 type Size = fn(u32, u32) -> (u32, u32);
+
+/// Tamaño de la imagen ya girada que hace falta decodificar como mínimo, a
+/// partir de su tamaño completo ya girado.
+type Cover<'a> = &'a dyn Fn(u32, u32) -> (u32, u32);
 
 /// Imagen decodificada, quizá ya reducida, junto con el tamaño completo del
 /// original (sin girar), del que sale el tamaño final.
@@ -64,9 +69,21 @@ pub enum ThumbnailError {
 /// por la extensión, salvo los RAW: aunque parezcan un TIFF, su miniatura
 /// sale siempre de la vista previa que trae el archivo, nunca se revelan.
 pub fn thumbnail(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    render(
-        decode(path, orientation, thumbnail_size)?,
+    thumbnail_edited(path, orientation, &Geometry::default())
+}
+
+/// Como [`thumbnail`], pero con la geometría de una receta de edición (spec
+/// 009) aplicada después de la orientación EXIF. El tamaño se calcula sobre
+/// la imagen ya editada.
+pub fn thumbnail_edited(
+    path: &Path,
+    orientation: u16,
+    geometry: &Geometry,
+) -> Result<Thumbnail, ThumbnailError> {
+    generate(
+        path,
         orientation,
+        geometry,
         thumbnail_size,
         THUMBNAIL_QUALITY,
     )
@@ -81,12 +98,18 @@ pub const DISPLAY_QUALITY: u8 = 90;
 /// (TIFF, RAW): ya girada, con el lado mayor de [`DISPLAY_MAX_SIDE`] como
 /// mucho y en JPEG. Se genera en memoria y no se guarda.
 pub fn display_image(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    render(
-        decode(path, orientation, display_size)?,
-        orientation,
-        display_size,
-        DISPLAY_QUALITY,
-    )
+    display_image_edited(path, orientation, &Geometry::default())
+}
+
+/// Como [`display_image`], pero con la geometría de una receta de edición
+/// (spec 009). Sirve para cualquier formato, también los que el motor web
+/// muestra tal cual, porque la foto editada siempre se genera.
+pub fn display_image_edited(
+    path: &Path,
+    orientation: u16,
+    geometry: &Geometry,
+) -> Result<Thumbnail, ThumbnailError> {
+    generate(path, orientation, geometry, display_size, DISPLAY_QUALITY)
 }
 
 /// Tamaño de la imagen del visor: el lado mayor se limita a
@@ -103,12 +126,48 @@ pub const EXPORT_QUALITY: u8 = 90;
 /// Foto exportada en tamaño reducido (spec 008): ya girada, con el lado mayor
 /// de [`EXPORT_MAX_SIDE`] como mucho, en JPEG y sin metadatos.
 pub fn export_image(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    render(
-        decode(path, orientation, export_size)?,
+    generate(
+        path,
         orientation,
+        &Geometry::default(),
         export_size,
         EXPORT_QUALITY,
     )
+}
+
+/// Decodifica, orienta, aplica la geometría, reduce y codifica en JPEG.
+///
+/// Los JPEG se decodifican ya reducidos al menor tamaño que, tras recortar,
+/// sigue cubriendo el tamaño final: un recorte pequeño pide más resolución
+/// del original que la foto entera.
+fn generate(
+    path: &Path,
+    orientation: u16,
+    geometry: &Geometry,
+    size: Size,
+    quality: u8,
+) -> Result<Thumbnail, ThumbnailError> {
+    let cover = |w: u32, h: u32| cover_size(w, h, geometry, size);
+    render(
+        decode(path, orientation, &cover)?,
+        orientation,
+        geometry,
+        size,
+        quality,
+    )
+}
+
+/// Tamaño mínimo de la imagen ya girada de `width` × `height` para que, tras
+/// aplicarle `geometry`, cubra el tamaño final que da `size`. Nunca pasa del
+/// tamaño completo.
+fn cover_size(width: u32, height: u32, geometry: &Geometry, size: Size) -> (u32, u32) {
+    let (width, height) = (width.max(1), height.max(1));
+    let (out_w, out_h) = geometry.output_size(width, height);
+    let (final_w, final_h) = size(out_w, out_h);
+    let scale = (f64::from(final_w) / f64::from(out_w)).max(f64::from(final_h) / f64::from(out_h));
+    // Los dos productos están entre 0 y el tamaño completo, que cabe en u32.
+    let side = |full: u32| ((f64::from(full) * scale).ceil() as u32).clamp(1, full);
+    (side(width), side(height))
 }
 
 /// Tamaño de una foto exportada en tamaño reducido: el lado mayor se limita a
@@ -162,7 +221,7 @@ pub fn web_mime(path: &Path) -> std::io::Result<Option<&'static str>> {
 /// menor tamaño que sigue cubriendo el que pide `size`; si no se puede, se
 /// decodifican enteros como el resto de formatos. El archivo se lee una sola
 /// vez.
-fn decode(path: &Path, orientation: u16, size: Size) -> Result<Decoded, ThumbnailError> {
+fn decode(path: &Path, orientation: u16, size: Cover) -> Result<Decoded, ThumbnailError> {
     let is_raw = crate::is_raw(path);
     let bytes = if is_raw {
         crate::raw_preview(path)?.ok_or(ThumbnailError::Unsupported)?
@@ -192,7 +251,7 @@ fn decode(path: &Path, orientation: u16, size: Size) -> Result<Decoded, Thumbnai
 ///
 /// Devuelve `None` cuando no puede: JPEG en CMYK o de 16 bits, o archivo que
 /// este decodificador no acepta. Entonces se decodifica entero.
-fn decode_jpeg_reduced(jpeg: &[u8], orientation: u16, size: Size) -> Option<Decoded> {
+fn decode_jpeg_reduced(jpeg: &[u8], orientation: u16, size: Cover) -> Option<Decoded> {
     let mut decoder = jpeg_decoder::Decoder::new(jpeg);
     decoder.set_max_decoding_buffer_size(usize::try_from(MAX_DECODE_ALLOC).ok()?);
     decoder.read_info().ok()?;
@@ -227,28 +286,36 @@ fn limits() -> Limits {
     limits
 }
 
-/// Gira, reduce y codifica en JPEG una imagen ya decodificada. El tamaño final
-/// sale del original completo, no de la versión reducida, para que no cambie
-/// por los redondeos de la reducción.
+/// Gira según el EXIF, aplica la geometría de la receta, reduce y codifica en
+/// JPEG una imagen ya decodificada. El tamaño final sale del original
+/// completo, no de la versión reducida, para que no cambie por los redondeos
+/// de la reducción.
 fn render(
     Decoded { mut img, full }: Decoded,
     orientation: u16,
+    geometry: &Geometry,
     size: Size,
     quality: u8,
 ) -> Result<Thumbnail, ThumbnailError> {
     let swaps = crate::swaps_dimensions(orientation);
-    let orientation = u8::try_from(orientation)
-        .ok()
-        .and_then(Orientation::from_exif)
-        .unwrap_or(Orientation::NoTransforms);
-    img.apply_orientation(orientation);
+    let oriented = if swaps { (full.1, full.0) } else { full };
+    let (out_w, out_h) = geometry.output_size(oriented.0, oriented.1);
+    let (width, height) = size(out_w, out_h);
 
-    let (width, height) = if swaps {
-        size(full.1, full.0)
+    // Se recorta y se reduce antes de girar: girar la foto completa costaría
+    // tanto como decodificarla. Girar y reflejar solo cambian los píxeles de
+    // sitio, así que el resultado es el mismo.
+    let transform = Transform::of(orientation, geometry);
+    if let Some(crop) = &geometry.crop {
+        let (x, y, w, h) = crop_rect(img.width(), img.height(), &transform.source_crop(crop));
+        img = img.crop_imm(x, y, w, h);
+    }
+    let (pre_w, pre_h) = if transform.transpose {
+        (height, width)
     } else {
-        size(full.0, full.1)
+        (width, height)
     };
-    let small = resize(&img, width, height);
+    let small = transform.apply(resize(&img, pre_w, pre_h));
     let mut jpeg = Vec::new();
     JpegEncoder::new_with_quality(Cursor::new(&mut jpeg), quality).encode_image(&small)?;
     Ok(Thumbnail {
@@ -281,14 +348,16 @@ pub fn thumbnail_size(width: u32, height: u32) -> (u32, u32) {
 fn resize(img: &DynamicImage, width: u32, height: u32) -> RgbImage {
     // Primero un muestreo rápido hasta el doble del tamaño final y luego un
     // filtro de calidad: mucho más rápido que filtrar la foto completa.
-    let rough = if img.width() > width * 2 && img.height() > height * 2 {
+    let resized = if img.width() > width * 2 && img.height() > height * 2 {
         img.thumbnail_exact(width * 2, height * 2)
+            .resize_exact(width, height, FilterType::Triangle)
     } else {
-        img.clone()
+        img.resize_exact(width, height, FilterType::Triangle)
     };
-    let rgba = rough
-        .resize_exact(width, height, FilterType::Triangle)
-        .to_rgba8();
+    if !resized.color().has_alpha() {
+        return resized.into_rgb8();
+    }
+    let rgba = resized.into_rgba8();
     RgbImage::from_fn(width, height, |x, y| {
         let [r, g, b, a] = rgba.get_pixel(x, y).0;
         let over_white = |c: u8| {
@@ -450,21 +519,21 @@ mod tests {
         let mut jpeg = Vec::new();
         write_image_to(&mut jpeg, 2400, 1600);
         // 540 × 360 cabe en 1/4 (600 × 400) pero no en 1/8 (300 × 200).
-        let img = decode_jpeg_reduced(&jpeg, 1, thumbnail_size).unwrap().img;
+        let img = decode_jpeg_reduced(&jpeg, 1, &thumbnail_size).unwrap().img;
         assert_eq!((img.width(), img.height()), (600, 400));
         // En una panorámica el giro decide la reducción: tumbada basta con
         // 1/4 (1200 × 400 para 1080 × 360) y de pie con 1/8 (600 × 200 para
         // 120 × 360 girada, es decir, 360 × 120 sin girar).
         let mut pano = Vec::new();
         write_image_to(&mut pano, 4800, 1600);
-        let img = decode_jpeg_reduced(&pano, 1, thumbnail_size).unwrap().img;
+        let img = decode_jpeg_reduced(&pano, 1, &thumbnail_size).unwrap().img;
         assert_eq!((img.width(), img.height()), (1200, 400));
-        let img = decode_jpeg_reduced(&pano, 6, thumbnail_size).unwrap().img;
+        let img = decode_jpeg_reduced(&pano, 6, &thumbnail_size).unwrap().img;
         assert_eq!((img.width(), img.height()), (600, 200));
         // Una imagen pequeña no se reduce.
         let mut small = Vec::new();
         write_image_to(&mut small, 400, 300);
-        let img = decode_jpeg_reduced(&small, 1, thumbnail_size).unwrap().img;
+        let img = decode_jpeg_reduced(&small, 1, &thumbnail_size).unwrap().img;
         assert_eq!((img.width(), img.height()), (400, 300));
     }
 
@@ -477,6 +546,7 @@ mod tests {
         let full = render(
             image::open(&path).unwrap().into(),
             1,
+            &Geometry::default(),
             thumbnail_size,
             THUMBNAIL_QUALITY,
         )
@@ -520,12 +590,12 @@ mod tests {
         let mut good = Vec::new();
         write_image_to(&mut good, 48, 32);
         for cut in 0..good.len() {
-            let _ = decode_jpeg_reduced(&good[..cut], 1, thumbnail_size);
+            let _ = decode_jpeg_reduced(&good[..cut], 1, &thumbnail_size);
         }
         for i in 0..good.len() {
             let mut bad = good.clone();
             bad[i] ^= 0xFF;
-            let _ = decode_jpeg_reduced(&bad, 6, thumbnail_size);
+            let _ = decode_jpeg_reduced(&bad, 6, &thumbnail_size);
         }
         let cases: u64 = std::env::var("MNEMOS_CASOS_JPEG")
             .ok()
@@ -544,14 +614,14 @@ mod tests {
                 let at = (next() % bad.len() as u64) as usize;
                 bad[at] = next() as u8;
             }
-            let _ = decode_jpeg_reduced(&bad, 1, thumbnail_size);
+            let _ = decode_jpeg_reduced(&bad, 1, &thumbnail_size);
         }
     }
 
     #[test]
     fn los_jpeg_cmyk_se_decodifican_enteros() {
         let jpeg = include_bytes!("../../../tests/fixtures/cmyk.jpg");
-        assert!(decode_jpeg_reduced(jpeg, 1, thumbnail_size).is_none());
+        assert!(decode_jpeg_reduced(jpeg, 1, &thumbnail_size).is_none());
         let dir = tempdir("cmyk");
         let path = dir.join("imprenta.jpg");
         std::fs::write(&path, jpeg).unwrap();
@@ -620,6 +690,186 @@ mod tests {
         thumbnail(&path, 6).unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), before);
         assert_eq!(std::fs::metadata(&path).unwrap().modified().unwrap(), mtime);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ── Recetas de edición (spec 009) ──
+
+    use crate::recipe::Crop;
+
+    const COLORES: [[u8; 3]; 4] = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]];
+
+    /// Rejilla de 2 × 2 cuadrantes: índices de [`COLORES`] arriba izquierda,
+    /// arriba derecha, abajo izquierda y abajo derecha.
+    type Rejilla = [usize; 4];
+
+    /// Imagen de `w` × `h` con un color por cuadrante, en el orden de la
+    /// rejilla `[0, 1, 2, 3]`.
+    fn escribe_cuadrantes(path: &Path, w: u32, h: u32, format: ImageFormat) {
+        RgbImage::from_fn(w, h, |x, y| {
+            let i = usize::from(x >= w / 2) + 2 * usize::from(y >= h / 2);
+            image::Rgb(COLORES[i])
+        })
+        .save_with_format(path, format)
+        .unwrap();
+    }
+
+    /// Color de [`COLORES`] más parecido, para tolerar el JPEG.
+    fn color(p: &image::Rgb<u8>) -> usize {
+        let dist = |c: &[u8; 3]| {
+            c.iter()
+                .zip(p.0)
+                .map(|(a, b)| (i32::from(*a) - i32::from(b)).pow(2))
+                .sum::<i32>()
+        };
+        (0..4).min_by_key(|&i| dist(&COLORES[i])).unwrap()
+    }
+
+    fn rejilla_de(thumb: &Thumbnail) -> Rejilla {
+        let img = image::load_from_memory(&thumb.jpeg).unwrap().to_rgb8();
+        let (w, h) = img.dimensions();
+        [
+            color(img.get_pixel(w / 4, h / 4)),
+            color(img.get_pixel(w * 3 / 4, h / 4)),
+            color(img.get_pixel(w / 4, h * 3 / 4)),
+            color(img.get_pixel(w * 3 / 4, h * 3 / 4)),
+        ]
+    }
+
+    // Transformaciones de la rejilla escritas a mano, sin usar `image`, para
+    // que la prueba no compruebe el código consigo mismo.
+    fn gira_90([a, b, c, d]: Rejilla) -> Rejilla {
+        [c, a, d, b]
+    }
+    fn voltea_h([a, b, c, d]: Rejilla) -> Rejilla {
+        [b, a, d, c]
+    }
+    fn orienta(r: Rejilla, exif: u16) -> Rejilla {
+        let [a, b, c, d] = r;
+        match exif {
+            2 => [b, a, d, c],
+            3 => [d, c, b, a],
+            4 => [c, d, a, b],
+            5 => [a, c, b, d],
+            6 => [c, a, d, b],
+            7 => [d, b, c, a],
+            8 => [b, d, a, c],
+            _ => r,
+        }
+    }
+
+    #[test]
+    fn la_receta_se_aplica_despues_de_la_orientacion_exif() {
+        let dir = tempdir("receta-orientaciones");
+        let path = dir.join("cuadrantes.png");
+        // Sin ser cuadrada, para comprobar también las dimensiones.
+        escribe_cuadrantes(&path, 800, 400, ImageFormat::Png);
+        for exif in 1..=8u16 {
+            for rotate in [0, 90, 180, 270] {
+                for flip_horizontal in [false, true] {
+                    let mut esperada = orienta([0, 1, 2, 3], exif);
+                    for _ in 0..rotate / 90 {
+                        esperada = gira_90(esperada);
+                    }
+                    if flip_horizontal {
+                        esperada = voltea_h(esperada);
+                    }
+                    let gira = crate::swaps_dimensions(exif) != (rotate % 180 == 90);
+                    let (w, h) = if gira { (400, 800) } else { (800, 400) };
+                    let caso = format!("exif {exif}, giro {rotate}, volteo {flip_horizontal}");
+
+                    let g = Geometry {
+                        rotate,
+                        flip_horizontal,
+                        crop: None,
+                    };
+                    let thumb = thumbnail_edited(&path, exif, &g).unwrap();
+                    assert_eq!((thumb.width, thumb.height), thumbnail_size(w, h), "{caso}");
+                    assert_eq!(rejilla_de(&thumb), esperada, "{caso}");
+
+                    // Recortar el cuarto de abajo a la derecha deja un solo color.
+                    let g = Geometry {
+                        crop: Some(Crop {
+                            x: 0.5,
+                            y: 0.5,
+                            width: 0.5,
+                            height: 0.5,
+                        }),
+                        ..g
+                    };
+                    let thumb = thumbnail_edited(&path, exif, &g).unwrap();
+                    assert_eq!(
+                        (thumb.width, thumb.height),
+                        thumbnail_size(w / 2, h / 2),
+                        "{caso}"
+                    );
+                    assert_eq!(rejilla_de(&thumb), [esperada[3]; 4], "{caso}");
+                }
+            }
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn un_recorte_pequeno_pide_mas_resolucion_al_decodificar() {
+        let g = Geometry {
+            crop: Some(Crop {
+                x: 0.0,
+                y: 0.0,
+                width: 0.25,
+                height: 0.25,
+            }),
+            ..Geometry::default()
+        };
+        // Sin recorte, una foto de 4000 × 3000 se puede decodificar a 480 × 360.
+        assert_eq!(
+            cover_size(4000, 3000, &Geometry::default(), thumbnail_size),
+            (480, 360)
+        );
+        // Con un cuarto de recorte hace falta el cuádruple.
+        assert_eq!(cover_size(4000, 3000, &g, thumbnail_size), (1920, 1440));
+        // Nunca más que el original.
+        assert_eq!(cover_size(400, 300, &g, display_size), (400, 300));
+    }
+
+    #[test]
+    fn el_recorte_de_un_jpeg_reducido_mantiene_tamano_y_colores() {
+        let dir = tempdir("receta-jpeg");
+        let path = dir.join("cuadrantes.jpg");
+        escribe_cuadrantes(&path, 4000, 3000, ImageFormat::Jpeg);
+        let g = Geometry {
+            rotate: 90,
+            flip_horizontal: false,
+            // Tras girar, 3000 × 4000: la mitad derecha de la fila de arriba.
+            crop: Some(Crop {
+                x: 0.5,
+                y: 0.0,
+                width: 0.5,
+                height: 0.5,
+            }),
+        };
+        let thumb = thumbnail_edited(&path, 1, &g).unwrap();
+        assert_eq!((thumb.width, thumb.height), thumbnail_size(1500, 2000));
+        // Arriba a la derecha tras girar 90° está lo que era arriba a la izquierda.
+        assert_eq!(rejilla_de(&thumb), [0; 4]);
+
+        let view = display_image_edited(&path, 1, &g).unwrap();
+        assert_eq!((view.width, view.height), (1500, 2000));
+        assert_eq!(rejilla_de(&view), [0; 4]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn sin_receta_sale_lo_mismo_que_antes() {
+        let dir = tempdir("receta-identidad");
+        let path = dir.join("foto.jpg");
+        write_image(&path, 1200, 900, ImageFormat::Jpeg);
+        for exif in [1, 6] {
+            assert_eq!(
+                thumbnail(&path, exif).unwrap(),
+                thumbnail_edited(&path, exif, &Geometry::default()).unwrap()
+            );
+        }
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
