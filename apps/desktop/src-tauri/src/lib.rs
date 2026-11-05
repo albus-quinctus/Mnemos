@@ -1,6 +1,7 @@
 mod configuracion;
 mod duplicados;
 mod media;
+mod organizacion;
 mod portatil;
 
 use std::path::{Path, PathBuf};
@@ -163,6 +164,16 @@ fn with_library<T>(
 ) -> Result<T, String> {
     let guard = lock(&estado.0);
     let lib = guard.as_ref().ok_or("no hay ninguna biblioteca abierta")?;
+    f(lib).map_err(|e| e.to_string())
+}
+
+/// Como `with_library`, para las operaciones que escriben en una transacción.
+fn with_library_mut<T>(
+    estado: &OpenLibrary,
+    f: impl FnOnce(&mut Library) -> mnemos_core::Result<T>,
+) -> Result<T, String> {
+    let mut guard = lock(&estado.0);
+    let lib = guard.as_mut().ok_or("no hay ninguna biblioteca abierta")?;
     f(lib).map_err(|e| e.to_string())
 }
 
@@ -455,7 +466,16 @@ pub fn run() {
             importar,
             cancelar_importacion,
             duplicados::duplicados_resumen,
-            duplicados::duplicados_grupos
+            duplicados::duplicados_grupos,
+            organizacion::vista_meses,
+            organizacion::vista_fotos,
+            organizacion::marcar_favoritos,
+            organizacion::archivar,
+            organizacion::seleccionar_todo,
+            organizacion::seleccionar_dia,
+            organizacion::seleccionar_rango,
+            organizacion::titulos_dia,
+            organizacion::poner_titulo_dia
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");

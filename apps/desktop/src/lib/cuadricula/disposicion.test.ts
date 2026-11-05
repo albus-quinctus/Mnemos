@@ -21,7 +21,7 @@ function fecha(dia: string): number {
 }
 
 function foto(id: number, dia: string, width: number | null = 3000, height: number | null = 2000): FotoCuadricula {
-  return { id, name: `${id}.jpg`, month: dia.slice(0, 7), date: fecha(dia), width, height, thumbnail_failed: false };
+  return { id, name: `${id}.jpg`, month: dia.slice(0, 7), date: fecha(dia), width, height, thumbnail_failed: false, favorite: false, archived: false };
 }
 
 function mesesDe(fotos: FotoCuadricula[]): Mes[] {
