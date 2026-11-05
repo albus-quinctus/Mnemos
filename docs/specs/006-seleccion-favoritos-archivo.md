@@ -170,7 +170,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 3. [x] Núcleo: filtro de vista (Fotos sin archivadas, Favoritos, Archivo) en
    meses y páginas de la línea de tiempo, con la búsqueda incluyendo
    archivadas. Medición con 10 000 fotos.
-4. [ ] Núcleo: ids de un día, de toda la vista y de un rango entre dos fotos,
+4. [x] Núcleo: ids de un día, de toda la vista y de un rango entre dos fotos,
    para seleccionar sin cargar páginas.
 5. [ ] Núcleo: leer y guardar títulos de día, con pruebas de textos raros.
 6. [ ] Comandos de Tauri para las tareas 2 a 5.

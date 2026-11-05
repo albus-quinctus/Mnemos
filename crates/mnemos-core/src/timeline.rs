@@ -45,7 +45,7 @@ pub enum View {
 impl View {
     /// Condición de la vista. Es SQL fijo, sin parámetros, y repite la de su
     /// índice parcial (migración 0007) para que SQLite lo use.
-    fn filter(self) -> Filter {
+    pub(crate) fn filter(self) -> Filter {
         let sql = match self {
             View::Photos => " AND archived_at IS NULL",
             View::Favorites => " AND favorite = 1",
