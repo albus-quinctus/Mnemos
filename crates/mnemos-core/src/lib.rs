@@ -3,6 +3,7 @@
 //! Gestiona la biblioteca portátil: su estructura en disco, la base de datos
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
+pub mod day_titles;
 pub mod db;
 pub mod duplicates;
 pub mod error;
@@ -20,6 +21,7 @@ mod takeout;
 pub mod thumbnails;
 pub mod timeline;
 
+pub use day_titles::{DayTitle, MAX_DAY_TITLE};
 pub use duplicates::{
     DuplicateCopy, DuplicateCursor, DuplicateGroup, DuplicatePage, DuplicateSummary,
 };
