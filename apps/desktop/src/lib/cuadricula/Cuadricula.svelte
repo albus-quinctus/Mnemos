@@ -369,7 +369,8 @@
       {#if bloque.tipo === "fila"}
         <div class="fila" style:transform="translateY({bloque.y}px)" style:height="{bloque.alto}px">
           {#each bloque.titulos as titulo, t (titulo.dia)}
-            {@const completo = todasSeleccionadas(idsPorDia.get(titulo.dia) ?? [])}
+            {@const idsDia = idsPorDia.get(titulo.dia) ?? []}
+            {@const completo = todasSeleccionadas(idsDia)}
             {@const hasta = bloque.titulos[t + 1]?.x ?? opciones.ancho + opciones.separacionDias}
             <h2
               class="dia"
@@ -377,17 +378,20 @@
               style:max-width="{hasta - titulo.x - opciones.separacionDias}px"
               style:height="{bloque.altoTitulo}px"
             >
-              <button
-                type="button"
-                class="casilla-dia"
-                class:marcada={completo}
-                role="checkbox"
-                aria-checked={completo}
-                aria-label="Seleccionar el día {nombreDia(titulo.dia)}"
-                onclick={() => alternarDia(titulo.dia).catch(avisarFallo)}
-              >
-                {#if completo}<Icono nombre="marca" tamano={14} grosor={3} />{/if}
-              </button>
+              <!-- Con una sola foto basta su propia casilla, como en Google Fotos. -->
+              {#if idsDia.length > 1}
+                <button
+                  type="button"
+                  class="casilla-dia"
+                  class:marcada={completo}
+                  role="checkbox"
+                  aria-checked={completo}
+                  aria-label="Seleccionar el día {nombreDia(titulo.dia)}"
+                  onclick={() => alternarDia(titulo.dia).catch(avisarFallo)}
+                >
+                  {#if completo}<Icono nombre="marca" tamano={14} grosor={3} />{/if}
+                </button>
+              {/if}
               <span class="fecha">{nombreDia(titulo.dia)}</span>
               <TituloDia dia={titulo.dia} />
             </h2>
