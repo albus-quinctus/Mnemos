@@ -96,8 +96,11 @@ con doble clic.
        del `.desktop` con escapado y marca, lectura de la ruta actual; pruebas.
 2. [x] Crear, quitar y corregir en Linux, con pruebas en carpetas temporales
        (`XDG_DATA_HOME` falso).
-3. [ ] `.lnk` en Windows: elegir entre una dependencia pequeña revisada con
-       `cargo deny` o PowerShell (`WScript.Shell`); crear, quitar y corregir.
+3. [x] `.lnk` en Windows con PowerShell (`WScript.Shell`), sin dependencias nuevas:
+       las rutas entran por variables de entorno y no dentro del script; crear,
+       quitar y corregir (`acceso_directo/windows.rs`). Solo se ha comprobado que
+       compila para Windows y la lógica con pruebas; falta probarlo en un Windows
+       real (tarea 8).
 4. [ ] Comandos de Tauri `acceso_directo_estado`, `crear_acceso_directo`,
        `quitar_acceso_directo` y corrección al arrancar; envoltorios en
        `biblioteca.ts`.

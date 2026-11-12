@@ -9,6 +9,8 @@
 // Los comandos de Tauri que lo usan llegan en la tarea 4 de la spec 012.
 #![allow(dead_code)]
 
+pub mod windows;
+
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
