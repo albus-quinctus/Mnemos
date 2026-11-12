@@ -104,8 +104,9 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
 
 ## Tareas (≤1 h cada una)
 1. [ ] `tema` en `Configuracion` (`serde(default)`, valor desconocido →
-       `sistema`), `recordar` sin borrar otros campos, comandos `tema` y
-       `poner_tema`; inyección en la ventana y `set_theme`; pruebas en Rust.
+       `sistema`), `recordar` sin borrar otros campos, comando `poner_tema`
+       (la página lee el tema de `data-tema`, así que no hace falta otro);
+       inyección en la ventana y `set_theme`; pruebas en Rust.
 2. [ ] Comandos `alternar_pantalla_completa` y `pantalla_completa`; atajo `F11`
        (y `Ctrl` + `Cmd` + `F` en macOS) en `+layout.svelte`; envoltorios en
        `biblioteca.ts`; pruebas.
