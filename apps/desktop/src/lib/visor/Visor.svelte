@@ -13,16 +13,19 @@
   import {
     camara as pedirCamara,
     detalles as pedirDetalles,
+    ediciones as pedirEdiciones,
     exportar,
     ponerFecha,
     quitarFechaManual,
     type Camara,
     type Detalles,
     type FotoCuadricula,
+    type Geometria,
     type TamanoExportacion,
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
   import { avisarCambio } from "$lib/cambios.svelte";
+  import Editor from "$lib/editor/Editor.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
   import { archivarFoto, marcarFavorita } from "$lib/seleccion/acciones.svelte";
   import { CacheImagenes, vecinas } from "./cache";
@@ -72,6 +75,10 @@
   // Sube cada vez que una imagen termina de cargar, para volver a pintar.
   let cambios = $state(0);
 
+  // Ediciones guardadas en esta sesión del visor, por foto: cambian la URL
+  // para que no se reutilice la imagen de antes de editar.
+  const guardadas = new SvelteMap<number, number>();
+
   const cache = new CacheImagenes<Completa>(
     5,
     (id) => {
@@ -87,7 +94,7 @@
         completa.aviso = await motivo(id);
         cambios++;
       };
-      img.src = fotoUrl(id);
+      img.src = fotoUrl(id, guardadas.get(id));
       return completa;
     },
     (completa) => {
@@ -309,8 +316,69 @@
 
   onDestroy(() => clearTimeout(temporizador));
 
+  // Modo edición (spec 009). Parte de la versión que se ve.
+  let enEditor = $state<{
+    id: number;
+    nombre: string;
+    ancho: number;
+    alto: number;
+    base: Geometria;
+  } | null>(null);
+  let abriendoEditor = $state(false);
+
+  async function abrirEditor() {
+    if (!foto || abriendoEditor || enEditor || completa?.estado === "error") return;
+    const { id, name } = foto;
+    abriendoEditor = true;
+    try {
+      const [d, ed] = await Promise.all([pedirDetalles(id), pedirEdiciones(id)]);
+      if (!d) return avisar("Esta foto ya no está en la biblioteca.", true);
+      if (!d.width || !d.height) return avisar("No se conoce el tamaño de esta foto.", true);
+      if (ed.damaged) return avisar(`No se puede editar: ${ed.damaged}`, true);
+      if (!ed.writable) {
+        return avisar("Esta foto se editó con una versión más nueva de MNEMOS.", true);
+      }
+      const actual = ed.versions.find((v) => v.id === ed.current);
+      const base: Geometria = actual
+        ? {
+            rotate: actual.rotate as Geometria["rotate"],
+            flip_horizontal: actual.flip_horizontal,
+            crop: actual.crop,
+          }
+        : { rotate: 0, flip_horizontal: false, crop: null };
+      menuExportar = false;
+      enEditor = { id, nombre: name, ancho: d.width, alto: d.height, base };
+    } catch (e) {
+      avisar(String(e), true);
+    } finally {
+      abriendoEditor = false;
+    }
+  }
+
+  async function alSalirDelEditor(
+    guardado: { como: "original" } | { como: "copia"; id: number } | null,
+  ) {
+    const id = enEditor?.id;
+    enEditor = null;
+    visor?.focus();
+    if (!guardado || id === undefined) return;
+    datosCambiados = true;
+    if (guardado.como === "original") {
+      cache.olvidar(id);
+      guardadas.set(id, (guardadas.get(id) ?? 0) + 1);
+      cambios++;
+      recarga++;
+      avisar("Edición guardada. El archivo original no se ha tocado.", false);
+    } else {
+      const copia = await pedirDetalles(guardado.id).catch(() => null);
+      avisar(copia ? `Copia guardada en ${copia.rel_path}` : "Copia guardada", false);
+    }
+  }
+
   function alPulsar(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // El editor tiene sus propias teclas.
+    if (enEditor) return;
     // Mientras se escribe la fecha, las teclas son del formulario.
     if (editando && e.target instanceof HTMLElement && e.target.closest(".editar-fecha")) {
       if (e.key === "Escape") {
@@ -322,6 +390,7 @@
     if (e.key === "Escape" && menuExportar) menuExportar = false;
     else if (e.key === "Escape") onCerrar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
+    else if ((e.key === "e" || e.key === "E") && !e.shiftKey) abrirEditor();
     else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
     else if (e.key === "ArrowRight") ir(1);
@@ -363,6 +432,16 @@
       <Icono nombre="cerrar" />
     </button>
     <span class="nombre">{foto?.name}</span>
+    <button
+      type="button"
+      class="boton editar"
+      aria-label="Editar"
+      title="Editar (E)"
+      disabled={abriendoEditor || completa?.estado === "error"}
+      onclick={abrirEditor}
+    >
+      <Icono nombre="editar" />
+    </button>
     <div class="exportar" bind:this={menu}>
       <button
         type="button"
@@ -429,7 +508,12 @@
     {#if foto}
       {#key foto.id}
         <!-- La miniatura ampliada se ve al instante; la completa la tapa al cargar. -->
-        <img class="miniatura" src={miniaturaUrl(foto.id)} alt="" draggable="false" />
+        <img
+          class="miniatura"
+          src={miniaturaUrl(foto.id, guardadas.get(foto.id))}
+          alt=""
+          draggable="false"
+        />
         {#if completa?.estado === "lista"}
           <img class="completa" src={completa.src} alt={foto.name} draggable="false" />
         {/if}
@@ -462,11 +546,11 @@
     {#each tira as { foto: f, indice: i } (f.id)}
       {#if i === indice}
         <button type="button" class="pequena actual" aria-current="true" bind:this={actualEnTira}>
-          <img src={miniaturaUrl(f.id)} alt={f.name} draggable="false" />
+          <img src={miniaturaUrl(f.id, guardadas.get(f.id))} alt={f.name} draggable="false" />
         </button>
       {:else}
         <button type="button" class="pequena" onclick={() => onCambiar(i)}>
-          <img src={miniaturaUrl(f.id)} alt={f.name} draggable="false" />
+          <img src={miniaturaUrl(f.id, guardadas.get(f.id))} alt={f.name} draggable="false" />
         </button>
       {/if}
     {/each}
@@ -558,6 +642,10 @@
     </aside>
   {/if}
 </div>
+
+{#if enEditor}
+  <Editor {...enEditor} onCerrar={alSalirDelEditor} />
+{/if}
 
 <style>
   .visor {
@@ -694,6 +782,10 @@
 
   .exportar {
     position: relative;
+  }
+
+  /* Las acciones van a la derecha, empezando por Editar. */
+  .editar {
     margin-left: auto;
   }
 

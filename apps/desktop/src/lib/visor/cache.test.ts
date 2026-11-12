@@ -27,6 +27,16 @@ describe("CacheImagenes", () => {
     expect(soltadas).toEqual([1, 2]);
   });
 
+  it("olvidar una imagen la suelta y la vuelve a cargar al pedirla", () => {
+    const { c, cargadas, soltadas } = cache();
+    c.obtener(1);
+    c.olvidar(1);
+    c.olvidar(2);
+    expect(soltadas).toEqual([1]);
+    c.obtener(1);
+    expect(cargadas).toEqual([1, 1]);
+  });
+
   it("usar una imagen la vuelve reciente", () => {
     const { c } = cache(3);
     c.obtener(1);

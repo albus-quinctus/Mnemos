@@ -214,6 +214,7 @@ export interface VersionEdicion {
   rotate: number;
   flip_horizontal: boolean;
   cropped: boolean;
+  crop: Recorte | null;
 }
 
 // Ediciones de una foto (`mnemos_core::EditSummary`).

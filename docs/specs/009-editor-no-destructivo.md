@@ -61,7 +61,9 @@ Petición de Paulo (2026-11-05).
     píxeles. Si el original no tiene EXIF o no se puede escribir, la copia
     sale sin él: sus datos están en la base de datos igualmente.
   - No pasan los álbumes ni el archivado: la copia empieza fuera de ellos.
-  - El original y su receta no cambian. En el visor se pasa a la copia.
+  - El original y su receta no cambian. El visor se queda en la original y
+    avisa con la ruta de la copia, que sale en la cuadrícula al cerrar el
+    visor (la lista del visor es la de la cuadrícula al abrirlo).
 
 ### Recortar
 - Al entrar, la foto ocupa el área de trabajo con un marco de recorte que la
@@ -263,7 +265,7 @@ Petición de Paulo (2026-11-05).
    las apruebe. Aprobadas el 2026-11-12 (`capturas/009-*.png`).
 9. [x] Estado del editor en la interfaz con pruebas: arrastrar esquinas y
    lados, proporciones, giro con el recorte, teclado, cambios sin guardar.
-10. [ ] Modo edición en el visor con el marco de recorte y la barra inferior.
+10. [x] Modo edición en el visor con el marco de recorte y la barra inferior.
 11. [ ] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
     en la cuadrícula.
 12. [ ] Prueba de originales intactos de punta a punta; actualizar
