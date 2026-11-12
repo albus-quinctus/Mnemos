@@ -258,10 +258,10 @@ Petición de Paulo (2026-11-05).
 7. [x] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la
    receta, guardar como original o como copia, listar versiones y elegir
    versión.
-8. [ ] Capturas del diseño del editor (marco de recorte, barra inferior,
+8. [x] Capturas del diseño del editor (marco de recorte, barra inferior,
    sección Ediciones, icono en la cuadrícula) en claro y oscuro para que Paulo
-   las apruebe.
-9. [ ] Estado del editor en la interfaz con pruebas: arrastrar esquinas y
+   las apruebe. Aprobadas el 2026-11-12 (`capturas/009-*.png`).
+9. [x] Estado del editor en la interfaz con pruebas: arrastrar esquinas y
    lados, proporciones, giro con el recorte, teclado, cambios sin guardar.
 10. [ ] Modo edición en el visor con el marco de recorte y la barra inferior.
 11. [ ] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
