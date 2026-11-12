@@ -132,7 +132,7 @@ impl Library {
 /// Nombre y extensión de la copia: los del original si el formato no
 /// cambia (`IMG_1234.JPG` sigue en `.JPG`), o la extensión del formato de la
 /// copia (`IMG_1234.CR2` pasa a `.jpg`).
-fn copy_name(src: &Path, format: CopyFormat) -> Result<(String, String)> {
+pub(crate) fn copy_name(src: &Path, format: CopyFormat) -> Result<(String, String)> {
     let stem = src
         .file_stem()
         .and_then(|s| s.to_str())
