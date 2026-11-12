@@ -21,6 +21,7 @@ const MIGRATIONS: &[&str] = &[
     // Se llama 0009 porque se reservó ese número para la spec 009, pero se
     // fusionó después de la 0011 y por eso va al final.
     include_str!("migrations/0009_edicion.sql"),
+    include_str!("migrations/0012_albumes.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -250,7 +251,7 @@ mod tests {
             .unwrap();
         }
         let conn = open(&path).unwrap();
-        assert_eq!(schema_version(&conn).unwrap(), 10);
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
         let fila: (Option<i64>, String) = conn
             .query_row("SELECT edit_version, taken_source FROM photos", [], |r| {
                 Ok((r.get(0)?, r.get(1)?))
@@ -335,5 +336,48 @@ mod tests {
             [],
         );
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn la_migracion_11_ordena_los_albumes_por_su_creacion() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        {
+            // Biblioteca en la versión 10 con un álbum del Takeout y una foto.
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..10].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute_batch(
+                "INSERT INTO photos (id, rel_path, size_bytes, modified_at, imported_at)
+                     VALUES (1, 'a.jpg', 1, 1, 1);
+                 INSERT INTO albums (id, name, created_at) VALUES (1, 'Picos', 1234);
+                 INSERT INTO album_photos (album_id, photo_id) VALUES (1, 1);",
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+        let fila: (String, i64, i64) = conn
+            .query_row(
+                "SELECT name, updated_at, (SELECT count(*) FROM album_photos) FROM albums",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(fila, ("Picos".to_owned(), 1234, 1));
+        let indice: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master
+                 WHERE type = 'index' AND name = 'album_photos_photo'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(indice, 1);
     }
 }

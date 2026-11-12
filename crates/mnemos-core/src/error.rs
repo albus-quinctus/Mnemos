@@ -57,6 +57,12 @@ pub enum Error {
     #[error("«{0}» no es un día válido; se espera AAAA-MM-DD")]
     InvalidDay(String),
 
+    #[error("no hay ningún álbum con el id {0}")]
+    AlbumNotFound(i64),
+
+    #[error("el nombre del álbum no puede estar vacío")]
+    EmptyAlbumName,
+
     #[error("no se puede generar la copia editada de {path}: {message}")]
     CannotRender { path: String, message: String },
 
