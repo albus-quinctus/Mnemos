@@ -101,7 +101,7 @@ con doble clic.
        quitar y corregir (`acceso_directo/windows.rs`). Solo se ha comprobado que
        compila para Windows y la lógica con pruebas; falta probarlo en un Windows
        real (tarea 8).
-4. [ ] Comandos de Tauri `acceso_directo_estado`, `crear_acceso_directo`,
+4. [x] Comandos de Tauri `acceso_directo_estado`, `crear_acceso_directo`,
        `quitar_acceso_directo` y corrección al arrancar; envoltorios en
        `biblioteca.ts`.
 5. [ ] Capturas del diseño de la entrada del menú lateral (claro y oscuro) para

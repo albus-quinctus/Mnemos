@@ -178,6 +178,28 @@ export function quitarFechaManual(id: number): Promise<boolean> {
   return invoke("quitar_fecha_manual", { id });
 }
 
+// Acceso directo en el equipo (spec 012). Solo se ofrece en modo portátil, en
+// Linux y Windows (`disponible`). "ajeno" es un archivo con el mismo nombre
+// que no creó MNEMOS: no se toca.
+export type EstadoAccesoDirecto = "no" | "si" | "ajeno";
+
+export interface InformeAccesoDirecto {
+  disponible: boolean;
+  estado: EstadoAccesoDirecto;
+}
+
+export function estadoAccesoDirecto(): Promise<InformeAccesoDirecto> {
+  return invoke("acceso_directo_estado");
+}
+
+export function crearAccesoDirecto(): Promise<InformeAccesoDirecto> {
+  return invoke("crear_acceso_directo");
+}
+
+export function quitarAccesoDirecto(): Promise<InformeAccesoDirecto> {
+  return invoke("quitar_acceso_directo");
+}
+
 // Exportar una foto (spec 008). "original" copia el archivo tal cual;
 // "reducida" guarda un JPEG de 2048 px como mucho, sin metadatos. Devuelve la
 // ruta del archivo creado; nunca sobrescribe nada en `carpeta`.
