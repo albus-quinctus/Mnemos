@@ -144,7 +144,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 - [x] Marcar o archivar 10 000 fotos sintéticas tarda menos de 1 s y paginar
   Fotos, Favoritos y Archivo sigue por debajo de lo medido en
   `docs/rendimiento.md`.
-- [ ] Deshacer devuelve las fotos a su estado anterior.
+- [x] Deshacer devuelve las fotos a su estado anterior.
 - [x] Capturas de la barra de selección, la estrella, Archivo y el título del
   día aprobadas por Paulo antes de cerrar la interfaz.
 - [ ] Los originales no se modifican: huella BLAKE3 y fecha de modificación
@@ -179,7 +179,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 8. [x] Estado de selección en la interfaz con pruebas: clic, `Ctrl`, `Mayús`,
    `Ctrl` + `A`, por día y `Esc`.
 9. [x] Casillas y cabeceras de día seleccionables en la cuadrícula.
-10. [ ] Barra de selección con favoritos y archivar, y aviso con deshacer.
+10. [x] Barra de selección con favoritos y archivar, y aviso con deshacer.
 11. [ ] Estrella y archivar en el visor, teclas `F` y `Mayús` + `A`.
 12. [ ] Vistas Favoritos y Archivo en el menú lateral, con sus mensajes vacíos.
 13. [ ] Título del día editable en la cabecera.
