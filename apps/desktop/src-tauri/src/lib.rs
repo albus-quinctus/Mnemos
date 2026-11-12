@@ -1,3 +1,4 @@
+mod acceso_directo;
 mod configuracion;
 mod duplicados;
 mod media;

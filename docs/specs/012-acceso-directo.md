@@ -1,6 +1,6 @@
 # 012 · Acceso directo en el equipo
 
-- Estado: aprobada
+- Estado: en curso
 - Fase: F1 (completa la versión portátil de la spec 005)
 
 ## Qué y por qué
@@ -75,11 +75,11 @@ con doble clic.
 ## Criterios de aceptación
 - [ ] En Linux, el `.desktop` generado es válido (`desktop-file-validate` en el
       CI) y abre MNEMOS desde fuzzel en Sway con el HDD real.
-- [ ] El escapado de `Exec` funciona con espacios, tildes, comillas y `%`
+- [x] El escapado de `Exec` funciona con espacios, tildes, comillas y `%`
       (prueba automática).
-- [ ] Al cambiar la ruta del disco, el acceso directo se reescribe al arrancar;
+- [x] Al cambiar la ruta del disco, el acceso directo se reescribe al arrancar;
       si no existía, no se crea (prueba automática con carpetas temporales).
-- [ ] «Quitar» borra solo archivos con la marca de MNEMOS (prueba automática).
+- [x] «Quitar» borra solo archivos con la marca de MNEMOS (prueba automática).
 - [ ] En Windows se crean los dos `.lnk` y abren la app (guía de prueba manual).
 - [ ] Sin modo portátil o en macOS, la entrada no aparece.
 - [ ] Los originales no se modifican (prueba automática).
@@ -92,12 +92,15 @@ con doble clic.
 - Cambiar el gestor de archivos para que ejecute el AppImage con doble clic.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Módulo `acceso_directo` (Rust): rutas de destino por sistema, contenido
+1. [x] Módulo `acceso_directo` (Rust): rutas de destino por sistema, contenido
        del `.desktop` con escapado y marca, lectura de la ruta actual; pruebas.
-2. [ ] Crear, quitar y corregir en Linux, con pruebas en carpetas temporales
+2. [x] Crear, quitar y corregir en Linux, con pruebas en carpetas temporales
        (`XDG_DATA_HOME` falso).
-3. [ ] `.lnk` en Windows: elegir entre una dependencia pequeña revisada con
-       `cargo deny` o PowerShell (`WScript.Shell`); crear, quitar y corregir.
+3. [x] `.lnk` en Windows con PowerShell (`WScript.Shell`), sin dependencias nuevas:
+       las rutas entran por variables de entorno y no dentro del script; crear,
+       quitar y corregir (`acceso_directo/windows.rs`). Solo se ha comprobado que
+       compila para Windows y la lógica con pruebas; falta probarlo en un Windows
+       real (tarea 8).
 4. [ ] Comandos de Tauri `acceso_directo_estado`, `crear_acceso_directo`,
        `quitar_acceso_directo` y corrección al arrancar; envoltorios en
        `biblioteca.ts`.
