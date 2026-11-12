@@ -10,7 +10,9 @@ export const DURACION_AVISO = 8000;
 
 export interface Aviso {
   texto: string;
+  /** Acción del botón del aviso. Por defecto se llama «Deshacer». */
   deshacer?: () => Promise<void>;
+  etiqueta?: string;
   error?: boolean;
 }
 

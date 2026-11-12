@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Aviso abajo durante 8 s tras una acción, con «Deshacer» (spec 006).
+  // Aviso abajo durante 8 s tras una acción, con «Deshacer» (spec 006) o la
+  // acción que se indique, como «Quitar» en el acceso directo (spec 012).
   import { avisos, cerrarAviso, deshacer } from "./acciones.svelte";
 </script>
 
@@ -7,7 +8,7 @@
   <div class="aviso" class:error={avisos.actual.error} role="status">
     <span>{avisos.actual.texto}</span>
     {#if avisos.actual.deshacer}
-      <button type="button" onclick={deshacer}>Deshacer</button>
+      <button type="button" onclick={deshacer}>{avisos.actual.etiqueta ?? "Deshacer"}</button>
     {:else}
       <button type="button" onclick={cerrarAviso}>Cerrar</button>
     {/if}

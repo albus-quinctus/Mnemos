@@ -1,5 +1,6 @@
 <script lang="ts">
   import { irA, navegacion, type Seccion } from "$lib/navegacion.svelte";
+  import AccesoDirecto from "$lib/acceso-directo/AccesoDirecto.svelte";
   import Icono, { type NombreIcono } from "./Icono.svelte";
 
   type Entrada = { nombre: string; icono: NombreIcono; seccion?: Seccion };
@@ -47,6 +48,8 @@
   {@render lista(entradas)}
   <hr />
   {@render lista(utilidades)}
+  <div class="relleno"></div>
+  <AccesoDirecto />
 </nav>
 
 <style>
@@ -66,6 +69,10 @@
     padding: 0 0.75rem;
     font-weight: 700;
     letter-spacing: 0.2em;
+  }
+
+  .relleno {
+    flex: 1;
   }
 
   hr {

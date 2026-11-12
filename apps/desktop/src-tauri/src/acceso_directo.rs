@@ -153,11 +153,42 @@ pub fn ejecutable_linux(exe: &Path, appimage: Option<&Path>) -> PathBuf {
     appimage.unwrap_or(exe).to_owned()
 }
 
-/// Qué ve la interfaz: si el equipo admite el acceso directo y si ya existe.
+/// Sistema operativo, para que la interfaz diga dónde aparece el acceso directo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Sistema {
+    Linux,
+    Windows,
+    Otro,
+}
+
+pub fn sistema() -> Sistema {
+    if cfg!(target_os = "linux") {
+        Sistema::Linux
+    } else if cfg!(windows) {
+        Sistema::Windows
+    } else {
+        Sistema::Otro
+    }
+}
+
+/// Qué ve la interfaz: si el equipo admite el acceso directo, si ya existe y
+/// en qué sistema está.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Informe {
     pub disponible: bool,
     pub estado: Estado,
+    pub sistema: Sistema,
+}
+
+impl Informe {
+    fn new(disponible: bool, estado: Estado) -> Self {
+        Self {
+            disponible,
+            estado,
+            sistema: sistema(),
+        }
+    }
 }
 
 const NO_DISPONIBLE: &str =
@@ -251,15 +282,9 @@ fn exigir_disponible(portatil: &Portatil) -> Result<(), String> {
 #[tauri::command(async)]
 pub fn acceso_directo_estado(portatil: State<'_, Portatil>) -> Result<Informe, String> {
     if !disponible(portatil.0.as_deref()) {
-        return Ok(Informe {
-            disponible: false,
-            estado: Estado::No,
-        });
+        return Ok(Informe::new(false, Estado::No));
     }
-    Ok(Informe {
-        disponible: true,
-        estado: estado_del_equipo()?,
-    })
+    Ok(Informe::new(true, estado_del_equipo()?))
 }
 
 /// Crea el acceso directo en este equipo (o lo actualiza si ya era de MNEMOS).
@@ -267,10 +292,7 @@ pub fn acceso_directo_estado(portatil: State<'_, Portatil>) -> Result<Informe, S
 pub fn crear_acceso_directo(portatil: State<'_, Portatil>) -> Result<Informe, String> {
     exigir_disponible(&portatil)?;
     crear_en_el_equipo(&ejecutable()?)?;
-    Ok(Informe {
-        disponible: true,
-        estado: estado_del_equipo()?,
-    })
+    Ok(Informe::new(true, estado_del_equipo()?))
 }
 
 /// Quita el acceso directo de este equipo. Solo borra lo que creó MNEMOS.
@@ -278,10 +300,7 @@ pub fn crear_acceso_directo(portatil: State<'_, Portatil>) -> Result<Informe, St
 pub fn quitar_acceso_directo(portatil: State<'_, Portatil>) -> Result<Informe, String> {
     exigir_disponible(&portatil)?;
     quitar_del_equipo()?;
-    Ok(Informe {
-        disponible: true,
-        estado: estado_del_equipo()?,
-    })
+    Ok(Informe::new(true, estado_del_equipo()?))
 }
 
 /// Al arrancar en modo portátil, reescribe el acceso directo si apunta a otra
@@ -450,10 +469,15 @@ mod tests {
         let informe = Informe {
             disponible: true,
             estado: Estado::Si,
+            sistema: Sistema::Windows,
         };
         assert_eq!(
             serde_json::to_string(&informe).unwrap(),
-            r#"{"disponible":true,"estado":"si"}"#
+            r#"{"disponible":true,"estado":"si","sistema":"windows"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&Sistema::Linux).unwrap(),
+            r#""linux""#
         );
         assert_eq!(serde_json::to_string(&Estado::Ajeno).unwrap(), r#""ajeno""#);
         assert_eq!(serde_json::to_string(&Estado::No).unwrap(), r#""no""#);
