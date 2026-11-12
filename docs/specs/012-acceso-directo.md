@@ -104,9 +104,13 @@ con doble clic.
 4. [x] Comandos de Tauri `acceso_directo_estado`, `crear_acceso_directo`,
        `quitar_acceso_directo` y corrección al arrancar; envoltorios en
        `biblioteca.ts`.
-5. [ ] Capturas del diseño de la entrada del menú lateral (claro y oscuro) para
-       que Paulo las apruebe.
+5. [x] Capturas del diseño de la entrada del menú lateral (claro y oscuro),
+       aprobadas por Paulo el 12 nov.
 6. [x] Entrada en `MenuLateral.svelte` y aviso; pruebas. Diseño aprobado por
        Paulo el 12 nov (`capturas/012-menu-*.png`); `lib/acceso-directo/`.
-7. [ ] `LEEME.txt` (macOS 15, Dock, botón) y `desktop-file-validate` en el CI.
-8. [ ] Prueba con el HDD real en Linux y guía de prueba en Windows.
+7. [x] `LEEME.txt` (macOS 15, Dock, botón) y `desktop-file-validate` en el CI
+       (la prueba `el_desktop_generado_es_valido` falla en el CI si falta la
+       herramienta).
+8. [ ] Prueba con el HDD real en Linux y guía de prueba en Windows. La guía está
+       escrita (`docs/guias/probar-el-acceso-directo.md`); falta que Paulo la
+       siga en Linux y que alguien la siga en un Windows.
