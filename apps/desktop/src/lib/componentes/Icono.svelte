@@ -17,22 +17,32 @@
     siguiente: "M9 5l7 7-7 7",
     duplicados: "M8 8h11v11H8zM5 16V5h11",
     info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-10v6m0-9.5h.01",
+    estrella:
+      "m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9L12 3.5Z",
+    archivo: "M3 5h18v4H3zM5 9v10h14V9M10 13h4",
+    desarchivar: "M3 5h18v4H3zM5 9v10h14V9M12 17v-5m0 0-2.5 2.5M12 12l2.5 2.5",
+    marca: "m7 12.5 3.2 3.2L17 9",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;
 </script>
 
 <script lang="ts">
-  let { nombre, tamano = 20 }: { nombre: NombreIcono; tamano?: number } = $props();
+  let {
+    nombre,
+    tamano = 20,
+    grosor = 1.75,
+    relleno = false,
+  }: { nombre: NombreIcono; tamano?: number; grosor?: number; relleno?: boolean } = $props();
 </script>
 
 <svg
   width={tamano}
   height={tamano}
   viewBox="0 0 24 24"
-  fill="none"
+  fill={relleno ? "currentColor" : "none"}
   stroke="currentColor"
-  stroke-width="1.75"
+  stroke-width={grosor}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"
