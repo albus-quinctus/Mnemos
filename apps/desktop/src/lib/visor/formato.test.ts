@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   apertura,
+  cambiosVersion,
   camposFecha,
   coordenadas,
+  cuandoVersion,
   dimensiones,
   exposicion,
   fecha,
@@ -68,5 +70,25 @@ describe("formato", () => {
     expect(fechaManual("2019-05-02", "09:05:07")).toBe("2019-05-02 09:05:07");
     expect(fechaManual("", "09:05")).toBeNull();
     expect(fechaManual("2019-05-02", "")).toBeNull();
+  });
+});
+
+describe("versiones de una edición", () => {
+  it("dice qué cambia", () => {
+    const v = { rotate: 0, flip_horizontal: false, cropped: false };
+    expect(cambiosVersion(v)).toBe("sin cambios");
+    expect(cambiosVersion({ ...v, cropped: true })).toBe("recorte");
+    expect(cambiosVersion({ ...v, cropped: true, rotate: 90 })).toBe("recorte y giro");
+    expect(cambiosVersion({ rotate: 270, flip_horizontal: true, cropped: true })).toBe(
+      "recorte, giro y volteo",
+    );
+  });
+
+  it("dice cuándo se guardó", () => {
+    const ahora = new Date(2026, 10, 12, 20, 0);
+    const s = (d: Date) => d.getTime() / 1000;
+    expect(cuandoVersion(s(new Date(2026, 10, 12, 18, 20)), ahora)).toBe("hoy, 18:20");
+    expect(cuandoVersion(s(new Date(2026, 10, 11, 21, 5)), ahora)).toBe("ayer, 21:05");
+    expect(cuandoVersion(s(new Date(2026, 9, 3, 9, 0)), ahora)).toContain("2026");
   });
 });

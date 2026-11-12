@@ -83,6 +83,9 @@ pub struct EditVersion {
     pub cropped: bool,
     /// Recorte de la versión, para abrir el editor sobre ella.
     pub crop: Option<mnemos_imaging::recipe::Crop>,
+    /// Tamaño de la foto con esta versión, si se conoce el de la foto.
+    pub width: Option<u32>,
+    pub height: Option<u32>,
 }
 
 impl From<&StoredRecipe> for EditSummary {
@@ -112,6 +115,8 @@ impl From<&StoredRecipe> for EditSummary {
                         flip_horizontal: v.geometry.flip_horizontal,
                         cropped: v.geometry.crop.is_some(),
                         crop: v.geometry.crop,
+                        width: None,
+                        height: None,
                     })
                     .collect(),
                 damaged: None,
@@ -144,7 +149,27 @@ impl Library {
 
     /// Resumen de las ediciones de la foto `id`.
     pub fn edit_summary(&self, id: i64) -> Result<EditSummary> {
-        Ok(EditSummary::from(&self.photo_recipe(id)?))
+        let target = self.edit_target(id)?;
+        let stored = match &target.content_hash {
+            Some(hash) => read_recipe(&self.root, hash)?,
+            None => StoredRecipe::None,
+        };
+        let mut summary = EditSummary::from(&stored);
+        if let (StoredRecipe::Valid(recipe), Some(w), Some(h)) =
+            (&stored, target.width, target.height)
+        {
+            let (w, h) = if mnemos_imaging::swaps_dimensions(target.orientation) {
+                (h, w)
+            } else {
+                (w, h)
+            };
+            for (summary, version) in summary.versions.iter_mut().zip(&recipe.versions) {
+                let (vw, vh) = version.geometry.output_size(w, h);
+                summary.width = Some(vw);
+                summary.height = Some(vh);
+            }
+        }
+        Ok(summary)
     }
 
     /// Guarda una versión nueva con `geometry`, la hace actual y devuelve su
@@ -489,6 +514,29 @@ mod tests {
     }
 
     #[test]
+    fn la_cuadricula_ve_la_version_y_el_tamano_editado() {
+        let mut s = setup();
+        let foto = |s: &Setup| s.lib.timeline_page(None, 10).unwrap().photos.remove(0);
+        let sin = foto(&s);
+        assert_eq!(
+            (sin.edit_version, sin.width, sin.height),
+            (None, Some(600), Some(400))
+        );
+
+        s.lib.save_edit(s.id, recorte()).unwrap();
+        let con = foto(&s);
+        assert_eq!(
+            (con.edit_version, con.width, con.height),
+            (Some(1), Some(200), Some(300))
+        );
+
+        // Una receta dañada no rompe la cuadrícula: tamaño sin editar.
+        fs::write(s.recipe_path(), b"{no es json").unwrap();
+        let danada = foto(&s);
+        assert_eq!((danada.width, danada.height), (Some(600), Some(400)));
+    }
+
+    #[test]
     fn guarda_versiones_y_vuelve_al_original_sin_tocarlo() {
         let mut s = setup();
         let before = original(&s);
@@ -509,6 +557,13 @@ mod tests {
         );
         assert!(summary.versions[1].cropped && !summary.versions[0].cropped);
         assert_eq!(summary.versions[1].crop, recorte().crop);
+        // 600 × 400 girada es 400 × 600; el recorte se queda con la mitad.
+        let tamanos: Vec<_> = summary
+            .versions
+            .iter()
+            .map(|v| (v.width, v.height))
+            .collect();
+        assert_eq!(tamanos, [(Some(400), Some(600)), (Some(200), Some(300))]);
 
         // Y se puede volver exactamente a la versión 2.
         s.lib.set_edit_version(s.id, Some(2)).unwrap();

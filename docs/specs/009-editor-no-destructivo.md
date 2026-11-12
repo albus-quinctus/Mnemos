@@ -89,7 +89,7 @@ Petición de Paulo (2026-11-05).
 - En el panel de detalles del visor aparece la sección «Ediciones» con la
   lista de versiones («Versión 3 · hoy, 18:20 · recorte y giro») y
   «Original». Pulsar una la convierte en la actual.
-- «Volver al original» (en el visor, en el menú de la foto) hace que la actual
+- «Volver al original» (en la sección «Ediciones» del visor) hace que la actual
   sea el original sin borrar el historial: se puede volver a cualquier
   versión. Es la forma de deshacer una edición, igual que en Google Fotos.
 - Las fotos editadas llevan en la cuadrícula un icono pequeño de lápiz abajo a
@@ -266,7 +266,7 @@ Petición de Paulo (2026-11-05).
 9. [x] Estado del editor en la interfaz con pruebas: arrastrar esquinas y
    lados, proporciones, giro con el recorte, teclado, cambios sin guardar.
 10. [x] Modo edición en el visor con el marco de recorte y la barra inferior.
-11. [ ] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
+11. [x] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
     en la cuadrícula.
 12. [ ] Prueba de originales intactos de punta a punta; actualizar
     `docs/progreso.md` y `docs/arquitectura.md`.
