@@ -267,9 +267,15 @@
     }
   }
 
-  function url(id: number): string {
-    const version = versiones.get(id);
-    return version ? `${miniaturaUrl(id)}?v=${version}` : miniaturaUrl(id);
+  // La versión editada que se ve entra en la URL: al cambiarla, la miniatura
+  // es otra aunque el id sea el mismo (spec 009).
+  function url(foto: FotoCuadricula): string {
+    const parametros = [
+      foto.edit_version !== null ? `e=${foto.edit_version}` : null,
+      versiones.has(foto.id) ? `v=${versiones.get(foto.id)}` : null,
+    ].filter((p) => p !== null);
+    const base = miniaturaUrl(foto.id);
+    return parametros.length ? `${base}?${parametros.join("&")}` : base;
   }
 
   function alCargar(id: number) {
@@ -410,7 +416,7 @@
               {:else}
                 {#key versiones.get(foto.id)}
                   <img
-                    src={url(foto.id)}
+                    src={url(foto)}
                     alt={foto.name}
                     decoding="async"
                     draggable="false"
@@ -424,8 +430,17 @@
                   <Icono nombre="estrella" tamano={18} relleno />
                 </span>
               {/if}
+              {#if foto.edit_version !== null}
+                <span class="insignia editada" title="Editada">
+                  <Icono nombre="editar" tamano={18} grosor={2.2} />
+                </span>
+              {/if}
               {#if marcaArchivadas && foto.archived}
-                <span class="insignia archivada" title="Archivada">
+                <span
+                  class="insignia archivada"
+                  class:junto={foto.edit_version !== null}
+                  title="Archivada"
+                >
                   <Icono nombre="archivo" tamano={16} />
                 </span>
               {/if}
@@ -629,6 +644,17 @@
   .favorita {
     left: 8px;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  }
+
+  /* El lápiz va abajo a la derecha; si también está archivada, la caja se
+     pone a su izquierda. */
+  .editada {
+    right: 8px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  }
+
+  .archivada.junto {
+    right: 36px;
   }
 
   .archivada {

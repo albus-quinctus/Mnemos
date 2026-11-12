@@ -107,3 +107,30 @@ export function fechaManual(dia: string, hora: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !/^\d{2}:\d{2}(:\d{2})?$/.test(hora)) return null;
   return `${dia} ${hora.length === 5 ? `${hora}:00` : hora}`;
 }
+
+/** Qué cambia una versión de la edición: «recorte y giro», «volteo»… */
+export function cambiosVersion(v: {
+  rotate: number;
+  flip_horizontal: boolean;
+  cropped: boolean;
+}): string {
+  const partes = [
+    v.cropped ? "recorte" : null,
+    v.rotate % 360 !== 0 ? "giro" : null,
+    v.flip_horizontal ? "volteo" : null,
+  ].filter((p) => p !== null);
+  if (partes.length === 0) return "sin cambios";
+  if (partes.length === 1) return partes[0];
+  return `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`;
+}
+
+/** Cuándo se guardó una versión: «hoy, 18:20», «ayer, 21:05» o la fecha. */
+export function cuandoVersion(segundos: number, ahora: Date = new Date()): string {
+  const d = new Date(segundos * 1000);
+  const hora = d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+  const dia = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dias = Math.round((dia(ahora) - dia(d)) / 86_400_000);
+  if (dias === 0) return `hoy, ${hora}`;
+  if (dias === 1) return `ayer, ${hora}`;
+  return fecha(segundos);
+}

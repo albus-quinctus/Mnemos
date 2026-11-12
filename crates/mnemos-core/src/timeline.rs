@@ -83,6 +83,9 @@ pub struct GridPhoto {
     pub favorite: bool,
     /// Está archivada: en la búsqueda se marca con una caja.
     pub archived: bool,
+    /// Versión de la edición que se ve (spec 009), o `None` si se ve el
+    /// original. Con edición, `width` y `height` son los de la foto editada.
+    pub edit_version: Option<u32>,
 }
 
 /// Dónde sigue la página siguiente: justo después de esta foto.
@@ -157,7 +160,7 @@ impl Library {
             "SELECT id, {DATE}, strftime('%Y-%m', {DATE}, 'unixepoch', 'localtime'),
                     width, height, coalesce(orientation, 1),
                     content_hash IN (SELECT content_hash FROM thumbnail_failures),
-                    rel_path, favorite, archived_at IS NOT NULL
+                    rel_path, favorite, archived_at IS NOT NULL, edit_version, content_hash
              FROM photos
              WHERE ({DATE}, id) < (?, ?) {}
              ORDER BY {DATE} DESC, id DESC
@@ -178,7 +181,9 @@ impl Library {
                     (w, h)
                 };
                 let rel_path: String = r.get(7)?;
-                Ok(GridPhoto {
+                let edit_version: Option<u32> = r.get(10)?;
+                let hash: Option<String> = r.get(11)?;
+                let photo = GridPhoto {
                     id: r.get(0)?,
                     name: rel_path.rsplit('/').next().unwrap_or_default().to_owned(),
                     date: r.get(1)?,
@@ -188,9 +193,17 @@ impl Library {
                     thumbnail_failed: r.get(6)?,
                     favorite: r.get(8)?,
                     archived: r.get(9)?,
-                })
+                    edit_version,
+                };
+                Ok((photo, hash.filter(|_| edit_version.is_some())))
             })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .map(|(photo, hash)| match hash {
+                Some(hash) => self.with_edited_size(photo, &hash),
+                None => photo,
+            })
+            .collect::<Vec<_>>();
         let next = if photos.len() > limit as usize {
             photos.truncate(limit as usize);
             photos.last().map(|p| TimelineCursor {
@@ -201,6 +214,22 @@ impl Library {
             None
         };
         Ok(TimelinePage { photos, next })
+    }
+
+    /// Tamaño de la foto editada, leído de su receta. Si la receta no se
+    /// puede leer, la cuadrícula usa el de la foto sin editar: la miniatura
+    /// sale igual, solo con otra proporción en la fila.
+    fn with_edited_size(&self, mut photo: GridPhoto, hash: &str) -> GridPhoto {
+        if let (Ok(recipe), Some(w), Some(h)) = (
+            crate::edits::read_recipe(&self.root, hash),
+            photo.width,
+            photo.height,
+        ) {
+            let (w, h) = recipe.geometry().output_size(w, h);
+            photo.width = Some(w);
+            photo.height = Some(h);
+        }
+        photo
     }
 }
 

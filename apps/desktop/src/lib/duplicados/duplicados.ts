@@ -46,6 +46,7 @@ export function fotosDelGrupo(g: GrupoDuplicado): FotoCuadricula[] {
       thumbnail_failed: false,
       favorite: c.favorite,
       archived: c.archived,
+      edit_version: null,
     };
   });
 }
