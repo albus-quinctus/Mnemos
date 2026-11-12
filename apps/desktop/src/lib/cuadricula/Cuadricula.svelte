@@ -669,6 +669,7 @@
 
   .casilla-dia {
     display: inline-flex;
+    flex: none;
     align-items: center;
     justify-content: center;
     width: 20px;

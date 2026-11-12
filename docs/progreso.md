@@ -22,6 +22,8 @@ Fase **F1 Biblioteca y navegación**, en curso.
 11. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
 ## Pendientes / ideas aparcadas
+- Botón de Ajustes en el menú lateral, encima de «Añadir a este equipo», para el modo claro u oscuro y otras preferencias (pedido por Paulo el 2026-11-12).
+- Pantalla completa con F11 (pedido por Paulo el 2026-11-12).
 - Revisar e instalar las skills de `docs/skills.md`.
 - Crear `tests/fixtures/` con imágenes de ejemplo sin datos personales.
 - Decidir qué hacer con las fotos desaparecidas (hoy solo se cuentan).
