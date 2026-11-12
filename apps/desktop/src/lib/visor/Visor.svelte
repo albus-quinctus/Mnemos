@@ -9,6 +9,7 @@
   // carga. La anterior y la siguiente se precargan en memoria.
   import { open } from "@tauri-apps/plugin-dialog";
   import { onDestroy } from "svelte";
+  import { SvelteMap } from "svelte/reactivity";
   import {
     camara as pedirCamara,
     detalles as pedirDetalles,
@@ -21,7 +22,9 @@
     type TamanoExportacion,
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
+  import { avisarCambio } from "$lib/cambios.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
+  import { archivarFoto, marcarFavorita } from "$lib/seleccion/acciones.svelte";
   import { CacheImagenes, vecinas } from "./cache";
   import { fechas } from "./fechas.svelte";
   import {
@@ -44,6 +47,8 @@
     onCambiar,
     onCerrar,
     onPedirMas,
+    enArchivo = false,
+    onArchivada,
   }: {
     fotos: FotoCuadricula[];
     indice: number;
@@ -51,6 +56,11 @@
     onCambiar: (indice: number) => void;
     onCerrar: () => void;
     onPedirMas: () => void;
+    // Dentro de Archivo el botón desarchiva (spec 006).
+    enArchivo?: boolean;
+    // Tras archivar o desarchivar: la cuadrícula decide si la foto deja de
+    // estar en la vista y el visor pasa a la siguiente.
+    onArchivada?: (indice: number, archivada: boolean) => void;
   } = $props();
 
   type Completa = {
@@ -119,6 +129,40 @@
     // Las cuadrículas se recargan al cerrar, no antes: así la foto no se
     // mueve de la tira mientras se mira.
     if (fechaCambiada) fechas.version++;
+  });
+
+  // Favoritos y archivo (spec 006). Lo cambiado aquí se ve al momento; las
+  // cuadrículas se recargan al cerrar, como con la fecha.
+  const favoritas = new SvelteMap<number, boolean>();
+  let datosCambiados = false;
+  let marcando = $state(false);
+  const esFavorita = $derived(foto ? (favoritas.get(foto.id) ?? foto.favorite) : false);
+
+  async function alternarFavorita() {
+    if (!foto || marcando) return;
+    const id = foto.id;
+    const favorito = !esFavorita;
+    marcando = true;
+    if (await marcarFavorita(id, favorito)) {
+      favoritas.set(id, favorito);
+      datosCambiados = true;
+    }
+    marcando = false;
+  }
+
+  async function alternarArchivada() {
+    if (!foto || marcando) return;
+    const archivada = !enArchivo;
+    marcando = true;
+    if (await archivarFoto(foto.id, archivada)) {
+      datosCambiados = true;
+      onArchivada?.(indice, archivada);
+    }
+    marcando = false;
+  }
+
+  onDestroy(() => {
+    if (datosCambiados) avisarCambio();
   });
 
   function ir(paso: number) {
@@ -278,6 +322,8 @@
     if (e.key === "Escape" && menuExportar) menuExportar = false;
     else if (e.key === "Escape") onCerrar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
+    else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
+    else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
     else if (e.key === "ArrowRight") ir(1);
     else if (e.key === "ArrowLeft") ir(-1);
     else return;
@@ -344,6 +390,28 @@
         </div>
       {/if}
     </div>
+    <button
+      type="button"
+      class="boton"
+      class:favorita={esFavorita}
+      aria-label={esFavorita ? "Quitar de Favoritos" : "Añadir a Favoritos"}
+      aria-pressed={esFavorita}
+      title={esFavorita ? "Quitar de Favoritos (F)" : "Añadir a Favoritos (F)"}
+      disabled={marcando}
+      onclick={alternarFavorita}
+    >
+      <Icono nombre="estrella" relleno={esFavorita} />
+    </button>
+    <button
+      type="button"
+      class="boton"
+      aria-label={enArchivo ? "Desarchivar" : "Archivar"}
+      title={enArchivo ? "Desarchivar (Mayús + A)" : "Archivar (Mayús + A)"}
+      disabled={marcando}
+      onclick={alternarArchivada}
+    >
+      <Icono nombre={enArchivo ? "desarchivar" : "archivo"} />
+    </button>
     <button
       type="button"
       class="boton info"
@@ -705,6 +773,10 @@
 
   .boton:hover {
     background: var(--visor-superficie);
+  }
+
+  .boton.favorita {
+    color: #ffd45c;
   }
 
   .escenario {
