@@ -41,6 +41,14 @@ export class CacheImagenes<T> {
     return [...this.entradas.keys()];
   }
 
+  /** Suelta la imagen de `id`, para que la próxima vez se cargue de nuevo. */
+  olvidar(id: number): void {
+    const valor = this.entradas.get(id);
+    if (valor === undefined) return;
+    this.entradas.delete(id);
+    this.soltar(valor);
+  }
+
   vaciar(): void {
     for (const valor of this.entradas.values()) this.soltar(valor);
     this.entradas.clear();

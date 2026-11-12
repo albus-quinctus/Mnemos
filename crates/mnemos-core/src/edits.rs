@@ -81,6 +81,8 @@ pub struct EditVersion {
     pub rotate: u16,
     pub flip_horizontal: bool,
     pub cropped: bool,
+    /// Recorte de la versión, para abrir el editor sobre ella.
+    pub crop: Option<mnemos_imaging::recipe::Crop>,
 }
 
 impl From<&StoredRecipe> for EditSummary {
@@ -109,6 +111,7 @@ impl From<&StoredRecipe> for EditSummary {
                         rotate: v.geometry.rotate,
                         flip_horizontal: v.geometry.flip_horizontal,
                         cropped: v.geometry.crop.is_some(),
+                        crop: v.geometry.crop,
                     })
                     .collect(),
                 damaged: None,
@@ -505,6 +508,7 @@ mod tests {
             [1, 2]
         );
         assert!(summary.versions[1].cropped && !summary.versions[0].cropped);
+        assert_eq!(summary.versions[1].crop, recorte().crop);
 
         // Y se puede volver exactamente a la versión 2.
         s.lib.set_edit_version(s.id, Some(2)).unwrap();

@@ -1,7 +1,9 @@
 //! Protocolo `mnemos://` (spec 002): sirve miniaturas y fotos a la interfaz.
 //!
 //! La interfaz pide las imágenes por el id de la foto, nunca por una ruta:
-//! `mnemos://localhost/miniatura/<id>` y `mnemos://localhost/foto/<id>` (en
+//! `mnemos://localhost/miniatura/<id>`, `mnemos://localhost/foto/<id>` y
+//! `mnemos://localhost/original/<id>`, la foto sin la edición, que es sobre la
+//! que trabaja el editor (en
 //! Windows, `http://mnemos.localhost/...`). El núcleo traduce el id a su ruta
 //! relativa, así que no se puede pedir ningún archivo fuera de la biblioteca.
 //!
@@ -22,6 +24,8 @@ use tauri::http::{Response, StatusCode, header};
 pub enum Kind {
     Thumbnail,
     Photo,
+    /// La foto sin la receta de edición, para el editor (spec 009).
+    Original,
 }
 
 /// Lee `/miniatura/<id>` o `/foto/<id>`. La barra puede llegar codificada
@@ -35,6 +39,7 @@ pub fn parse(path: &str) -> Option<(Kind, i64)> {
     let kind = match kind {
         "miniatura" => Kind::Thumbnail,
         "foto" => Kind::Photo,
+        "original" => Kind::Original,
         _ => return None,
     };
     if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
@@ -52,9 +57,18 @@ pub fn respond(
 ) -> Response<Vec<u8>> {
     // La huella identifica el contenido, y la versión la edición: si no
     // cambian, el navegador reutiliza lo que ya tiene.
-    let version = media.edit.map(|e| e.version);
+    let edit = if kind == Kind::Original {
+        None
+    } else {
+        media.edit
+    };
+    let version = edit.map(|e| e.version);
     let etag = media.content_hash.as_deref().map(|h| {
-        let prefix = if kind == Kind::Thumbnail { "m" } else { "f" };
+        let prefix = match kind {
+            Kind::Thumbnail => "m",
+            Kind::Photo => "f",
+            Kind::Original => "o",
+        };
         match version {
             Some(v) => format!("\"{prefix}-e{v}-{h}\""),
             None => format!("\"{prefix}-{h}\""),
@@ -74,9 +88,9 @@ pub fn respond(
                 Err(_) => status(StatusCode::NOT_FOUND),
             }
         }
-        Kind::Photo => {
+        Kind::Photo | Kind::Original => {
             let path = media.rel_path.to_path(root);
-            if let Some(edit) = media.edit {
+            if let Some(edit) = edit {
                 return match mnemos_imaging::display_image_edited(
                     &path,
                     media.orientation,
@@ -149,6 +163,7 @@ mod tests {
         assert_eq!(parse("/miniatura/42"), Some((Kind::Thumbnail, 42)));
         assert_eq!(parse("/foto/7"), Some((Kind::Photo, 7)));
         assert_eq!(parse("/foto%2F7"), Some((Kind::Photo, 7)));
+        assert_eq!(parse("/original/7"), Some((Kind::Original, 7)));
         for bad in [
             "/",
             "/foto/",
@@ -305,5 +320,22 @@ mod tests {
         assert!(img.width() > img.height());
         let photo = respond(dir.path(), Kind::Photo, &media, Some(&old_etag));
         assert_eq!(photo.status(), StatusCode::NOT_MODIFIED);
+    }
+
+    #[test]
+    fn el_editor_recibe_la_foto_sin_editar() {
+        let (dir, mut lib, id) = library_with("a.jpg", image::ImageFormat::Jpeg);
+        let giro = mnemos_imaging::recipe::Geometry {
+            rotate: 90,
+            ..Default::default()
+        };
+        lib.save_edit(id, giro).unwrap();
+        let media = lib.photo_media(id).unwrap().unwrap();
+        let response = respond(dir.path(), Kind::Original, &media, None);
+        assert_eq!(response.status(), StatusCode::OK);
+        let original = fs::read(dir.path().join("Originales/a.jpg")).unwrap();
+        assert_eq!(response.body(), &original);
+        let etag = response.headers()[header::ETAG].to_str().unwrap();
+        assert!(etag.starts_with("\"o-"), "{etag}");
     }
 }

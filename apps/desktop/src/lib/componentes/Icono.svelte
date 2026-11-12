@@ -20,6 +20,11 @@
     archivo: "M3 5h18v4H3zM5 9v10h14V9M10 13h4",
     desarchivar: "M3 5h18v4H3zM5 9v10h14V9M12 17v-5m0 0-2.5 2.5M12 12l2.5 2.5",
     marca: "m7 12.5 3.2 3.2L17 9",
+    editar: "M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4",
+    girar: "M4 9a8 8 0 1 1 1.6 7.4M4 4v5h5",
+    voltear: "M12 3v18M9 7 4 17h5zM15 7l5 10h-5z",
+    vertical: "M7 4h10v16H7zM19 9l2 2-2 2M5 9l-2 2 2 2",
+    desplegar: "m6 9 6 6 6-6",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;
