@@ -173,7 +173,7 @@ pub(crate) fn parse_manual(text: &str) -> Option<String> {
 }
 
 impl Taken {
-    const NONE: Taken = Taken {
+    pub(crate) const NONE: Taken = Taken {
         when: None,
         source: Source::None,
     };

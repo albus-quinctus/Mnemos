@@ -57,6 +57,9 @@ pub enum Error {
     #[error("«{0}» no es un día válido; se espera AAAA-MM-DD")]
     InvalidDay(String),
 
+    #[error("no se puede generar la copia editada de {path}: {message}")]
+    CannotRender { path: String, message: String },
+
     #[error("receta de edición: {0}")]
     Recipe(#[from] mnemos_imaging::recipe::RecipeError),
 }

@@ -207,6 +207,11 @@ impl Geometry {
         self.rotate == 0 && !self.flip_horizontal && self.crop.is_none()
     }
 
+    /// Comprueba que el giro y el recorte están dentro de rango.
+    pub fn check(&self) -> Result<(), RecipeError> {
+        self.validate().map_err(invalid)
+    }
+
     fn validate(&self) -> Result<(), String> {
         if !matches!(self.rotate, 0 | 90 | 180 | 270) {
             return Err(format!(
@@ -368,7 +373,10 @@ impl Transform {
     }
 
     /// Aplica la transformación a una imagen.
-    pub fn apply(&self, img: image::RgbImage) -> image::RgbImage {
+    pub fn apply<P: image::Pixel + 'static>(
+        &self,
+        img: image::ImageBuffer<P, Vec<P::Subpixel>>,
+    ) -> image::ImageBuffer<P, Vec<P::Subpixel>> {
         use image::imageops::{flip_horizontal, flip_vertical, rotate90};
         // Transponer es girar 90° y reflejar en horizontal; los dos reflejos
         // horizontales seguidos se anulan.
