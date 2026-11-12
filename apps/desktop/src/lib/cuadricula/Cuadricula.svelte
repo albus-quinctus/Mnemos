@@ -34,6 +34,8 @@
   import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
   import BarraMeses from "./BarraMeses.svelte";
+  import { cargarTitulos } from "./titulos.svelte";
+  import TituloDia from "./TituloDia.svelte";
   import { diaDe, disponer, nombreDia, visibles, type Opciones } from "./disposicion";
 
   // Con `texto`, la cuadrícula muestra solo los resultados de esa búsqueda.
@@ -291,6 +293,8 @@
   }
 
   onMount(() => {
+    // Un fallo al leer los títulos no impide ver las fotos.
+    cargarTitulos().catch(() => {});
     let dejarDeEscuchar: (() => void) | undefined;
     listen<EventoMiniaturas>("miniaturas", (e) => alEvento(e.payload))
       .then((f) => (dejarDeEscuchar = f))
@@ -364,9 +368,15 @@
     {#each enPantalla as bloque (bloque.tipo === "fila" ? `f${fotos[bloque.celdas[0].indice].id}` : `p${bloque.mes}`)}
       {#if bloque.tipo === "fila"}
         <div class="fila" style:transform="translateY({bloque.y}px)" style:height="{bloque.alto}px">
-          {#each bloque.titulos as titulo (titulo.dia)}
+          {#each bloque.titulos as titulo, t (titulo.dia)}
             {@const completo = todasSeleccionadas(idsPorDia.get(titulo.dia) ?? [])}
-            <h2 class="dia" style:left="{titulo.x}px" style:height="{bloque.altoTitulo}px">
+            {@const hasta = bloque.titulos[t + 1]?.x ?? opciones.ancho + opciones.separacionDias}
+            <h2
+              class="dia"
+              style:left="{titulo.x}px"
+              style:max-width="{hasta - titulo.x - opciones.separacionDias}px"
+              style:height="{bloque.altoTitulo}px"
+            >
               <button
                 type="button"
                 class="casilla-dia"
@@ -378,7 +388,8 @@
               >
                 {#if completo}<Icono nombre="marca" tamano={14} grosor={3} />{/if}
               </button>
-              {nombreDia(titulo.dia)}
+              <span class="fecha">{nombreDia(titulo.dia)}</span>
+              <TituloDia dia={titulo.dia} />
             </h2>
           {/each}
           {#each bloque.celdas as celda (fotos[celda.indice].id)}
@@ -551,6 +562,10 @@
     font-size: 0.9rem;
     font-weight: 500;
     white-space: nowrap;
+  }
+
+  .fecha {
+    flex: none;
   }
 
   .celda {

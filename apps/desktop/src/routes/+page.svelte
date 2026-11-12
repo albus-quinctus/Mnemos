@@ -4,6 +4,7 @@
   import { onMount, untrack } from "svelte";
   import { busqueda, limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
+  import { olvidarTitulos } from "$lib/cuadricula/titulos.svelte";
   import Duplicados from "$lib/duplicados/Duplicados.svelte";
   import { navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
@@ -69,6 +70,7 @@
     busqueda.disponible = info !== null;
     void info?.root;
     limpiarBusqueda();
+    olvidarTitulos();
   });
 
   onMount(async () => {
