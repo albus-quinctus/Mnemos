@@ -548,6 +548,7 @@ pub fn run() {
             acceso_directo::quitar_acceso_directo,
             duplicados::duplicados_resumen,
             duplicados::duplicados_grupos,
+            duplicados::copias_identicas,
             organizacion::vista_meses,
             organizacion::vista_fotos,
             organizacion::marcar_favoritos,
