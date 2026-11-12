@@ -253,3 +253,48 @@ export function elegirVersion(
 ): Promise<void> {
   return invoke("elegir_version", { id, version });
 }
+
+// Duplicados exactos (spec 010). Reflejan `mnemos_core::duplicates`. Solo
+// consultan: nada se borra ni se mueve.
+export interface ResumenDuplicados {
+  groups: number;
+  extra_copies: number; // en cada grupo, todas las copias menos una
+  extra_bytes: number;
+}
+
+export interface CopiaDuplicada {
+  id: number;
+  rel_path: string;
+  size_bytes: number;
+  date: number; // captura o, si falta, modificación
+  favorite: boolean;
+  archived: boolean;
+  exists: boolean; // false: foto desaparecida del disco
+}
+
+export interface GrupoDuplicado {
+  content_hash: string;
+  date: number;
+  copies: CopiaDuplicada[]; // por orden de llegada a la biblioteca
+}
+
+export interface CursorDuplicados {
+  date: number;
+  content_hash: string;
+}
+
+export interface PaginaDuplicados {
+  groups: GrupoDuplicado[];
+  next: CursorDuplicados | null;
+}
+
+export function duplicadosResumen(): Promise<ResumenDuplicados> {
+  return invoke("duplicados_resumen");
+}
+
+export function duplicadosGrupos(
+  despues: CursorDuplicados | null,
+  limite: number,
+): Promise<PaginaDuplicados> {
+  return invoke("duplicados_grupos", { despues, limite });
+}
