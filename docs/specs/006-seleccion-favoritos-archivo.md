@@ -181,7 +181,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 9. [x] Casillas y cabeceras de día seleccionables en la cuadrícula.
 10. [x] Barra de selección con favoritos y archivar, y aviso con deshacer.
 11. [x] Estrella y archivar en el visor, teclas `F` y `Mayús` + `A`.
-12. [ ] Vistas Favoritos y Archivo en el menú lateral, con sus mensajes vacíos.
+12. [x] Vistas Favoritos y Archivo en el menú lateral, con sus mensajes vacíos.
 13. [ ] Título del día editable en la cabecera.
 14. [ ] Prueba de originales intactos y de biblioteca copiada a otra ruta;
    actualizar `docs/progreso.md`.

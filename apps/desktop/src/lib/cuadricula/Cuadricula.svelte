@@ -1,24 +1,24 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
-  import { onMount, tick, untrack } from "svelte";
+  import { onMount, tick } from "svelte";
   import {
     buscarFotos,
     buscarMeses,
-    fotos as pedirFotos,
-    meses as pedirMeses,
+    vistaFotos,
+    vistaMeses,
     priorizarMiniaturas,
     type Cursor,
     type EventoMiniaturas,
     type FotoCuadricula,
     type Mes,
     type PaginaFotos,
+    type Vista,
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
   import { miniaturaUrl } from "$lib/media";
   import {
     alternarDia,
     avisarFallo,
-    cambiarAmbito,
     clicEnFoto,
     haySeleccion,
     seleccion,
@@ -38,7 +38,20 @@
 
   // Con `texto`, la cuadrícula muestra solo los resultados de esa búsqueda.
   // `onSalir` se llama con Esc cuando el visor no está abierto.
-  let { texto = "", onSalir }: { texto?: string; onSalir?: () => void } = $props();
+  // Sin `texto`, muestra una vista: Fotos, Favoritos o Archivo (spec 006).
+  // `activa` es falso mientras otra capa la tapa: entonces no atiende teclas.
+  let {
+    texto = "",
+    vista = "fotos",
+    activa = true,
+    onSalir,
+  }: { texto?: string; vista?: Vista; activa?: boolean; onSalir?: () => void } = $props();
+
+  const pedirMeses = () => (texto ? buscarMeses(texto) : vistaMeses(vista));
+  const pedirFotos = (despues: Cursor | null, limite: number) =>
+    texto ? buscarFotos(texto, despues, limite) : vistaFotos(vista, despues, limite);
+  // En la búsqueda y en Favoritos salen archivadas: llevan la caja.
+  const marcaArchivadas = $derived(texto !== "" || vista === "favoritos");
 
   const PAGINA = 500;
   // Margen por encima y por debajo de la pantalla que también se pinta, para
@@ -80,12 +93,6 @@
     visibles(disposicion.bloques, desplazamiento - MARGEN, desplazamiento + altoVista + MARGEN),
   );
 
-  // La selección es de esta vista o de esta búsqueda: cambiarla la pierde.
-  $effect(() => {
-    const ambito = texto ? { busqueda: texto } : { vista: "fotos" as const };
-    untrack(() => cambiarAmbito(ambito));
-  });
-
   // Ids cargados de cada día, para marcar la casilla de su cabecera.
   const idsPorDia = $derived.by(() => {
     const porDia = new Map<string, number[]>();
@@ -109,7 +116,7 @@
 
   // Ctrl + A y Esc, salvo con el visor abierto o escribiendo en un campo.
   function alPulsarTecla(e: KeyboardEvent) {
-    if (abierta !== null) return;
+    if (!activa || abierta !== null) return;
     const destino = e.target as HTMLElement | null;
     if (destino?.closest("input, textarea, [contenteditable]")) return;
     if (teclaSeleccion(e.key, { ctrl: e.ctrlKey || e.metaKey, mayus: e.shiftKey })) {
@@ -125,9 +132,11 @@
   }
 
   // Archivar desde el visor: en Fotos la foto deja de estar y el visor pasa a
-  // la siguiente (o a la anterior si era la última). En la búsqueda se queda.
+  // la siguiente (o a la anterior si era la última); igual al desarchivar en
+  // Archivo. En la búsqueda y en Favoritos se queda.
   function alArchivarEnVisor(indice: number, archivada: boolean) {
-    if (texto || !archivada) return;
+    if (texto) return;
+    if (!(vista === "fotos" && archivada) && !(vista === "archivo" && !archivada)) return;
     fotos = fotos.toSpliced(indice, 1);
     if (fotos.length === 0) abierta = null;
     else if (indice >= fotos.length) abierta = fotos.length - 1;
@@ -139,7 +148,7 @@
   /** Al cerrar el visor, la cuadrícula muestra y enfoca la última foto vista. */
   async function cerrarVisor() {
     const indice = abierta;
-    vista = indice === null ? null : (fotos[indice]?.id ?? null);
+    ultimaVista = indice === null ? null : (fotos[indice]?.id ?? null);
     abierta = null;
     if (indice === null || !contenedor) return;
     const bloque = disposicion.bloques.find(
@@ -157,9 +166,7 @@
     if (cargando || !quedan) return;
     cargando = true;
     try {
-      const pagina = texto
-        ? await buscarFotos(texto, siguiente, PAGINA)
-        : await pedirFotos(siguiente, PAGINA);
+      const pagina = await pedirFotos(siguiente, PAGINA);
       fotos = fotos.concat(pagina.photos);
       siguiente = pagina.next;
       quedan = pagina.next !== null;
@@ -172,7 +179,7 @@
   }
 
   // Última foto vista en el visor, para enfocarla tras recargar.
-  let vista: number | null = null;
+  let ultimaVista: number | null = null;
 
   /**
    * Vuelve a pedir los meses y las fotos ya cargadas sin mover el
@@ -183,13 +190,11 @@
     cargando = true;
     const cuantas = Math.max(fotos.length, 1);
     try {
-      const nuevosMeses = texto ? await buscarMeses(texto) : await pedirMeses();
+      const nuevosMeses = await pedirMeses();
       let nuevas: FotoCuadricula[] = [];
       let cursor: Cursor | null = null;
       do {
-        const pagina: PaginaFotos = texto
-          ? await buscarFotos(texto, cursor, PAGINA)
-          : await pedirFotos(cursor, PAGINA);
+        const pagina: PaginaFotos = await pedirFotos(cursor, PAGINA);
         nuevas = nuevas.concat(pagina.photos);
         cursor = pagina.next;
       } while (cursor !== null && nuevas.length < cuantas);
@@ -208,7 +213,7 @@
     } finally {
       cargando = false;
     }
-    const indice = fotos.findIndex((f) => f.id === vista);
+    const indice = fotos.findIndex((f) => f.id === ultimaVista);
     if (indice >= 0 && abierta === null) {
       await tick();
       contenedor?.querySelector<HTMLElement>(`[data-indice="${indice}"]`)?.focus();
@@ -284,7 +289,7 @@
     listen<EventoMiniaturas>("miniaturas", (e) => alEvento(e.payload))
       .then((f) => (dejarDeEscuchar = f))
       .catch(() => {});
-    (texto ? buscarMeses(texto) : pedirMeses())
+    pedirMeses()
       .then((m) => {
         meses = m;
         listo = true;
@@ -335,6 +340,15 @@
           «playa», «marzo 2024» o «26/10».
         </p>
       </div>
+    {:else if vista === "favoritos"}
+      <p class="aviso">
+        Aún no tienes favoritos. Pulsa la estrella o la tecla F en una foto para añadirla.
+      </p>
+    {:else if vista === "archivo"}
+      <p class="aviso">
+        No hay nada archivado. Las fotos archivadas no salen en Fotos, pero siguen en tu
+        biblioteca y en la búsqueda.
+      </p>
     {:else}
       <p class="aviso">Esta biblioteca aún no tiene fotos.</p>
     {/if}
@@ -399,7 +413,7 @@
                   <Icono nombre="estrella" tamano={18} relleno />
                 </span>
               {/if}
-              {#if texto && foto.archived}
+              {#if marcaArchivadas && foto.archived}
                 <span class="insignia archivada" title="Archivada">
                   <Icono nombre="archivo" tamano={16} />
                 </span>
@@ -448,6 +462,7 @@
     onCambiar={(i) => (abierta = i)}
     onCerrar={cerrarVisor}
     onPedirMas={cargarPagina}
+    enArchivo={!texto && vista === "archivo"}
     onArchivada={alArchivarEnVisor}
   />
 {/if}

@@ -1,11 +1,12 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { busqueda, limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
   import Duplicados from "$lib/duplicados/Duplicados.svelte";
   import { navegacion } from "$lib/navegacion.svelte";
+  import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
 
   type LibraryInfo = {
@@ -49,6 +50,20 @@
     if (ruta) await usar("crear_biblioteca", ruta);
   }
 
+  // Fotos queda debajo, sin desmontarse, mientras se ve otra cosa encima.
+  const tapada = $derived(busqueda.consulta !== "" || navegacion.seccion !== "fotos");
+
+  // La selección es de la vista o de la búsqueda que se ve: al cambiar de
+  // sección, buscar o salir de la búsqueda, se pierde (spec 006).
+  $effect(() => {
+    const seccion = navegacion.seccion;
+    const consulta = busqueda.consulta;
+    untrack(() => {
+      if (consulta) cambiarAmbito({ busqueda: consulta });
+      else cambiarAmbito({ vista: seccion === "duplicados" ? "fotos" : seccion });
+    });
+  });
+
   // Cada biblioteca empieza sin búsqueda.
   $effect(() => {
     busqueda.disponible = info !== null;
@@ -73,13 +88,18 @@
     <!-- Se monta de nuevo con cada biblioteca para empezar desde cero. Durante
          una búsqueda queda oculta debajo, para volver al mismo punto. -->
     {#key `${info.root}#${importacion.version}`}
-      <div
-        class="capa"
-        class:oculta={busqueda.consulta !== "" || navegacion.seccion === "duplicados"}
-      >
-        <Cuadricula />
+      <div class="capa" class:oculta={tapada}>
+        <Cuadricula activa={!tapada} />
       </div>
     {/key}
+    <!-- Favoritos y Archivo empiezan de cero cada vez que se abren. -->
+    {#if navegacion.seccion === "favoritos" || navegacion.seccion === "archivo"}
+      {#key `${info.root}#${importacion.version}#${navegacion.seccion}`}
+        <div class="capa encima" class:oculta={busqueda.consulta !== ""}>
+          <Cuadricula vista={navegacion.seccion} activa={!busqueda.consulta} />
+        </div>
+      {/key}
+    {/if}
     {#if navegacion.seccion === "duplicados" && !busqueda.consulta}
       {#key `${info.root}#${importacion.version}`}
         <div class="capa encima">
