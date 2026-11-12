@@ -202,7 +202,7 @@ Petición de Paulo (2026-11-05).
   nombra por la huella (hexadecimal) y la interfaz solo maneja ids.
 
 ## Criterios de aceptación
-- [ ] Recortar y girar una foto cambia lo que se ve en la cuadrícula y en el
+- [x] Recortar y girar una foto cambia lo que se ve en la cuadrícula y en el
   visor, y el original no se modifica: huella BLAKE3 y fecha de modificación
   iguales antes y después de guardar, cambiar de versión y volver al original
   (prueba automática).
@@ -214,13 +214,13 @@ Petición de Paulo (2026-11-05).
 - [ ] Guardar como copia crea un archivo nuevo `nombre (N).ext` en la misma
   carpeta, con la fecha de captura y los datos del original, indexado como
   otra foto, y el original no cambia (prueba automática).
-- [ ] Volver al original y luego a la versión 2 muestra exactamente la versión
+- [x] Volver al original y luego a la versión 2 muestra exactamente la versión
   2 (prueba automática).
 - [ ] Un corte a mitad de guardar deja la receta anterior intacta (prueba
   automática).
 - [ ] Una receta dañada o de un formato futuro no rompe la cuadrícula ni el
   visor (prueba automática).
-- [ ] Una biblioteca copiada a otra ruta, o con la base de datos borrada y
+- [x] Una biblioteca copiada a otra ruta, o con la base de datos borrada y
   vuelta a indexar, conserva sus ediciones (prueba automática).
 - [ ] Aplicar la receta para el visor a una foto de 24 MP tarda menos de
   400 ms con giro o volteo, y como mucho el doble que sin editar con un
@@ -268,5 +268,5 @@ Petición de Paulo (2026-11-05).
 10. [x] Modo edición en el visor con el marco de recorte y la barra inferior.
 11. [x] Sección Ediciones en Detalles, «Volver al original» e icono de lápiz
     en la cuadrícula.
-12. [ ] Prueba de originales intactos de punta a punta; actualizar
+12. [x] Prueba de originales intactos de punta a punta; actualizar
     `docs/progreso.md` y `docs/arquitectura.md`.
