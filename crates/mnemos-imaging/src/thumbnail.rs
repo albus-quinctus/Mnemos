@@ -126,13 +126,18 @@ pub const EXPORT_QUALITY: u8 = 90;
 /// Foto exportada en tamaño reducido (spec 008): ya girada, con el lado mayor
 /// de [`EXPORT_MAX_SIDE`] como mucho, en JPEG y sin metadatos.
 pub fn export_image(path: &Path, orientation: u16) -> Result<Thumbnail, ThumbnailError> {
-    generate(
-        path,
-        orientation,
-        &Geometry::default(),
-        export_size,
-        EXPORT_QUALITY,
-    )
+    export_image_edited(path, orientation, &Geometry::default())
+}
+
+/// Como [`export_image`], pero con la geometría de una receta de edición
+/// (spec 009) aplicada después de la orientación EXIF. El lado mayor se mide
+/// sobre la foto ya editada.
+pub fn export_image_edited(
+    path: &Path,
+    orientation: u16,
+    geometry: &Geometry,
+) -> Result<Thumbnail, ThumbnailError> {
+    generate(path, orientation, geometry, export_size, EXPORT_QUALITY)
 }
 
 /// Decodifica, orienta, aplica la geometría, reduce y codifica en JPEG.
