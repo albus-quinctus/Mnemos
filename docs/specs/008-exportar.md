@@ -23,6 +23,16 @@ de su barra de selección usando el mismo núcleo.
     mucho (nunca se amplía), ya girado según la orientación y con calidad 90.
     Se guarda **sin metadatos**: no lleva la ubicación ni la cámara, lo que
     conviene para compartir. El nombre es el del original con extensión `.jpg`.
+- **Foto editada** (spec 009): si se ve una versión editada, los dos tamaños
+  salen con la edición aplicada, generada al exportar a partir del original:
+  - Tamaño original: la foto editada a tamaño completo, igual que «Guardar como
+    copia»: JPEG de calidad 95 (PNG si el original es PNG), con el EXIF del
+    original (orientación 1 y las medidas nuevas) y su fecha de modificación.
+  - Tamaño reducido: el mismo JPEG de 2048 px sin metadatos, con el lado mayor
+    medido sobre la foto ya editada.
+  El texto de cada opción del menú lo dice («Con las ediciones…»). Para sacar
+  el archivo sin editar, se elige «Original» en la sección Ediciones de
+  Detalles y se exporta.
 - Tras elegir la opción se abre el selector de carpetas del sistema
   («Elige dónde guardar la foto»). Si se cancela, no pasa nada. Durante la
   sesión, el selector propone la última carpeta usada.
@@ -60,11 +70,10 @@ de su barra de selección usando el mismo núcleo.
 - [x] Un formato no decodificable en tamaño reducido da un error claro y no deja archivos (prueba automática).
 - [x] El botón y el menú del visor funcionan con ratón y teclado.
 - [x] Los originales y la base de datos no se modifican (prueba automática).
+- [x] Con una versión editada a la vista, los dos tamaños salen con la edición; al volver al original, sale el archivo tal cual (prueba automática).
 
 ## Fuera de alcance
 - Exportar varias fotos a la vez (después de la spec 006).
-- Exportar la versión editada (spec 009, editor no destructivo): cuando exista,
-  el menú ofrecerá «Con ediciones».
 - Elegir otros tamaños, formatos (PNG, WebP) o calidad.
 - Conservar parte de los metadatos en la reducida (fecha sí, ubicación no).
 - Compartir directamente con otras apps o por correo (regla 4: sin nube).
@@ -76,3 +85,4 @@ de su barra de selección usando el mismo núcleo.
 4. [x] App: comando `exportar` que trabaja fuera del bloqueo de la biblioteca.
 5. [x] Visor: botón, menú, selector de carpeta y aviso.
 6. [ ] Probarlo en la app real con el HDD (Paulo).
+7. [x] Exportar la versión editada: `export_image_edited` en `mnemos-imaging`, `export` aplica la receta que se ve (`PhotoMedia::edit`) y el menú del visor lo indica. Pruebas.
