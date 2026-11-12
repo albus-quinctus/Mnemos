@@ -10,7 +10,8 @@
     { nombre: "Explorar", icono: "explorar" },
     { nombre: "Álbumes", icono: "albumes" },
     { nombre: "Etiquetas", icono: "etiquetas" },
-    { nombre: "Favoritos", icono: "favoritos" },
+    { nombre: "Favoritos", icono: "estrella", seccion: "favoritos" },
+    { nombre: "Archivo", icono: "archivo", seccion: "archivo" },
     { nombre: "Papelera", icono: "papelera" },
   ];
 
