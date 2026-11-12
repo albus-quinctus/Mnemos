@@ -459,6 +459,34 @@ mod tests {
         assert_eq!(serde_json::to_string(&Estado::No).unwrap(), r#""no""#);
     }
 
+    /// Pasa el `.desktop` que genera MNEMOS por `desktop-file-validate`. Sin la
+    /// herramienta se salta, salvo que `MNEMOS_EXIGE_DESKTOP_FILE_VALIDATE`
+    /// esté definida: el CI la define para que no se salte sin avisar.
+    #[test]
+    fn el_desktop_generado_es_valido() {
+        let dir = tempfile::tempdir().unwrap();
+        let archivo = dir.path().join(DESKTOP);
+        // Una ruta incómoda: espacios, tildes, comillas, `$`, `%` y `\`.
+        let exe = Path::new(r#"/media/u/Mis fotos/Año "100%"/$HOME\MNEMOS-linux.AppImage"#);
+        let icono = dir.path().join("mnemos-portatil.png");
+        fs::write(&archivo, contenido_desktop(exe, &icono).unwrap()).unwrap();
+        let resultado = std::process::Command::new("desktop-file-validate")
+            .arg(&archivo)
+            .output();
+        match resultado {
+            Ok(salida) => assert!(
+                salida.status.success(),
+                "desktop-file-validate: {}{}",
+                String::from_utf8_lossy(&salida.stdout),
+                String::from_utf8_lossy(&salida.stderr)
+            ),
+            Err(_) if std::env::var_os("MNEMOS_EXIGE_DESKTOP_FILE_VALIDATE").is_none() => {
+                eprintln!("desktop-file-validate no está instalado: prueba saltada");
+            }
+            Err(e) => panic!("desktop-file-validate no se puede ejecutar: {e}"),
+        }
+    }
+
     #[test]
     fn exec_escapa_espacios_tildes_comillas_y_porcentajes() {
         assert_eq!(
