@@ -3,9 +3,18 @@ MNEMOS · versión portátil
 
 Este disco lleva MNEMOS y tu biblioteca de fotos (carpeta MNEMOS/).
 No hace falta instalar nada: los ajustes se guardan en el propio disco
-(carpeta .mnemos-portatil/) y no queda nada en el ordenador.
+(carpeta .mnemos-portatil/) y no queda nada en el ordenador, salvo el acceso
+directo si tú lo añades (ver más abajo).
 
 Antes de desenchufar el disco, cierra MNEMOS y expulsa el disco.
+
+Acceso directo en el ordenador (Linux y Windows)
+------------------------------------------------
+Dentro de MNEMOS, abajo en el menú lateral, "Añadir a este equipo" pone MNEMOS
+en el menú de aplicaciones (Linux) o en Inicio y en el escritorio (Windows),
+para abrirlo sin buscar el archivo en el disco. Solo vale para ese ordenador:
+en otro, se vuelve a pulsar. "Quitar" lo borra. Si el disco aparece en otra
+ruta o con otra letra, MNEMOS lo corrige solo al abrirse desde el disco.
 
 
 Windows 10 / 11
@@ -15,24 +24,38 @@ Windows 10 / 11
    y "Ejecutar de todas formas". Pasa porque la app no está firmada.
 3. Si no se abre en un Windows 10 antiguo, falta WebView2:
    https://developer.microsoft.com/microsoft-edge/webview2/
+4. Para abrirlo desde Inicio o el escritorio la próxima vez: dentro de
+   MNEMOS, "Añadir a este equipo" (abajo en el menú lateral).
 
 
 macOS 11 o posterior
 --------------------
-1. La primera vez: clic derecho (o Control + clic) en MNEMOS.app y "Abrir".
-   macOS lo pide porque la app no está firmada por Apple.
+1. La primera vez, macOS bloquea la app porque no está firmada por Apple:
+   - macOS 11 a 14: clic derecho (o Control + clic) en MNEMOS.app y "Abrir".
+   - macOS 15 o posterior: ese truco ya no basta. Haz doble clic en
+     MNEMOS.app (saldrá un aviso; pulsa "Aceptar" o "Listo"), abre
+     Ajustes del Sistema > Privacidad y seguridad, baja hasta "Seguridad"
+     y pulsa "Abrir igualmente" junto al aviso de MNEMOS. Te pedirá la
+     contraseña del Mac. Solo hace falta una vez por ordenador.
 2. Las siguientes veces, doble clic.
-3. macOS no puede escribir en discos NTFS. Si el disco está en NTFS,
+3. Para tenerla a mano, arrastra MNEMOS.app al Dock. Si algún día el icono
+   deja de abrir MNEMOS (por ejemplo, el disco aparece con otro nombre),
+   vuelve a arrastrarla. En macOS no hay botón "Añadir a este equipo".
+4. macOS no puede escribir en discos NTFS. Si el disco está en NTFS,
    MNEMOS avisará de que está en solo lectura. Usa un disco en exFAT.
 
 
 Linux (x86_64)
 --------------
-1. Doble clic en MNEMOS-linux.AppImage o, en una terminal:
+1. Doble clic en MNEMOS-linux.AppImage. Si tu gestor de archivos no lo
+   ejecuta (muchos lo abren como texto), prueba clic derecho > "Ejecutar"
+   o, en una terminal:
        ./MNEMOS-linux.AppImage
 2. Si no se abre y dice que falta FUSE:
        ./MNEMOS-linux.AppImage --appimage-extract-and-run
-3. Si el disco aparece en solo lectura después de desenchufarlo sin
+3. Para abrirlo desde el menú de aplicaciones la próxima vez: dentro de
+   MNEMOS, "Añadir a este equipo" (abajo en el menú lateral).
+4. Si el disco aparece en solo lectura después de desenchufarlo sin
    expulsarlo (NTFS), repáralo con: sudo ntfsfix -d /dev/sdX1
 
 
