@@ -4,12 +4,17 @@
 //! `mnemos://localhost/miniatura/<id>` y `mnemos://localhost/foto/<id>` (en
 //! Windows, `http://mnemos.localhost/...`). El núcleo traduce el id a su ruta
 //! relativa, así que no se puede pedir ningún archivo fuera de la biblioteca.
+//!
+//! Si la foto está editada (spec 009), las dos imágenes salen con la receta
+//! aplicada: la miniatura editada que guarda la cola y la foto generada en
+//! memoria. La versión va en la ETag, para que el navegador no reutilice la
+//! imagen de antes de editar.
 
 use std::fs;
 use std::path::Path;
 
 use mnemos_core::PhotoMedia;
-use mnemos_core::thumbnails::thumbnail_rel_path;
+use mnemos_core::thumbnails::thumbnail_rel_path_for;
 use tauri::http::{Response, StatusCode, header};
 
 /// Qué imagen se pide.
@@ -45,13 +50,15 @@ pub fn respond(
     media: &PhotoMedia,
     if_none_match: Option<&str>,
 ) -> Response<Vec<u8>> {
-    // La huella identifica el contenido: si no cambia, el navegador reutiliza
-    // lo que ya tiene.
+    // La huella identifica el contenido, y la versión la edición: si no
+    // cambian, el navegador reutiliza lo que ya tiene.
+    let version = media.edit.map(|e| e.version);
     let etag = media.content_hash.as_deref().map(|h| {
-        format!(
-            "\"{}-{h}\"",
-            if kind == Kind::Thumbnail { "m" } else { "f" }
-        )
+        let prefix = if kind == Kind::Thumbnail { "m" } else { "f" };
+        match version {
+            Some(v) => format!("\"{prefix}-e{v}-{h}\""),
+            None => format!("\"{prefix}-{h}\""),
+        }
     });
     if etag.is_some() && etag.as_deref() == if_none_match {
         return build(StatusCode::NOT_MODIFIED, None, etag, Vec::new());
@@ -61,7 +68,7 @@ pub fn respond(
             let Some(hash) = media.content_hash.as_deref() else {
                 return status(StatusCode::NOT_FOUND);
             };
-            match fs::read(root.join(thumbnail_rel_path(hash))) {
+            match fs::read(root.join(thumbnail_rel_path_for(hash, version))) {
                 Ok(jpeg) => build(StatusCode::OK, Some("image/jpeg"), etag, jpeg),
                 // Aún no generada: la interfaz muestra el hueco.
                 Err(_) => status(StatusCode::NOT_FOUND),
@@ -69,6 +76,16 @@ pub fn respond(
         }
         Kind::Photo => {
             let path = media.rel_path.to_path(root);
+            if let Some(edit) = media.edit {
+                return match mnemos_imaging::display_image_edited(
+                    &path,
+                    media.orientation,
+                    &edit.geometry,
+                ) {
+                    Ok(img) => build(StatusCode::OK, Some("image/jpeg"), etag, img.jpeg),
+                    Err(err) => display_error(&err),
+                };
+            }
             match mnemos_imaging::web_mime(&path) {
                 Ok(Some(mime)) => match fs::read(&path) {
                     Ok(bytes) => build(StatusCode::OK, Some(mime), etag, bytes),
@@ -76,14 +93,21 @@ pub fn respond(
                 },
                 Ok(None) => match mnemos_imaging::display_image(&path, media.orientation) {
                     Ok(img) => build(StatusCode::OK, Some("image/jpeg"), etag, img.jpeg),
-                    Err(mnemos_imaging::ThumbnailError::Io(_)) => status(StatusCode::NOT_FOUND),
-                    // HEIC sin soporte, RAW sin vista previa o imagen dañada.
-                    Err(_) => status(StatusCode::UNSUPPORTED_MEDIA_TYPE),
+                    Err(err) => display_error(&err),
                 },
                 // El archivo no está en el disco.
                 Err(_) => status(StatusCode::NOT_FOUND),
             }
         }
+    }
+}
+
+/// Respuesta cuando no se puede generar la foto del visor.
+fn display_error(err: &mnemos_imaging::ThumbnailError) -> Response<Vec<u8>> {
+    match err {
+        mnemos_imaging::ThumbnailError::Io(_) => status(StatusCode::NOT_FOUND),
+        // HEIC sin soporte, RAW sin vista previa o imagen dañada.
+        _ => status(StatusCode::UNSUPPORTED_MEDIA_TYPE),
     }
 }
 
@@ -227,5 +251,59 @@ mod tests {
         respond(dir.path(), Kind::Photo, &media, None);
         assert_eq!(fs::read(&path).unwrap(), before);
         assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), mtime);
+    }
+
+    #[test]
+    fn una_foto_editada_sale_con_la_receta_y_otra_etag() {
+        let (dir, mut lib, id) = library_with("a.jpg", image::ImageFormat::Jpeg);
+        let before = respond(
+            dir.path(),
+            Kind::Photo,
+            &lib.photo_media(id).unwrap().unwrap(),
+            None,
+        );
+        let old_etag = before.headers()[header::ETAG].to_str().unwrap().to_owned();
+        lib.generate_thumbnails().unwrap();
+
+        let giro = mnemos_imaging::recipe::Geometry {
+            rotate: 90,
+            ..Default::default()
+        };
+        lib.save_edit(id, giro).unwrap();
+        let media = lib.photo_media(id).unwrap().unwrap();
+
+        // La etiqueta de antes ya no vale: el navegador no reutiliza la foto.
+        let response = respond(dir.path(), Kind::Photo, &media, Some(&old_etag));
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header::CONTENT_TYPE], "image/jpeg");
+        let etag = response.headers()[header::ETAG]
+            .to_str()
+            .unwrap()
+            .to_owned();
+        assert!(etag.starts_with("\"f-e1-"), "{etag}");
+        let img = image::load_from_memory(response.body()).unwrap();
+        assert_eq!((img.width(), img.height()), (1707, 2560));
+        let again = respond(dir.path(), Kind::Photo, &media, Some(&etag));
+        assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
+
+        // La miniatura editada da 404 hasta que la genera la cola.
+        assert_eq!(
+            respond(dir.path(), Kind::Thumbnail, &media, None).status(),
+            StatusCode::NOT_FOUND
+        );
+        lib.generate_thumbnails().unwrap();
+        let thumb = respond(dir.path(), Kind::Thumbnail, &media, None);
+        assert_eq!(thumb.status(), StatusCode::OK);
+        let img = image::load_from_memory(thumb.body()).unwrap();
+        assert!(img.height() > img.width());
+
+        // Al volver al original vuelve su miniatura.
+        lib.set_edit_version(id, None).unwrap();
+        let media = lib.photo_media(id).unwrap().unwrap();
+        let thumb = respond(dir.path(), Kind::Thumbnail, &media, None);
+        let img = image::load_from_memory(thumb.body()).unwrap();
+        assert!(img.width() > img.height());
+        let photo = respond(dir.path(), Kind::Photo, &media, Some(&old_etag));
+        assert_eq!(photo.status(), StatusCode::NOT_MODIFIED);
     }
 }

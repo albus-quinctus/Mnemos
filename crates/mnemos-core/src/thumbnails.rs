@@ -101,14 +101,25 @@ impl Library {
     /// contenido actual, en el orden de la cuadrícula. Si dos fotos comparten
     /// huella, solo sale una.
     pub fn pending_thumbnails(&self) -> Result<Vec<ThumbnailJob>> {
-        let mut stmt = self.conn.prepare(
+        self.pending_where("1", &[])
+    }
+
+    /// Miniatura que le falta a la foto `id` para lo que se ve de ella, o
+    /// `None` si ya la tiene o ya falló. Sirve tras guardar una edición, sin
+    /// mirar el resto de la biblioteca.
+    pub fn pending_thumbnail(&self, id: i64) -> Result<Option<ThumbnailJob>> {
+        Ok(self.pending_where("p.id = ?1", &[id])?.pop())
+    }
+
+    fn pending_where(&self, filter: &str, params: &[i64]) -> Result<Vec<ThumbnailJob>> {
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT p.id, p.rel_path, p.content_hash, coalesce(p.orientation, 1), p.edit_version
              FROM photos p
              LEFT JOIN thumbnail_failures f ON f.content_hash = p.content_hash
-             WHERE p.content_hash IS NOT NULL AND f.content_hash IS NULL
-             ORDER BY coalesce(p.taken_at, p.modified_at) DESC, p.id DESC",
-        )?;
-        let rows = stmt.query_map([], |r| {
+             WHERE p.content_hash IS NOT NULL AND f.content_hash IS NULL AND {filter}
+             ORDER BY coalesce(p.taken_at, p.modified_at) DESC, p.id DESC"
+        ))?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params), |r| {
             Ok((
                 r.get::<_, i64>(0)?,
                 r.get::<_, String>(1)?,

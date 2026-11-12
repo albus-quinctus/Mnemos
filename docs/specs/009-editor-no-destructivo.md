@@ -255,7 +255,7 @@ Petición de Paulo (2026-11-05).
 6. [x] Núcleo: guardar como copia (render a tamaño completo, nombre
    `(N)`, EXIF y datos copiados, escritura en `tmp/` e indexado), con
    pruebas de originales intactos y de fallo a mitad.
-7. [ ] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la
+7. [x] Protocolo `mnemos://` y comandos de Tauri: foto y miniatura con la
    receta, guardar como original o como copia, listar versiones y elegir
    versión.
 8. [ ] Capturas del diseño del editor (marco de recorte, barra inferior,
