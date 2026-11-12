@@ -6,7 +6,7 @@
 //! toque lo que creó él. Como el punto de montaje del disco puede cambiar,
 //! [`AccesoLinux::corregir`] lo reescribe al arrancar si apunta a otra ruta.
 
-// Los comandos de Tauri que lo usan llegan en la tarea 4 de la spec 012.
+// Cada sistema usa solo su parte (Linux o Windows); en macOS, ninguna.
 #![allow(dead_code)]
 
 pub mod windows;
@@ -14,6 +14,11 @@ pub mod windows;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use serde::Serialize;
+use tauri::State;
+
+use crate::Portatil;
 
 /// Línea que marca un `.desktop` como creado por MNEMOS.
 pub const MARCA: &str = "X-Mnemos-Portatil=1";
@@ -28,7 +33,7 @@ pub const ICONO: &str = "mnemos-portatil";
 pub const ICONO_PNG: &[u8] = include_bytes!("../icons/128x128@2x.png");
 
 /// Si el equipo tiene el acceso directo.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Estado {
     /// No hay ninguno.
@@ -146,6 +151,151 @@ impl AccesoLinux {
 /// AppImage, el propio ejecutable.
 pub fn ejecutable_linux(exe: &Path, appimage: Option<&Path>) -> PathBuf {
     appimage.unwrap_or(exe).to_owned()
+}
+
+/// Qué ve la interfaz: si el equipo admite el acceso directo y si ya existe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Informe {
+    pub disponible: bool,
+    pub estado: Estado,
+}
+
+const NO_DISPONIBLE: &str =
+    "El acceso directo solo está disponible en modo portátil, en Linux y Windows.";
+
+/// Si se ofrece el acceso directo: solo en modo portátil (`raiz` es la raíz del
+/// disco) y solo en Linux y Windows. En macOS basta con arrastrar la app al Dock.
+pub fn disponible(raiz: Option<&Path>) -> bool {
+    raiz.is_some() && cfg!(any(target_os = "linux", windows))
+}
+
+/// Programa al que apunta el acceso directo.
+fn ejecutable() -> Result<PathBuf, String> {
+    let exe =
+        std::env::current_exe().map_err(|e| format!("No se pudo saber dónde está MNEMOS: {e}"))?;
+    if cfg!(target_os = "linux") {
+        let appimage = std::env::var_os("APPIMAGE");
+        Ok(ejecutable_linux(&exe, appimage.as_deref().map(Path::new)))
+    } else {
+        Ok(exe)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux() -> Result<AccesoLinux, String> {
+    AccesoLinux::del_usuario()
+        .ok_or_else(|| "No se encontró la carpeta personal (HOME).".to_owned())
+}
+
+#[cfg(target_os = "linux")]
+fn estado_del_equipo() -> Result<Estado, String> {
+    Ok(linux()?.estado())
+}
+#[cfg(target_os = "linux")]
+fn crear_en_el_equipo(exe: &Path) -> Result<(), String> {
+    linux()?.crear(exe)
+}
+#[cfg(target_os = "linux")]
+fn quitar_del_equipo() -> Result<bool, String> {
+    linux()?.quitar()
+}
+#[cfg(target_os = "linux")]
+fn corregir_en_el_equipo(exe: &Path) -> Result<bool, String> {
+    linux()?.corregir(exe)
+}
+
+#[cfg(windows)]
+fn estado_del_equipo() -> Result<Estado, String> {
+    windows::estado_actual()
+}
+#[cfg(windows)]
+fn crear_en_el_equipo(exe: &Path) -> Result<(), String> {
+    windows::crear(exe)
+}
+#[cfg(windows)]
+fn quitar_del_equipo() -> Result<bool, String> {
+    windows::quitar()
+}
+#[cfg(windows)]
+fn corregir_en_el_equipo(exe: &Path) -> Result<bool, String> {
+    windows::corregir(exe)
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
+fn estado_del_equipo() -> Result<Estado, String> {
+    Err(NO_DISPONIBLE.to_owned())
+}
+#[cfg(not(any(target_os = "linux", windows)))]
+fn crear_en_el_equipo(_exe: &Path) -> Result<(), String> {
+    Err(NO_DISPONIBLE.to_owned())
+}
+#[cfg(not(any(target_os = "linux", windows)))]
+fn quitar_del_equipo() -> Result<bool, String> {
+    Err(NO_DISPONIBLE.to_owned())
+}
+#[cfg(not(any(target_os = "linux", windows)))]
+fn corregir_en_el_equipo(_exe: &Path) -> Result<bool, String> {
+    Err(NO_DISPONIBLE.to_owned())
+}
+
+fn exigir_disponible(portatil: &Portatil) -> Result<(), String> {
+    if disponible(portatil.0.as_deref()) {
+        Ok(())
+    } else {
+        Err(NO_DISPONIBLE.to_owned())
+    }
+}
+
+/// ¿Se ofrece el acceso directo en este equipo y ya existe? Los comandos son
+/// `async` para que PowerShell, en Windows, no congele la interfaz.
+#[tauri::command(async)]
+pub fn acceso_directo_estado(portatil: State<'_, Portatil>) -> Result<Informe, String> {
+    if !disponible(portatil.0.as_deref()) {
+        return Ok(Informe {
+            disponible: false,
+            estado: Estado::No,
+        });
+    }
+    Ok(Informe {
+        disponible: true,
+        estado: estado_del_equipo()?,
+    })
+}
+
+/// Crea el acceso directo en este equipo (o lo actualiza si ya era de MNEMOS).
+#[tauri::command(async)]
+pub fn crear_acceso_directo(portatil: State<'_, Portatil>) -> Result<Informe, String> {
+    exigir_disponible(&portatil)?;
+    crear_en_el_equipo(&ejecutable()?)?;
+    Ok(Informe {
+        disponible: true,
+        estado: estado_del_equipo()?,
+    })
+}
+
+/// Quita el acceso directo de este equipo. Solo borra lo que creó MNEMOS.
+#[tauri::command(async)]
+pub fn quitar_acceso_directo(portatil: State<'_, Portatil>) -> Result<Informe, String> {
+    exigir_disponible(&portatil)?;
+    quitar_del_equipo()?;
+    Ok(Informe {
+        disponible: true,
+        estado: estado_del_equipo()?,
+    })
+}
+
+/// Al arrancar en modo portátil, reescribe el acceso directo si apunta a otra
+/// ruta (el disco se montó en otro sitio). En segundo plano y sin molestar:
+/// si falla, solo lo escribe en el registro de errores.
+pub fn corregir_al_arrancar(raiz: Option<&Path>) {
+    if !disponible(raiz) {
+        return;
+    }
+    std::thread::spawn(|| {
+        if let Err(e) = ejecutable().and_then(|exe| corregir_en_el_equipo(&exe)) {
+            eprintln!("acceso directo: {e}");
+        }
+    });
 }
 
 fn es_de_mnemos(texto: &str) -> bool {
@@ -284,6 +434,29 @@ mod tests {
         let appimage = Path::new("/media/lilith/FOTOS/MNEMOS-linux.AppImage");
         assert_eq!(ejecutable_linux(montado, Some(appimage)), appimage);
         assert_eq!(ejecutable_linux(montado, None), montado);
+    }
+
+    #[test]
+    fn solo_se_ofrece_en_modo_portatil_y_en_linux_o_windows() {
+        assert!(!disponible(None));
+        assert_eq!(
+            disponible(Some(Path::new("/media/u/DISCO"))),
+            cfg!(any(target_os = "linux", windows))
+        );
+    }
+
+    #[test]
+    fn el_informe_viaja_a_la_interfaz_en_minusculas() {
+        let informe = Informe {
+            disponible: true,
+            estado: Estado::Si,
+        };
+        assert_eq!(
+            serde_json::to_string(&informe).unwrap(),
+            r#"{"disponible":true,"estado":"si"}"#
+        );
+        assert_eq!(serde_json::to_string(&Estado::Ajeno).unwrap(), r#""ajeno""#);
+        assert_eq!(serde_json::to_string(&Estado::No).unwrap(), r#""no""#);
     }
 
     #[test]

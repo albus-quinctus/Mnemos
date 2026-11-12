@@ -508,7 +508,9 @@ pub fn run() {
     let raiz = portatil::raiz();
     tauri::Builder::default()
         .setup(|app| {
-            crear_ventana(app.handle(), app.state::<Portatil>().0.as_deref())?;
+            let raiz = app.state::<Portatil>().0.clone();
+            crear_ventana(app.handle(), raiz.as_deref())?;
+            acceso_directo::corregir_al_arrancar(raiz.as_deref());
             Ok(())
         })
         .manage(Portatil(raiz))
@@ -541,6 +543,9 @@ pub fn run() {
             priorizar_miniaturas,
             importar,
             cancelar_importacion,
+            acceso_directo::acceso_directo_estado,
+            acceso_directo::crear_acceso_directo,
+            acceso_directo::quitar_acceso_directo,
             duplicados::duplicados_resumen,
             duplicados::duplicados_grupos,
             organizacion::vista_meses,
