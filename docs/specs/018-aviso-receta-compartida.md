@@ -67,15 +67,15 @@ y no cambia con esta spec: solo se avisa.
       vacía (prueba automática).
 - [x] La consulta no cambia la base de datos ni los originales (prueba
       automática).
-- [ ] En el editor, «Guardar como original» con una copia idéntica abre el
+- [x] En el editor, «Guardar como original» con una copia idéntica abre el
       diálogo y no guarda hasta elegir; sin copias guarda directamente
       (comprobado en el navegador con la biblioteca simulada).
-- [ ] «Guardar como copia aparte» desde el diálogo crea la copia y no toca la
+- [x] «Guardar como copia aparte» desde el diálogo crea la copia y no toca la
       receta compartida; «Aplicar a las dos» guarda como original (comprobado en el
       navegador con la biblioteca simulada).
-- [ ] Detalles muestra la línea de ediciones compartidas solo cuando hay copias
+- [x] Detalles muestra la línea de ediciones compartidas solo cuando hay copias
       (prueba de los textos en `lib/editor/compartida.test.ts`).
-- [ ] Los originales no se modifican (prueba automática).
+- [x] Los originales no se modifican (prueba automática).
 
 ## Fuera de alcance
 - Separar la receta de una copia (editar una sin que cambie la otra sin crear
@@ -86,9 +86,10 @@ y no cambia con esta spec: solo se avisa.
 ## Tareas (≤1 h cada una)
 1. [x] `Library::identical_copies` en `duplicates.rs`, con pruebas.
 2. [x] Comando `copias_identicas` y envoltorio en `biblioteca.ts`.
-3. [ ] Capturas del diseño del diálogo y de la línea de Detalles para la
-       aprobación de Paulo (`capturas/018-*.png`; el editor y el visor son
+3. [x] Capturas del diseño del diálogo y de la línea de Detalles, aprobadas
+       por Paulo el 12 nov (`capturas/018-*.png`; el editor y el visor son
        oscuros en los dos temas).
-4. [ ] Diálogo en `Editor.svelte` y línea en Detalles, con pruebas. Hecho a la
-       espera de que se aprueben las capturas (`lib/editor/compartida.ts`).
-5. [ ] `docs/progreso.md` y estado de la spec.
+4. [x] Diálogo en `Editor.svelte` y línea en Detalles, con pruebas
+       (`lib/editor/compartida.ts`).
+5. [x] `docs/progreso.md` y estado de la spec.
+6. [ ] Probarlo en la app real con dos copias idénticas.
