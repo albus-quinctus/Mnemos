@@ -137,3 +137,35 @@ export function deshacer() {
   cerrarAviso();
   return ejecutar(aviso.deshacer);
 }
+
+// Una sola foto, desde el visor (spec 006, tarea 11). Devuelven si se ha
+// aplicado; si falla, sale el error en el aviso y nada cambia.
+
+/** Estrella o tecla F del visor. */
+export async function marcarFavorita(id: number, favorito: boolean): Promise<boolean> {
+  try {
+    await marcarFavoritos([id], favorito);
+    return true;
+  } catch (e) {
+    mostrarAviso({ texto: mensajeDeError(e), error: true });
+    return false;
+  }
+}
+
+/** Archivar o desarchivar desde el visor, con «Deshacer» en el aviso. */
+export async function archivarFoto(id: number, archivada: boolean): Promise<boolean> {
+  try {
+    await archivar([id], archivada);
+  } catch (e) {
+    mostrarAviso({ texto: mensajeDeError(e), error: true });
+    return false;
+  }
+  mostrarAviso({
+    texto: fotosTexto(1, archivada ? "archivada" : "desarchivada"),
+    deshacer: async () => {
+      await archivar([id], !archivada);
+      avisarCambio();
+    },
+  });
+  return true;
+}

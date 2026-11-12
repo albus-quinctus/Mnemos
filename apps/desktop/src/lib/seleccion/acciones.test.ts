@@ -25,6 +25,8 @@ vi.mock("../biblioteca", () => ({
 import type { FotoCuadricula } from "../biblioteca";
 import { cambios } from "../cambios.svelte";
 import {
+  archivarFoto,
+  marcarFavorita,
   alternarArchivo,
   alternarFavoritos,
   avisos,
@@ -131,6 +133,30 @@ describe("acciones de la selección", () => {
     expect(archivadas()).toEqual([]);
     expect(avisos.actual?.error).toBe(true);
     expect(avisos.actual?.texto).toContain("disco desconectado");
+  });
+
+  it("visor: la estrella marca una sola foto y no toca la selección", async () => {
+    marcar(2);
+    expect(await marcarFavorita(1, true)).toBe(true);
+    expect(favoritas()).toEqual([1]);
+    expect([...seleccion.ids]).toEqual([2]);
+  });
+
+  it("visor: archivar una foto avisa y se puede deshacer", async () => {
+    expect(await archivarFoto(3, true)).toBe(true);
+    expect(archivadas()).toEqual([3]);
+    expect(avisos.actual?.texto).toBe("1 foto archivada");
+    await deshacer();
+    expect(archivadas()).toEqual([]);
+  });
+
+  it("visor: si el núcleo falla, no cambia nada y sale el error", async () => {
+    fallar = true;
+    expect(await marcarFavorita(1, true)).toBe(false);
+    expect(await archivarFoto(1, true)).toBe(false);
+    expect(favoritas()).toEqual([]);
+    expect(archivadas()).toEqual([]);
+    expect(avisos.actual?.error).toBe(true);
   });
 });
 

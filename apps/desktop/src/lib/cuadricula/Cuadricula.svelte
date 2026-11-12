@@ -26,7 +26,11 @@
     todasSeleccionadas,
   } from "$lib/seleccion/seleccion.svelte";
   import { cambios } from "$lib/cambios.svelte";
-  import { registrarFotos } from "$lib/seleccion/acciones.svelte";
+  import {
+    alternarArchivo,
+    alternarFavoritos,
+    registrarFotos,
+  } from "$lib/seleccion/acciones.svelte";
   import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
   import BarraMeses from "./BarraMeses.svelte";
@@ -110,7 +114,23 @@
     if (destino?.closest("input, textarea, [contenteditable]")) return;
     if (teclaSeleccion(e.key, { ctrl: e.ctrlKey || e.metaKey, mayus: e.shiftKey })) {
       e.preventDefault();
+      return;
     }
+    // Con selección, F marca favoritos y Mayús + A archiva, como en el visor.
+    if (!haySeleccion() || e.ctrlKey || e.metaKey || e.altKey) return;
+    if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavoritos();
+    else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivo();
+    else return;
+    e.preventDefault();
+  }
+
+  // Archivar desde el visor: en Fotos la foto deja de estar y el visor pasa a
+  // la siguiente (o a la anterior si era la última). En la búsqueda se queda.
+  function alArchivarEnVisor(indice: number, archivada: boolean) {
+    if (texto || !archivada) return;
+    fotos = fotos.toSpliced(indice, 1);
+    if (fotos.length === 0) abierta = null;
+    else if (indice >= fotos.length) abierta = fotos.length - 1;
   }
 
   // Foto abierta en el visor, por su posición en `fotos`.
@@ -428,6 +448,7 @@
     onCambiar={(i) => (abierta = i)}
     onCerrar={cerrarVisor}
     onPedirMas={cargarPagina}
+    onArchivada={alArchivarEnVisor}
   />
 {/if}
 
