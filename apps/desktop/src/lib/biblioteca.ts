@@ -183,9 +183,12 @@ export function quitarFechaManual(id: number): Promise<boolean> {
 // que no creó MNEMOS: no se toca.
 export type EstadoAccesoDirecto = "no" | "si" | "ajeno";
 
+export type SistemaAccesoDirecto = "linux" | "windows" | "otro";
+
 export interface InformeAccesoDirecto {
   disponible: boolean;
   estado: EstadoAccesoDirecto;
+  sistema: SistemaAccesoDirecto;
 }
 
 export function estadoAccesoDirecto(): Promise<InformeAccesoDirecto> {

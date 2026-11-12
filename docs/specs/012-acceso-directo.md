@@ -81,7 +81,7 @@ con doble clic.
       si no existía, no se crea (prueba automática con carpetas temporales).
 - [x] «Quitar» borra solo archivos con la marca de MNEMOS (prueba automática).
 - [ ] En Windows se crean los dos `.lnk` y abren la app (guía de prueba manual).
-- [ ] Sin modo portátil o en macOS, la entrada no aparece.
+- [x] Sin modo portátil o en macOS, la entrada no aparece.
 - [ ] Los originales no se modifican (prueba automática).
 
 ## Fuera de alcance
@@ -106,6 +106,7 @@ con doble clic.
        `biblioteca.ts`.
 5. [ ] Capturas del diseño de la entrada del menú lateral (claro y oscuro) para
        que Paulo las apruebe.
-6. [ ] Entrada en `MenuLateral.svelte` y aviso; pruebas.
+6. [x] Entrada en `MenuLateral.svelte` y aviso; pruebas. Diseño aprobado por
+       Paulo el 12 nov (`capturas/012-menu-*.png`); `lib/acceso-directo/`.
 7. [ ] `LEEME.txt` (macOS 15, Dock, botón) y `desktop-file-validate` en el CI.
 8. [ ] Prueba con el HDD real en Linux y guía de prueba en Windows.

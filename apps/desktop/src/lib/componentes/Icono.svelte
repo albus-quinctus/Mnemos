@@ -25,6 +25,7 @@
     voltear: "M12 3v18M9 7 4 17h5zM15 7l5 10h-5z",
     vertical: "M7 4h10v16H7zM19 9l2 2-2 2M5 9l-2 2 2 2",
     desplegar: "m6 9 6 6 6-6",
+    acceso: "M3 5h18v11H3zM9 20h6M12 16v4M12 8v5M9.5 10.5h5",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;
