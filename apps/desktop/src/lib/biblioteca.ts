@@ -43,7 +43,7 @@ export function fotos(
 
 // Vistas, selección, favoritos, archivo y títulos de día (spec 006). Reflejan
 // `mnemos_core::{View, Scope, DayTitle}`.
-export type Vista = "fotos" | "favoritos" | "archivo";
+export type Vista = "fotos" | "favoritos" | "archivo" | { etiqueta: number };
 
 // Dónde se selecciona: una vista o los resultados de una búsqueda.
 export type Ambito = { vista: Vista } | { busqueda: string };
@@ -326,4 +326,63 @@ export function duplicadosGrupos(
   limite: number,
 ): Promise<PaginaDuplicados> {
   return invoke("duplicados_grupos", { despues, limite });
+}
+
+// Etiquetas (spec 016). Solo cambian la base de datos.
+
+export interface Etiqueta {
+  id: number;
+  name: string;
+  photos: number;
+  /** Id de la foto más reciente, para la portada. */
+  cover: number | null;
+  cover_edit_version: number | null;
+}
+
+export interface UsoEtiqueta {
+  tag: number;
+  /** Cuántas fotos de la selección la tienen. */
+  photos: number;
+}
+
+/** Al renombrar: hecho, o ya existe otra con ese nombre (para ofrecer unir). */
+export type Renombrado = { hecho: Etiqueta } | { existe: Etiqueta };
+
+export function etiquetas(): Promise<Etiqueta[]> {
+  return invoke("etiquetas");
+}
+
+export function crearEtiqueta(nombre: string): Promise<Etiqueta> {
+  return invoke("crear_etiqueta", { nombre });
+}
+
+export function renombrarEtiqueta(id: number, nombre: string): Promise<Renombrado> {
+  return invoke("renombrar_etiqueta", { id, nombre });
+}
+
+export function unirEtiquetas(desde: number, en: number): Promise<Etiqueta> {
+  return invoke("unir_etiquetas", { desde, en });
+}
+
+/** Devuelve las fotos que tenía, para «Deshacer». */
+export function borrarEtiqueta(id: number): Promise<number[]> {
+  return invoke("borrar_etiqueta", { id });
+}
+
+/** Devuelve las fotos que no la tenían, para «Deshacer». */
+export function ponerEtiqueta(ids: number[], etiqueta: number): Promise<number[]> {
+  return invoke("poner_etiqueta", { ids, etiqueta });
+}
+
+/** Devuelve las fotos que la tenían, para «Deshacer». */
+export function quitarEtiqueta(ids: number[], etiqueta: number): Promise<number[]> {
+  return invoke("quitar_etiqueta", { ids, etiqueta });
+}
+
+export function etiquetasDeFoto(id: number): Promise<Etiqueta[]> {
+  return invoke("etiquetas_de_foto", { id });
+}
+
+export function usoEtiquetas(ids: number[]): Promise<UsoEtiqueta[]> {
+  return invoke("uso_etiquetas", { ids });
 }

@@ -1,6 +1,7 @@
 mod acceso_directo;
 mod configuracion;
 mod duplicados;
+mod etiquetas;
 mod media;
 mod organizacion;
 mod portatil;
@@ -556,7 +557,16 @@ pub fn run() {
             organizacion::seleccionar_dia,
             organizacion::seleccionar_rango,
             organizacion::titulos_dia,
-            organizacion::poner_titulo_dia
+            organizacion::poner_titulo_dia,
+            etiquetas::etiquetas,
+            etiquetas::crear_etiqueta,
+            etiquetas::renombrar_etiqueta,
+            etiquetas::unir_etiquetas,
+            etiquetas::borrar_etiqueta,
+            etiquetas::poner_etiqueta,
+            etiquetas::quitar_etiqueta,
+            etiquetas::etiquetas_de_foto,
+            etiquetas::uso_etiquetas
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");
