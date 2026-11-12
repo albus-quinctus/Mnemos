@@ -4,6 +4,7 @@
   import MenuLateral from "$lib/componentes/MenuLateral.svelte";
   import { escucharImportacion } from "$lib/importacion/importacion.svelte";
   import ProgresoImportacion from "$lib/importacion/ProgresoImportacion.svelte";
+  import { esTeclaPantallaCompleta, pantallaCompleta } from "$lib/ajustes/pantalla";
   import Aviso from "$lib/seleccion/Aviso.svelte";
   import BarraSeleccion from "$lib/seleccion/BarraSeleccion.svelte";
   import { haySeleccion } from "$lib/seleccion/seleccion.svelte";
@@ -12,7 +13,18 @@
   let { children } = $props();
 
   onMount(escucharImportacion);
+
+  // F11 alterna la pantalla completa en cualquier pantalla (spec 013): en la
+  // fase de captura, para que valga también en el visor, el editor y los campos
+  // de texto, y sin escribir nada en ellos.
+  function alPulsar(e: KeyboardEvent) {
+    if (!esTeclaPantallaCompleta(e)) return;
+    e.preventDefault();
+    pantallaCompleta();
+  }
 </script>
+
+<svelte:window onkeydowncapture={alPulsar} />
 
 <div class="galeria">
   <MenuLateral />
