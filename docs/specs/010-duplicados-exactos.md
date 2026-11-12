@@ -1,6 +1,6 @@
 # 010 · Duplicados exactos
 
-- Estado: en curso
+- Estado: hecha
 - Fase: F4 (adelantada a F2)
 
 ## Qué y por qué
@@ -20,7 +20,7 @@ Quiero saber qué fotos tengo repetidas en la biblioteca, byte a byte, para deci
 - **Archivadas y favoritas:** cuentan como cualquier otra foto. Se indica para que el usuario lo vea al decidir.
 - **Fotos desaparecidas:** se muestran dentro de su grupo marcadas como desaparecidas, porque explican muchos duplicados (fotos movidas a mano). Un grupo con una copia en el disco y otra desaparecida sigue siendo un grupo.
 - **CLI:** `mnemos duplicados <biblioteca>` imprime el resumen y cada grupo con sus rutas. Sale con código 0 haya o no duplicados.
-- **Interfaz:** una vista "Duplicados" con el resumen arriba y un grupo por fila: la miniatura (es la misma para todas las copias, porque va por huella) y la lista de copias con su carpeta, nombre, tamaño y avisos (favorita, archivada, desaparecida). Al pulsar una copia se abre en el visor. Sin selección ni botones de borrar.
+- **Interfaz:** una entrada "Duplicados" en el menú lateral, debajo de una línea, abre una vista con el resumen arriba y un grupo por fila: la miniatura (es la misma para todas las copias, porque va por huella) y la lista de copias con su carpeta, nombre, tamaño y avisos (favorita, archivada, desaparecida). Al pulsar una copia se abre en el visor. Sin selección ni botones de borrar.
 - La detección solo consulta la base de datos (y comprueba si cada archivo existe). Nunca escribe en los originales ni en la base de datos.
 
 ## Casos límite
@@ -41,7 +41,7 @@ Quiero saber qué fotos tengo repetidas en la biblioteca, byte a byte, para deci
 - [x] Una copia borrada del disco sale marcada como desaparecida (prueba automática).
 - [x] Ni la consulta ni la CLI modifican originales ni la base de datos (prueba automática).
 - [x] Resumen y primera página en menos de 100 ms con 10 000 fotos sintéticas.
-- [ ] Vista "Duplicados" en la aplicación, aprobada por Paulo con capturas.
+- [x] Vista "Duplicados" en la aplicación, aprobada por Paulo con capturas (2026-11-12).
 
 ## Fuera de alcance
 - Borrar, mover, fusionar o "quedarse con una" copia. Llegará con la papelera, que necesita una excepción a la regla 1 de `CLAUDE.md`.
@@ -53,5 +53,5 @@ Quiero saber qué fotos tengo repetidas en la biblioteca, byte a byte, para deci
 1. [x] Consulta de resumen y grupos paginados en `mnemos-core`, con pruebas y medición con 10 000 fotos.
 2. [x] `mnemos duplicados <biblioteca>` en la CLI.
 3. [x] Comandos de Tauri `duplicados_resumen` y `duplicados_grupos`.
-4. [ ] Capturas del diseño de la vista para que Paulo las apruebe. Espera a que la spec 006 fije la navegación lateral (Fotos, Favoritos, Archivo) para añadir "Duplicados" ahí sin chocar.
-5. [ ] Vista "Duplicados" con resumen, grupos y apertura en el visor.
+4. [x] Capturas del diseño de la vista para que Paulo las apruebe. Espera a que la spec 006 fije la navegación lateral (Fotos, Favoritos, Archivo) para añadir "Duplicados" ahí sin chocar.
+5. [x] Vista "Duplicados" con resumen, grupos y apertura en el visor.
