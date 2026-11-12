@@ -299,6 +299,12 @@
   // Exportar (spec 008): menú con los dos tamaños, selector de carpeta y un
   // aviso con el resultado.
   let menuExportar = $state(false);
+  // Si se ve una versión editada, se exporta esa. Las ediciones guardadas o
+  // elegidas en esta sesión del visor mandan sobre lo que trajo la cuadrícula.
+  const editadasAhora = new SvelteMap<number, boolean>();
+  const conEdicion = $derived(
+    foto ? (editadasAhora.get(foto.id) ?? foto.edit_version !== null) : false,
+  );
   let exportando = $state(false);
   let mensaje = $state<{ texto: string; error: boolean } | null>(null);
   let menu = $state<HTMLDivElement>();
@@ -387,6 +393,7 @@
     if (!guardado || id === undefined) return;
     datosCambiados = true;
     if (guardado.como === "original") {
+      editadasAhora.set(id, true);
       recargarFoto(id);
       avisar("Edición guardada. El archivo original no se ha tocado.", false);
     } else {
@@ -417,6 +424,7 @@
     eligiendo = true;
     try {
       await elegirVersion(id, version);
+      editadasAhora.set(id, version !== null);
       recargarFoto(id);
       avisar(version === null ? "Se ve el original" : `Se ve la versión ${version}`, false);
     } catch (e) {
@@ -512,11 +520,15 @@
         <div class="menu" role="menu" aria-label="Exportar">
           <button type="button" role="menuitem" onclick={() => exportarComo("original")}>
             Tamaño original
-            <span>El archivo tal cual, con sus datos</span>
+            <span>
+              {conEdicion ? "Con las ediciones y sus datos" : "El archivo tal cual, con sus datos"}
+            </span>
           </button>
           <button type="button" role="menuitem" onclick={() => exportarComo("reducida")}>
             Tamaño reducido (2048 px)
-            <span>JPEG para compartir, sin ubicación</span>
+            <span>
+              {conEdicion ? "Con las ediciones, sin ubicación" : "JPEG para compartir, sin ubicación"}
+            </span>
           </button>
         </div>
       {/if}
