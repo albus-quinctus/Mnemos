@@ -15,7 +15,7 @@ Versión completa: documento "Workflow de desarrollo de MNEMOS". Esto es el resu
 |---|---|---|---|
 | 1. Especificar | Qué y por qué, casos límite, criterios de aceptación | brainstorming | `docs/specs/NNN-*.md` |
 | 2. Planificar | Tareas de ≤1 h con archivos y pruebas | writing-plans | lista de tareas en la spec |
-| 3. Implementar | Una tarea por sesión, rama `feat/NNN-*` | Claude Code + skills de stack | commits pequeños |
+| 3. Implementar | Una tarea por sesión, rama `feature/NNN-*` | Claude Code + skills de stack | commits pequeños |
 | 4. Verificar | fmt, clippy, tests, `pnpm check` | CI | todo en verde |
 | 5. Revisar | Revisión del diff; seguridad si toca archivos o IPC | rust-review, differential-review | correcciones |
 | 6. Cerrar | Actualizar `docs/progreso.md`, PR, fusionar | `/clear` | estado al día |
@@ -36,7 +36,21 @@ Si una tarea pasa de ~30 mensajes, estaba mal dividida: vuelve al paso 2.
 ## Ramas
 - `main`: solo versiones publicadas del producto. Se actualiza desde `develop` al sacar una versión y se etiqueta (`v0.1.0`).
 - `develop`: rama de integración. Todo el trabajo entra aquí por PR.
-- Ramas de trabajo desde `develop`: `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, `ci/`.
+- Ramas de trabajo: salen de `develop` y vuelven a `develop` por PR. Su nombre es `<prefijo>/<descripción>`, con el prefijo según el tipo de cambio:
+
+  | Prefijo | Uso | Ejemplo |
+  |---|---|---|
+  | `feature/` | funcionalidad nueva | `feature/010-duplicados` |
+  | `fix/` | corrección de un error | `fix/visor-zoom` |
+  | `chore/` | mantenimiento, dependencias, configuración | `chore/actualiza-tauri` |
+  | `docs/` | solo documentación | `docs/prefijos-ramas` |
+  | `refactor/` | reorganización sin cambio de comportamiento | `refactor/cola-miniaturas` |
+  | `test/` | solo pruebas | `test/002-rendimiento` |
+  | `perf/` | mejora de rendimiento | `perf/miniaturas-jpeg` |
+  | `ci/` | integración continua | `ci/cache-cargo` |
+
+- La descripción va en minúsculas, con guiones y en español; si la rama pertenece a una spec, empieza por su número (`feature/006-seleccion`).
+- No se usan nombres generados por herramientas (`claude/...`, `project-thread-...`, `patch-1`). Una rama de un PR abierto no se renombra, porque GitHub cerraría el PR: el nombre se corrige en la rama siguiente.
 
 ## Commits
 Se sigue [Conventional Commits 1.0.0](https://www.conventionalcommits.org/es/v1.0.0/):
