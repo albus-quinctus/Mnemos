@@ -65,6 +65,9 @@ jobs:
           cd "$RUNNER_TEMP"
           "$imagen" --appimage-extract >/dev/null
           gancho=squashfs-root/apprun-hooks/mnemos-gsettings.sh
+          ls -la squashfs-root squashfs-root/apprun-hooks
+          find squashfs-root -name 'mnemos-gsettings.sh'
+          head -n 20 squashfs-root/AppRun || true
           cmp "$gancho" "$GITHUB_WORKSPACE/apps/desktop/src-tauri/appimage/mnemos-gsettings.sh"
           grep -n 'apprun-hooks' squashfs-root/AppRun
           grep -q 'mnemos-gsettings.sh' squashfs-root/AppRun
