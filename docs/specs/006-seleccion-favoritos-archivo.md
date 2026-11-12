@@ -1,6 +1,6 @@
 # 006 · Selección múltiple, favoritos, archivo y título del día
 
-- Estado: en curso
+- Estado: hecha
 - Fase: F2
 
 ## Qué y por qué
@@ -134,7 +134,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
   archivadas; Archivo solo incluye archivadas; Favoritos incluye favoritas
   archivadas o no (prueba automática).
 - [x] La búsqueda devuelve las fotos archivadas (prueba automática).
-- [ ] El rango de `Mayús` + clic incluye las fotos de páginas no cargadas, en
+- [x] El rango de `Mayús` + clic incluye las fotos de páginas no cargadas, en
   el orden de la cuadrícula (prueba automática del núcleo y de la interfaz).
 - [x] Si la escritura falla a mitad de una selección, ninguna foto cambia
   (prueba automática).
@@ -147,7 +147,7 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 - [x] Deshacer devuelve las fotos a su estado anterior.
 - [x] Capturas de la barra de selección, la estrella, Archivo y el título del
   día aprobadas por Paulo antes de cerrar la interfaz.
-- [ ] Los originales no se modifican: huella BLAKE3 y fecha de modificación
+- [x] Los originales no se modifican: huella BLAKE3 y fecha de modificación
   iguales antes y después de cada acción (prueba automática).
 
 ## Fuera de alcance
@@ -183,5 +183,5 @@ Fotos (puntos 1, 2 y 7 de la prioridad 1, y el título del día).
 11. [x] Estrella y archivar en el visor, teclas `F` y `Mayús` + `A`.
 12. [x] Vistas Favoritos y Archivo en el menú lateral, con sus mensajes vacíos.
 13. [x] Título del día editable en la cabecera.
-14. [ ] Prueba de originales intactos y de biblioteca copiada a otra ruta;
+14. [x] Prueba de originales intactos y de biblioteca copiada a otra ruta;
    actualizar `docs/progreso.md`.
