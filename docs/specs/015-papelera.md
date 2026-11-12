@@ -127,8 +127,7 @@ Salvaguardas que la acompañan:
   - Rehace los índices parciales de la línea de tiempo (migración 0007) para
     excluir las fotos en la Papelera, y añade `photos_papelera` sobre
     `(trashed_at DESC, id DESC) WHERE trashed_at IS NOT NULL`.
-  - Tabla de ajustes de la biblioteca (o la que ya exista) con
-    `ultima_apertura`.
+  - Tabla `library_meta` (clave y valor) con `ultima_apertura`.
 - `View` gana `Papelera`; todas las vistas, la búsqueda, los duplicados, los
   álbumes y las etiquetas filtran `trashed_at IS NULL`. Las specs 014
   (álbumes) y 016 (etiquetas) tienen que respetarlo: la que se fusione después
@@ -196,11 +195,12 @@ Salvaguardas que la acompañan:
 ## Tareas (≤1 h cada una)
 1. [x] Aprobación de Paulo de la excepción a la regla 1 y cambio de la regla
    en `CLAUDE.md`.
-2. [ ] Migración `0014_papelera.sql` (`trashed_at`, índices, última
-   apertura) y `View::Papelera`; filtros en vistas, búsqueda, barra de meses y
-   duplicados, con pruebas.
+2. [x] Migración `0014_papelera.sql` (`trashed_at`, índices y tabla
+   `library_meta` para la última apertura); filtros en las vistas, la
+   búsqueda, la barra de meses, la selección y los duplicados, con pruebas.
 3. [ ] Núcleo: `send_to_trash` y `restore` sobre un `Scope`, en una
-   transacción, con pruebas y medida con 10 000 fotos.
+   transacción, y la vista Papelera ordenada por fecha de envío (con su
+   cursor y su selección), con pruebas y medida con 10 000 fotos.
 4. [ ] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación
    de tamaño y fecha, recetas y miniaturas sin otra foto con la huella), con
    pruebas y la prueba que recorre el código fuente.

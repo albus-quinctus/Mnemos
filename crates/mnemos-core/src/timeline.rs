@@ -30,7 +30,8 @@ pub(crate) struct Filter {
 /// el mismo orden y el mismo cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum View {
-    /// La biblioteca sin las fotos archivadas.
+    /// La biblioteca sin las fotos archivadas. Ninguna vista incluye las
+    /// fotos de la Papelera (spec 015).
     #[default]
     #[serde(rename = "fotos")]
     Photos,
@@ -44,12 +45,12 @@ pub enum View {
 
 impl View {
     /// Condición de la vista. Es SQL fijo, sin parámetros, y repite la de su
-    /// índice parcial (migración 0007) para que SQLite lo use.
+    /// índice parcial (migración 0014) para que SQLite lo use.
     pub(crate) fn filter(self) -> Filter {
         let sql = match self {
-            View::Photos => " AND archived_at IS NULL",
-            View::Favorites => " AND favorite = 1",
-            View::Archive => " AND archived_at IS NOT NULL",
+            View::Photos => " AND archived_at IS NULL AND trashed_at IS NULL",
+            View::Favorites => " AND favorite = 1 AND trashed_at IS NULL",
+            View::Archive => " AND archived_at IS NOT NULL AND trashed_at IS NULL",
         };
         Filter {
             sql: sql.to_owned(),

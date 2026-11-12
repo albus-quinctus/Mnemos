@@ -21,6 +21,9 @@ const MIGRATIONS: &[&str] = &[
     // Se llama 0009 porque se reservó ese número para la spec 009, pero se
     // fusionó después de la 0011 y por eso va al final.
     include_str!("migrations/0009_edicion.sql"),
+    // Papelera (spec 015). Las migraciones 0012 y 0013 (álbumes y etiquetas)
+    // van en el orden en que se fusionen, siempre al final de la lista.
+    include_str!("migrations/0014_papelera.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -250,7 +253,7 @@ mod tests {
             .unwrap();
         }
         let conn = open(&path).unwrap();
-        assert_eq!(schema_version(&conn).unwrap(), 10);
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
         let fila: (Option<i64>, String) = conn
             .query_row("SELECT edit_version, taken_source FROM photos", [], |r| {
                 Ok((r.get(0)?, r.get(1)?))
@@ -335,5 +338,44 @@ mod tests {
             [],
         );
         assert!(res.is_err());
+    }
+    #[test]
+    fn la_migracion_de_la_papelera_conserva_favoritos_y_archivo() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        {
+            // Biblioteca justo antes de la papelera, con una favorita
+            // archivada.
+            let mut conn = Connection::open(&path).unwrap();
+            let before = MIGRATIONS.len() - 1;
+            for (i, sql) in MIGRATIONS[..before].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at,
+                                     favorite, archived_at)
+                 VALUES ('a.jpg', 1, 1, 1, 1, 5)",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+        let fila: (i64, Option<i64>, Option<i64>) = conn
+            .query_row(
+                "SELECT favorite, archived_at, trashed_at FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(fila, (1, Some(5), None));
+        let meta: i64 = conn
+            .query_row("SELECT count(*) FROM library_meta", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(meta, 0);
     }
 }
