@@ -1,6 +1,6 @@
 # 017 · Exportar varias fotos a la vez
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F2
 
 ## Qué y por qué
@@ -78,7 +78,7 @@ el mismo núcleo.
 - [ ] Cancelar para tras la foto en curso sin dejar archivos a medias (prueba automática).
 - [ ] Una foto con versión editada se exporta igual que desde el visor (prueba automática, cuando exista la exportación de editadas).
 - [ ] El botón, el menú, el progreso, «Cancelar» y «Ver» funcionan con ratón y teclado.
-- [ ] Capturas del botón, el progreso y el resumen aprobadas por Paulo.
+- [x] Capturas del botón, el progreso y el resumen aprobadas por Paulo.
 - [ ] Los originales y la base de datos no se modifican (prueba automática).
 
 ## Fuera de alcance
@@ -90,7 +90,7 @@ el mismo núcleo.
 - Barra de selección con solo iconos cuando se llene con álbumes, etiquetas y papelera.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Spec y capturas del diseño.
+1. [x] Spec y capturas del diseño (aprobadas por Paulo el 12 nov; `capturas/017-*.png` en los archivos del proyecto).
 2. [ ] `mnemos-core`: `export_many` en un módulo aparte, con progreso, cancelación y la regla de saltar o parar. Pruebas. Llama a la exportación de una foto de la spec 008 (con la versión editada, cuando esté).
 3. [ ] App: comandos `exportar_varias` y `cancelar_exportacion` con el evento `exportacion` (en curso, terminada, cancelada, detenida), en un hilo aparte como la importación.
 4. [ ] Barra de selección: botón y menú, selector de carpeta, progreso con «Cancelar», resumen y «Ver». Pruebas de la interfaz.
