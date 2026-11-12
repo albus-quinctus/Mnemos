@@ -1,6 +1,6 @@
 # 015 · Papelera
 
-- Estado: borrador (pendiente de aprobar la excepción a la regla 1)
+- Estado: aprobada (Paulo, 2026-11-12)
 - Fase: F2
 
 ## Qué y por qué
@@ -15,9 +15,9 @@ excepción a la regla 1 de `CLAUDE.md` (ver más abajo). Lo decidió Paulo el
 2026-11-01 en la comparativa con Google Fotos: vaciado automático a los 30
 días y borrado definitivo en cualquier momento.
 
-## Excepción a la regla 1 de CLAUDE.md (pide aprobación)
-La regla 1 dice: «Nunca modificar, mover ni borrar un original». Esta spec
-propone cambiarla por:
+## Excepción a la regla 1 de CLAUDE.md (aprobada el 2026-11-12)
+La regla 1 decía: «Nunca modificar, mover ni borrar un original». Paulo
+aprobó cambiarla el 2026-11-12 por:
 
 > 1. **Nunca modificar, mover ni borrar un original** de la biblioteca. Las
 >    ediciones son recetas JSON en `.mnemos/ediciones/`. **Única excepción:**
@@ -179,7 +179,7 @@ Salvaguardas que la acompañan:
   búsqueda, barra de meses ni Duplicados (prueba automática).
 - [ ] Restaurar devuelve favorito, archivo y edición (prueba automática).
 - [ ] Enviar o restaurar 10 000 fotos tarda menos de 1 s.
-- [ ] Capturas de la Papelera, la barra de selección y el diálogo aprobadas
+- [x] Capturas de la Papelera, la barra de selección y el diálogo aprobadas
   por Paulo antes de cerrar la interfaz.
 - [ ] Los originales no se modifican salvo al eliminar para siempre (prueba
   automática).
@@ -194,7 +194,7 @@ Salvaguardas que la acompañan:
   spec aparte que usará esta Papelera.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Aprobación de Paulo de la excepción a la regla 1 y cambio de la regla
+1. [x] Aprobación de Paulo de la excepción a la regla 1 y cambio de la regla
    en `CLAUDE.md`.
 2. [ ] Migración `0014_papelera.sql` (`trashed_at`, índices, última
    apertura) y `View::Papelera`; filtros en vistas, búsqueda, barra de meses y
@@ -210,7 +210,8 @@ Salvaguardas que la acompañan:
 7. [ ] Comandos de Tauri (`enviar_a_papelera`, `restaurar`,
    `eliminar_para_siempre`, `vaciar_papelera`, vaciado al abrir) con
    progreso, y envoltorios en `biblioteca.ts`.
-8. [ ] Capturas del diseño para Paulo.
+8. [x] Capturas del diseño para Paulo (aprobadas el 2026-11-12;
+   `capturas/015-*.png`).
 9. [ ] Interfaz: botón y tecla `Supr` en la barra de selección y en el visor,
    con aviso y «Deshacer».
 10. [ ] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
