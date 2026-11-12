@@ -107,7 +107,5 @@ con doble clic.
 5. [ ] Capturas del diseño de la entrada del menú lateral (claro y oscuro) para
        que Paulo las apruebe.
 6. [ ] Entrada en `MenuLateral.svelte` y aviso; pruebas.
-7. [x] `LEEME.txt` (macOS 15, Dock, botón) y `desktop-file-validate` en el CI
-       (la prueba `el_desktop_generado_es_valido` falla en el CI si falta la
-       herramienta).
+7. [ ] `LEEME.txt` (macOS 15, Dock, botón) y `desktop-file-validate` en el CI.
 8. [ ] Prueba con el HDD real en Linux y guía de prueba en Windows.
