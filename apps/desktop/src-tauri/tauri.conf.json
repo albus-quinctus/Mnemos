@@ -24,13 +24,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "linux": {
-      "appimage": {
-        "files": {
-          "/apprun-hooks/mnemos-gsettings.sh": "appimage/mnemos-gsettings.sh"
-        }
-      }
-    }
+    ]
   }
 }

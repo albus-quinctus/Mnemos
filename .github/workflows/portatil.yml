@@ -56,33 +56,6 @@ jobs:
         working-directory: apps/desktop
       - run: pnpm tauri build ${{ matrix.args }}
         working-directory: apps/desktop
-      # La GTK de la AppImage aborta en Sway sin GSETTINGS_BACKEND=memory: el
-      # gancho que lo fija tiene que estar dentro y el AppRun tiene que cargarlo.
-      - name: Comprobar el gancho de GSettings (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          imagen=$(ls "$GITHUB_WORKSPACE"/target/release/bundle/appimage/*.AppImage)
-          cd "$RUNNER_TEMP"
-          "$imagen" --appimage-extract >/dev/null
-          gancho=squashfs-root/apprun-hooks/mnemos-gsettings.sh
-          ls -la squashfs-root squashfs-root/apprun-hooks
-          find squashfs-root -name 'mnemos-gsettings.sh'
-          head -n 20 squashfs-root/AppRun || true
-          cmp "$gancho" "$GITHUB_WORKSPACE/apps/desktop/src-tauri/appimage/mnemos-gsettings.sh"
-          grep -n 'apprun-hooks' squashfs-root/AppRun
-          grep -q 'mnemos-gsettings.sh' squashfs-root/AppRun
-          probar() {
-            esperado=$1; shift
-            obtenido=$(env -i "$@" sh -c ". ./$gancho; echo \"\${GSETTINGS_BACKEND:-ninguno}\"")
-            echo "$* -> $obtenido"
-            [ "$obtenido" = "$esperado" ]
-          }
-          probar memory WAYLAND_DISPLAY=wayland-1 XDG_CURRENT_DESKTOP=sway
-          probar memory WAYLAND_DISPLAY=wayland-1
-          probar ninguno WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=ubuntu:GNOME
-          probar ninguno WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=KDE
-          probar ninguno DISPLAY=:0 XDG_CURRENT_DESKTOP=i3
-          probar dconf WAYLAND_DISPLAY=wayland-1 GSETTINGS_BACKEND=dconf
       # tar conserva los permisos de ejecución, que upload-artifact pierde.
       - name: Recoger el ejecutable
         shell: bash
