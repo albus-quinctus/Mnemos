@@ -1,6 +1,6 @@
 # 014 · Álbumes
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F2
 
 ## Qué y por qué
@@ -132,9 +132,9 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
        `remove_from_album`; álbum del Takeout una sola vez por foto; pruebas,
        también con 10 000 fotos.
 3. [ ] Comandos de Tauri y envoltorios en `biblioteca.ts`.
-4. [ ] Capturas del diseño (pantalla Álbumes, dentro de un álbum, «Añadir a
-       álbum» y eliminar), en claro y oscuro, para que Paulo las apruebe.
-       Hechas como maqueta (`capturas/014-*.png`), pendientes de aprobación.
+4. [x] Capturas del diseño (pantalla Álbumes, dentro de un álbum, «Añadir a
+       álbum» y eliminar), en claro y oscuro, aprobadas por Paulo el 12 nov
+       (`capturas/014-*.png`).
 5. [ ] Pantalla Álbumes y entrada del menú (`lib/albumes/`), con «Nuevo álbum»
        y estado vacío; pruebas.
 6. [ ] Vista de un álbum: cabecera, cambiar nombre, eliminar y cuadrícula;
