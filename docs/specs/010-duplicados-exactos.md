@@ -1,6 +1,6 @@
 # 010 · Duplicados exactos
 
-- Estado: en curso
+- Estado: hecha
 - Fase: F4 (adelantada a F2)
 
 ## Qué y por qué
@@ -41,7 +41,7 @@ Quiero saber qué fotos tengo repetidas en la biblioteca, byte a byte, para deci
 - [x] Una copia borrada del disco sale marcada como desaparecida (prueba automática).
 - [x] Ni la consulta ni la CLI modifican originales ni la base de datos (prueba automática).
 - [x] Resumen y primera página en menos de 100 ms con 10 000 fotos sintéticas.
-- [ ] Vista "Duplicados" en la aplicación, aprobada por Paulo con capturas.
+- [x] Vista "Duplicados" en la aplicación, aprobada por Paulo con capturas (2026-11-12).
 
 ## Fuera de alcance
 - Borrar, mover, fusionar o "quedarse con una" copia. Llegará con la papelera, que necesita una excepción a la regla 1 de `CLAUDE.md`.
