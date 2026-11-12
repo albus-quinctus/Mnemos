@@ -35,12 +35,22 @@ pub struct LibraryInfo {
     pub tags: u64,
 }
 
-/// Lo que hace falta para mostrar una foto: dónde está y cómo girarla.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Lo que hace falta para mostrar una foto: dónde está, cómo girarla y qué
+/// edición se ve.
+#[derive(Debug, Clone, PartialEq)]
 pub struct PhotoMedia {
     pub rel_path: RelPath,
     pub content_hash: Option<String>,
     pub orientation: u16,
+    /// Edición que se ve (spec 009), o `None` si se ve el original.
+    pub edit: Option<MediaEdit>,
+}
+
+/// Versión de la receta que se ve y su geometría.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MediaEdit {
+    pub version: u32,
+    pub geometry: mnemos_imaging::recipe::Geometry,
 }
 
 /// Lo que muestra el panel de detalles del visor (spec 002). Las dimensiones
@@ -106,29 +116,48 @@ impl Library {
     }
 
     /// Datos para mostrar la foto `id`, o `None` si no existe.
+    ///
+    /// La receta solo se lee si la caché `edit_version` dice que la foto está
+    /// editada; entonces manda lo que diga la receta. Una receta dañada o que
+    /// ya no tiene versión actual muestra el original.
     pub fn photo_media(&self, id: i64) -> Result<Option<PhotoMedia>> {
         let row = self
             .conn
             .query_row(
-                "SELECT rel_path, content_hash, coalesce(orientation, 1) FROM photos WHERE id = ?1",
+                "SELECT rel_path, content_hash, coalesce(orientation, 1), edit_version
+                 FROM photos WHERE id = ?1",
                 [id],
                 |r| {
                     Ok((
                         r.get::<_, String>(0)?,
                         r.get::<_, Option<String>>(1)?,
                         r.get::<_, u16>(2)?,
+                        r.get::<_, Option<u32>>(3)?,
                     ))
                 },
             )
             .optional()?;
-        row.map(|(rel_path, content_hash, orientation)| {
-            Ok(PhotoMedia {
-                rel_path: RelPath::new(&rel_path)?,
-                content_hash,
-                orientation,
-            })
-        })
-        .transpose()
+        let Some((rel_path, content_hash, orientation, edit_version)) = row else {
+            return Ok(None);
+        };
+        let edit = match (edit_version, content_hash.as_deref()) {
+            (Some(_), Some(hash)) => match crate::edits::read_recipe(&self.root, hash)? {
+                crate::edits::StoredRecipe::Valid(recipe) => {
+                    recipe.current.map(|version| MediaEdit {
+                        version,
+                        geometry: recipe.current_geometry(),
+                    })
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        Ok(Some(PhotoMedia {
+            rel_path: RelPath::new(&rel_path)?,
+            content_hash,
+            orientation,
+            edit,
+        }))
     }
 
     /// Detalles de la foto `id` para el visor, o `None` si no existe.
@@ -294,6 +323,7 @@ mod tests {
         assert_eq!(media.rel_path.as_str(), "Originales/a.png");
         assert_eq!(media.orientation, 1);
         assert!(media.content_hash.is_some());
+        assert_eq!(media.edit, None);
         assert_eq!(lib.photo_media(id + 1).unwrap(), None);
     }
 

@@ -190,6 +190,70 @@ export function exportar(
   return invoke("exportar", { id, carpeta, tamano });
 }
 
+// Editor no destructivo (spec 009). La geometría es la de la receta
+// (`mnemos_imaging::recipe::Geometry`): giro en grados en sentido horario
+// sobre la foto ya girada según el EXIF, volteo después del giro y recorte en
+// fracciones (0 a 1) de la imagen ya girada y volteada.
+export interface Recorte {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Geometria {
+  rotate: 0 | 90 | 180 | 270;
+  flip_horizontal: boolean;
+  crop: Recorte | null;
+}
+
+// Una versión guardada (`mnemos_core::EditVersion`).
+export interface VersionEdicion {
+  id: number;
+  created_at: number; // segundos desde la época Unix
+  rotate: number;
+  flip_horizontal: boolean;
+  cropped: boolean;
+}
+
+// Ediciones de una foto (`mnemos_core::EditSummary`).
+export interface Ediciones {
+  current: number | null; // versión que se ve, o null si se ve el original
+  versions: VersionEdicion[]; // de la más antigua a la más nueva
+  damaged: string | null; // por qué no se puede usar la receta
+  writable: boolean; // false si la receta es de una versión más nueva
+}
+
+export function ediciones(id: number): Promise<Ediciones> {
+  return invoke("ediciones", { id });
+}
+
+// «Guardar como original»: añade una versión y la hace actual. Devuelve su
+// número. El archivo original no se toca.
+export function guardarEdicion(
+  id: number,
+  geometria: Geometria,
+): Promise<number> {
+  return invoke("guardar_edicion", { id, geometria });
+}
+
+// «Guardar como copia»: crea `nombre (N).ext` junto al original con la
+// edición aplicada y devuelve el id de la foto nueva.
+export function guardarCopia(
+  id: number,
+  geometria: Geometria,
+): Promise<number> {
+  return invoke("guardar_copia", { id, geometria });
+}
+
+// Muestra una versión, o el original con `null` («Volver al original»).
+export function elegirVersion(
+  id: number,
+  version: number | null,
+): Promise<void> {
+  return invoke("elegir_version", { id, version });
+}
+
 // Duplicados exactos (spec 010). Reflejan `mnemos_core::duplicates`. Solo
 // consultan: nada se borra ni se mueve.
 export interface ResumenDuplicados {

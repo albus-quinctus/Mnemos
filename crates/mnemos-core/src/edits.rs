@@ -777,6 +777,39 @@ mod tests {
     }
 
     #[test]
+    fn los_datos_para_mostrar_llevan_la_edicion_que_se_ve() {
+        let mut s = setup();
+        assert_eq!(s.lib.photo_media(s.id).unwrap().unwrap().edit, None);
+        s.lib.save_edit(s.id, giro()).unwrap();
+        s.lib.save_edit(s.id, recorte()).unwrap();
+        let edit = s.lib.photo_media(s.id).unwrap().unwrap().edit.unwrap();
+        assert_eq!((edit.version, edit.geometry), (2, recorte()));
+
+        s.lib.set_edit_version(s.id, Some(1)).unwrap();
+        let edit = s.lib.photo_media(s.id).unwrap().unwrap().edit.unwrap();
+        assert_eq!((edit.version, edit.geometry), (1, giro()));
+
+        s.lib.set_edit_version(s.id, None).unwrap();
+        assert_eq!(s.lib.photo_media(s.id).unwrap().unwrap().edit, None);
+
+        // Una receta dañada muestra el original aunque la caché diga otra cosa.
+        s.lib.set_edit_version(s.id, Some(2)).unwrap();
+        fs::write(s.recipe_path(), b"{ roto").unwrap();
+        assert_eq!(s.lib.photo_media(s.id).unwrap().unwrap().edit, None);
+    }
+
+    #[test]
+    fn tras_guardar_falta_solo_la_miniatura_de_esa_foto() {
+        let mut s = setup();
+        s.lib.generate_thumbnails().unwrap();
+        assert_eq!(s.lib.pending_thumbnail(s.id).unwrap(), None);
+        s.lib.save_edit(s.id, giro()).unwrap();
+        let job = s.lib.pending_thumbnail(s.id).unwrap().unwrap();
+        assert_eq!((job.photo_id, job.edit_version), (s.id, Some(1)));
+        assert_eq!(s.lib.pending_thumbnail(s.id + 1).unwrap(), None);
+    }
+
+    #[test]
     fn no_se_edita_una_foto_que_no_esta_en_el_disco() {
         let mut s = setup();
         fs::remove_file(s.root().join(ORIGINALS_DIR).join("Año ñ.jpg")).unwrap();

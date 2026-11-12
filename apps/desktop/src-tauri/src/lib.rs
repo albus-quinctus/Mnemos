@@ -10,9 +10,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use mnemos_core::thumbnails::DEFAULT_WORKERS;
 use mnemos_core::{
-    ExportSize, ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso, SearchQuery,
-    ThumbnailQueue, TimelineCursor, TimelinePage,
+    EditSummary, ExportSize, ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso,
+    SearchQuery, ThumbnailQueue, TimelineCursor, TimelinePage,
 };
+use mnemos_imaging::recipe::Geometry;
 use serde::Serialize;
 use tauri::http::{Method, StatusCode, header};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -248,6 +249,76 @@ fn quitar_fecha_manual(id: i64, estado: State<'_, OpenLibrary>) -> Result<bool, 
     with_library(&estado, |lib| lib.clear_manual_taken(id))
 }
 
+/// Versiones guardadas de la foto `id` para la sección «Ediciones» del
+/// visor (spec 009).
+#[tauri::command]
+fn ediciones(id: i64, estado: State<'_, OpenLibrary>) -> Result<EditSummary, String> {
+    with_library(&estado, |lib| lib.edit_summary(id))
+}
+
+/// «Guardar como original»: añade una versión con `geometria` a la receta y
+/// la hace actual. Devuelve su número. El archivo original no se toca.
+#[tauri::command]
+fn guardar_edicion(
+    id: i64,
+    geometria: Geometry,
+    estado: State<'_, OpenLibrary>,
+    miniaturas: State<'_, Thumbnails>,
+) -> Result<u32, String> {
+    let version = with_library_mut(&estado, |lib| lib.save_edit(id, geometria))?;
+    encolar_miniatura(&estado, &miniaturas, id);
+    Ok(version)
+}
+
+/// «Guardar como copia»: crea junto al original una foto nueva con
+/// `geometria` aplicada y devuelve su id. Generar la copia a tamaño completo
+/// lleva tiempo, así que se hace con una conexión propia, sin bloquear la
+/// biblioteca abierta.
+#[tauri::command(async)]
+fn guardar_copia(
+    id: i64,
+    geometria: Geometry,
+    estado: State<'_, OpenLibrary>,
+    miniaturas: State<'_, Thumbnails>,
+) -> Result<i64, String> {
+    let root = with_library(&estado, |lib| Ok(lib.root().to_path_buf()))?;
+    let copia = Library::open(&root)
+        .and_then(|mut lib| lib.save_edit_as_copy(id, &geometria))
+        .map_err(|e| e.to_string())?;
+    encolar_miniatura(&estado, &miniaturas, copia);
+    Ok(copia)
+}
+
+/// Muestra la versión `version` de la foto `id`, o el original si es `None`
+/// («Volver al original»). No borra ninguna versión.
+#[tauri::command]
+fn elegir_version(
+    id: i64,
+    version: Option<u32>,
+    estado: State<'_, OpenLibrary>,
+    miniaturas: State<'_, Thumbnails>,
+) -> Result<(), String> {
+    with_library_mut(&estado, |lib| lib.set_edit_version(id, version))?;
+    encolar_miniatura(&estado, &miniaturas, id);
+    Ok(())
+}
+
+/// Pone delante en la cola la miniatura que le falte a la foto `id` para lo
+/// que se ve de ella. La cuadrícula la recibe con el evento `miniaturas`.
+fn encolar_miniatura(estado: &OpenLibrary, miniaturas: &Thumbnails, id: i64) {
+    let Some(queue) = lock(&miniaturas.0).clone() else {
+        return;
+    };
+    match with_library(estado, |lib| lib.pending_thumbnail(id)) {
+        Ok(Some(job)) => {
+            queue.push([job]);
+            queue.prioritize(&[id]);
+        }
+        Ok(None) => {}
+        Err(e) => eprintln!("no se pudo encolar la miniatura de la foto {id}: {e}"),
+    }
+}
+
 /// Exporta la foto `id` a la carpeta `carpeta` (spec 008) y devuelve la ruta
 /// del archivo creado. La biblioteca solo se bloquea para traducir el id: la
 /// copia o la reducción se hacen fuera, en un hilo aparte.
@@ -462,6 +533,10 @@ pub fn run() {
             poner_fecha,
             quitar_fecha_manual,
             exportar,
+            ediciones,
+            guardar_edicion,
+            guardar_copia,
+            elegir_version,
             priorizar_miniaturas,
             importar,
             cancelar_importacion,
