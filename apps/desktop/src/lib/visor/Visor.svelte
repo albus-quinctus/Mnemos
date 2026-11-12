@@ -14,11 +14,13 @@
     camara as pedirCamara,
     detalles as pedirDetalles,
     ediciones as pedirEdiciones,
+    elegirVersion,
     exportar,
     ponerFecha,
     quitarFechaManual,
     type Camara,
     type Detalles,
+    type Ediciones,
     type FotoCuadricula,
     type Geometria,
     type TamanoExportacion,
@@ -32,8 +34,10 @@
   import { fechas } from "./fechas.svelte";
   import {
     apertura,
+    cambiosVersion,
     camposFecha,
     coordenadas,
+    cuandoVersion,
     dimensiones,
     exposicion,
     fecha,
@@ -182,6 +186,7 @@
   let panel = $state(false);
   let info = $state<Detalles | null>(null);
   let camaraInfo = $state<Camara | null>(null);
+  let edicionesInfo = $state<Ediciones | null>(null);
   // Sube al guardar una fecha, para volver a pedir los detalles.
   let recarga = $state(0);
   const captura = $derived(info ? fechaCaptura(info.taken_at, info.taken_source) : null);
@@ -201,6 +206,13 @@
       })
       .catch(() => {
         if (vigente) info = null;
+      });
+    pedirEdiciones(id)
+      .then((e) => {
+        if (vigente) edicionesInfo = e;
+      })
+      .catch(() => {
+        if (vigente) edicionesInfo = null;
       });
     // El EXIF se lee del original: si el disco no está, solo falta la sección.
     pedirCamara(id)
@@ -364,14 +376,43 @@
     if (!guardado || id === undefined) return;
     datosCambiados = true;
     if (guardado.como === "original") {
-      cache.olvidar(id);
-      guardadas.set(id, (guardadas.get(id) ?? 0) + 1);
-      cambios++;
-      recarga++;
+      recargarFoto(id);
       avisar("Edición guardada. El archivo original no se ha tocado.", false);
     } else {
       const copia = await pedirDetalles(guardado.id).catch(() => null);
       avisar(copia ? `Copia guardada en ${copia.rel_path}` : "Copia guardada", false);
+    }
+  }
+
+  /** Tras cambiar lo que se ve de la foto: la vuelve a pedir con otra URL. */
+  function recargarFoto(id: number) {
+    cache.olvidar(id);
+    guardadas.set(id, (guardadas.get(id) ?? 0) + 1);
+    cambios++;
+    recarga++;
+    datosCambiados = true;
+  }
+
+  // Sección Ediciones (spec 009): elegir qué versión se ve, o el original.
+  // No se borra ninguna versión.
+  let eligiendo = $state(false);
+  const versionActual = $derived(
+    edicionesInfo?.versions.find((v) => v.id === edicionesInfo?.current) ?? null,
+  );
+
+  async function elegir(version: number | null) {
+    if (!foto || eligiendo || edicionesInfo?.current === version) return;
+    const id = foto.id;
+    eligiendo = true;
+    try {
+      await elegirVersion(id, version);
+      recargarFoto(id);
+      avisar(version === null ? "Se ve el original" : `Se ve la versión ${version}`, false);
+    } catch (e) {
+      const texto = String(e);
+      avisar(texto.charAt(0).toUpperCase() + texto.slice(1), true);
+    } finally {
+      eligiendo = false;
     }
   }
 
@@ -564,7 +605,14 @@
           <dt>Ruta</dt>
           <dd class="mono">{info.rel_path}</dd>
           <dt>Dimensiones</dt>
-          <dd>{dimensiones(info.width, info.height)}</dd>
+          {#if versionActual}
+            <dd>
+              {dimensiones(versionActual.width, versionActual.height)}
+              <span class="origen">Original: {dimensiones(info.width, info.height)}</span>
+            </dd>
+          {:else}
+            <dd>{dimensiones(info.width, info.height)}</dd>
+          {/if}
           <dt>Tamaño</dt>
           <dd>{tamano(info.size_bytes)}</dd>
           <dt>Fecha</dt>
@@ -613,6 +661,55 @@
           <dt>Formato</dt>
           <dd>{info.format || "Desconocido"}</dd>
         </dl>
+        {#if edicionesInfo && (edicionesInfo.versions.length > 0 || edicionesInfo.damaged)}
+          {@const ed = edicionesInfo}
+          <h3>Ediciones</h3>
+          {#if ed.damaged}
+            <p class="nota">La receta de esta foto no se puede leer: se ve sin editar. ({ed.damaged})</p>
+          {:else}
+            <ul class="versiones" aria-label="Versiones">
+              {#each [...ed.versions].reverse() as v (v.id)}
+                <li>
+                  <button
+                    type="button"
+                    class:actual={ed.current === v.id}
+                    aria-pressed={ed.current === v.id}
+                    disabled={eligiendo}
+                    onclick={() => elegir(v.id)}
+                  >
+                    <span class="punto">
+                      {#if ed.current === v.id}<Icono nombre="marca" tamano={10} grosor={3.5} />{/if}
+                    </span>
+                    <span>
+                      Versión {v.id}
+                      <small>{cuandoVersion(v.created_at)} · {cambiosVersion(v)}</small>
+                    </span>
+                  </button>
+                </li>
+              {/each}
+              <li>
+                <button
+                  type="button"
+                  class:actual={ed.current === null}
+                  aria-pressed={ed.current === null}
+                  disabled={eligiendo}
+                  onclick={() => elegir(null)}
+                >
+                  <span class="punto">
+                    {#if ed.current === null}<Icono nombre="marca" tamano={10} grosor={3.5} />{/if}
+                  </span>
+                  <span>Original<small>tal como está en el disco</small></span>
+                </button>
+              </li>
+            </ul>
+            {#if ed.current !== null}
+              <button type="button" class="texto volver" disabled={eligiendo} onclick={() => elegir(null)}>
+                Volver al original
+              </button>
+            {/if}
+            <p class="nota">Cambiar de versión no borra ninguna.</p>
+          {/if}
+        {/if}
         {#if camaraInfo}
           {@const c = camaraInfo}
           {@const distancia = focal(c.focal_mm, c.focal_35mm)}
@@ -772,6 +869,67 @@
     display: block;
     color: var(--visor-texto-suave);
     font-size: 0.8rem;
+  }
+
+  /* Sección Ediciones (spec 009). */
+  .versiones {
+    display: grid;
+    gap: 2px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .versiones button {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 8px;
+    align-items: start;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--radio);
+    background: transparent;
+    color: var(--visor-texto);
+    font: inherit;
+    font-size: 0.88rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .versiones button:hover:not(:disabled),
+  .versiones button.actual {
+    background: var(--visor-superficie);
+  }
+
+  .versiones button:disabled {
+    cursor: default;
+  }
+
+  .versiones small {
+    display: block;
+    color: var(--visor-texto-suave);
+    font-size: 0.78rem;
+  }
+
+  .punto {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    border: 1.5px solid var(--visor-texto-suave);
+    border-radius: 50%;
+  }
+
+  .actual .punto {
+    border-color: #7aa7f5; /* --acento del tema oscuro: el visor siempre es oscuro */
+    background: #7aa7f5;
+    color: #0d1a33;
+  }
+
+  .volver {
+    margin-top: 10px;
   }
 
   .nota {

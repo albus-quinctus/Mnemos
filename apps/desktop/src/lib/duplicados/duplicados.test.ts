@@ -63,6 +63,7 @@ describe("duplicados", () => {
         thumbnail_failed: false,
         favorite: true,
         archived: false,
+        edit_version: null,
       },
     ]);
   });

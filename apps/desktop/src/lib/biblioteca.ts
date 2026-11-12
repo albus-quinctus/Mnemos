@@ -17,6 +17,7 @@ export interface FotoCuadricula {
   thumbnail_failed: boolean; // sin miniatura posible: se muestra el marcador
   favorite: boolean; // en Favoritos: estrella (spec 006)
   archived: boolean; // archivada: caja en la búsqueda (spec 006)
+  edit_version: number | null; // versión editada que se ve (spec 009); con ella, width y height son los de la editada
 }
 
 export interface Cursor {
@@ -215,6 +216,8 @@ export interface VersionEdicion {
   flip_horizontal: boolean;
   cropped: boolean;
   crop: Recorte | null;
+  width: number | null; // tamaño de la foto con esta versión
+  height: number | null;
 }
 
 // Ediciones de una foto (`mnemos_core::EditSummary`).
