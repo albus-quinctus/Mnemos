@@ -1,6 +1,6 @@
 # 012 · Acceso directo en el equipo
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F1 (completa la versión portátil de la spec 005)
 
 ## Qué y por qué
