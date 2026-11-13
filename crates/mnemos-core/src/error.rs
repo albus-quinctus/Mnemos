@@ -66,6 +66,15 @@ pub enum Error {
     #[error("no se puede generar la copia editada de {path}: {message}")]
     CannotRender { path: String, message: String },
 
+    #[error("«{0}» no vale como nombre de etiqueta: debe tener entre 1 y 50 caracteres")]
+    InvalidTagName(String),
+
+    #[error("no hay ninguna etiqueta con el id {0}")]
+    TagNotFound(i64),
+
+    #[error("ya existe una etiqueta llamada «{name}»")]
+    TagNameTaken { name: String, existing: i64 },
+
     #[error("receta de edición: {0}")]
     Recipe(#[from] mnemos_imaging::recipe::RecipeError),
 }
