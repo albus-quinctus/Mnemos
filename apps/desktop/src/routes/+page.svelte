@@ -11,6 +11,7 @@
   import { irA, navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
+  import { cambios } from "$lib/cambios.svelte";
   import { vaciarCaducadas } from "$lib/papelera/papelera.svelte";
 
   type LibraryInfo = {
@@ -118,7 +119,7 @@
             <Albumes />
           {:else}
             <div class="album">
-              <CabeceraAlbum id={navegacion.album} />
+              <CabeceraAlbum id={navegacion.album} version={cambios.version} />
               <div class="album-fotos">
                 <Cuadricula
                   vista={{ album: navegacion.album }}

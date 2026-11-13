@@ -3,13 +3,17 @@
 // falla, nada cambia y la selección se conserva para reintentar.
 
 import {
+  anadirAAlbum,
   archivar,
+  crearAlbum,
   enviarAPapelera,
   marcarFavoritos,
+  quitarDeAlbum,
   restaurar,
   type FotoCuadricula,
 } from "../biblioteca";
 import { avisarCambio } from "../cambios.svelte";
+import { abrirAlbum } from "../navegacion.svelte";
 import { alFallar, limpiarSeleccion, seleccion } from "./seleccion.svelte";
 
 export const DURACION_AVISO = 8000;
@@ -78,6 +82,14 @@ export function enPapelera(): boolean {
   return "vista" in seleccion.ambito && seleccion.ambito.vista === "papelera";
 }
 
+/** El álbum abierto (spec 014), donde la barra ofrece «Quitar del álbum». */
+export function albumAbierto(): number | null {
+  const ambito = seleccion.ambito;
+  if (!("vista" in ambito)) return null;
+  const vista = ambito.vista;
+  return typeof vista === "object" && "album" in vista ? vista.album : null;
+}
+
 // «1 foto archivada», «3 fotos archivadas».
 function fotosTexto(n: number, participio: string): string {
   return n === 1 ? `1 foto ${participio}` : `${n.toLocaleString("es")} fotos ${participio}s`;
@@ -139,6 +151,56 @@ export function enviarSeleccionAPapelera() {
     const cambiadas = await enviarAPapelera([...seleccion.ids]);
     terminar(`${fotosTexto(cambiadas.length, "movida")} a la papelera`, () =>
       restaurar(cambiadas),
+    );
+  });
+}
+
+/**
+ * Añade la selección a un álbum (spec 014). Las que ya estaban no cuentan.
+ * El aviso ofrece «Ver álbum» en lugar de «Deshacer».
+ */
+export function anadirSeleccionAAlbum(album: number, nombre: string) {
+  return ejecutar(async () => {
+    const cambiadas = await anadirAAlbum(album, [...seleccion.ids]);
+    avisarAnadidas(cambiadas.length, album, nombre);
+  });
+}
+
+/**
+ * «Nuevo álbum…» de la barra: crea el álbum con la selección. Devuelve el
+ * error para el diálogo, o null.
+ */
+export async function crearAlbumConSeleccion(nombre: string): Promise<string | null> {
+  try {
+    const album = await crearAlbum(nombre, [...seleccion.ids]);
+    avisarAnadidas(album.photos, album.id, album.name);
+    return null;
+  } catch (e) {
+    return String(e);
+  }
+}
+
+function avisarAnadidas(n: number, album: number, nombre: string) {
+  limpiarSeleccion();
+  avisarCambio();
+  mostrarAviso({
+    texto:
+      n === 0
+        ? `Ya estaban en «${nombre}»`
+        : `${fotosTexto(n, "añadida")} a «${nombre}»`,
+    etiqueta: "Ver álbum",
+    deshacer: async () => abrirAlbum(album),
+  });
+}
+
+/** Dentro de un álbum: quita la selección del álbum, no de la biblioteca. */
+export function quitarSeleccionDeAlbum() {
+  const album = albumAbierto();
+  if (album === null) return;
+  return ejecutar(async () => {
+    const cambiadas = await quitarDeAlbum(album, [...seleccion.ids]);
+    terminar(`${fotosTexto(cambiadas.length, "quitada")} del álbum`, () =>
+      anadirAAlbum(album, cambiadas),
     );
   });
 }

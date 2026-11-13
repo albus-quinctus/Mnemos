@@ -151,6 +151,7 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 6. [x] Vista de un álbum: cabecera, cambiar nombre, eliminar y cuadrícula;
        pruebas. `CabeceraAlbum.svelte`: «Álbumes» para volver, nombre editable
        en el sitio, «N fotos · rango» y menú ⋮; `Esc` vuelve a Álbumes.
-7. [ ] Barra de selección: «Añadir a álbum» con su lista y «Quitar del álbum»
-       con «Deshacer»; pruebas.
+7. [x] Barra de selección: «Añadir a álbum» con su lista y «Quitar del álbum»
+       con «Deshacer»; pruebas. `MenuAnadirAlbum.svelte`; si la barra no cabe,
+       los botones se quedan en icono con su nombre al pasar el ratón.
 8. [ ] Prueba de originales intactos con álbumes y `docs/progreso.md`.
