@@ -62,7 +62,8 @@ export function cambiarAmbito(ambito: Ambito) {
 }
 
 function mismoAmbito(a: Ambito, b: Ambito): boolean {
-  if ("vista" in a) return "vista" in b && a.vista === b.vista;
+  // Un álbum o una etiqueta es un objeto: se comparan por su contenido.
+  if ("vista" in a) return "vista" in b && JSON.stringify(a.vista) === JSON.stringify(b.vista);
   return "busqueda" in b && a.busqueda === b.busqueda;
 }
 

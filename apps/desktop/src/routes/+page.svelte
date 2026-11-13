@@ -5,6 +5,7 @@
   import { busqueda, limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
   import { olvidarTitulos } from "$lib/cuadricula/titulos.svelte";
+  import Albumes from "$lib/albumes/Albumes.svelte";
   import Duplicados from "$lib/duplicados/Duplicados.svelte";
   import { navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
@@ -61,9 +62,12 @@
   // sección, buscar o salir de la búsqueda, se pierde (spec 006).
   $effect(() => {
     const seccion = navegacion.seccion;
+    const album = navegacion.album;
     const consulta = busqueda.consulta;
     untrack(() => {
       if (consulta) cambiarAmbito({ busqueda: consulta });
+      else if (seccion === "albumes")
+        cambiarAmbito({ vista: album === null ? "fotos" : { album } });
       else cambiarAmbito({ vista: seccion === "duplicados" ? "fotos" : seccion });
     });
   });
@@ -102,6 +106,18 @@
       {#key `${info.root}#${importacion.version}#${navegacion.seccion}`}
         <div class="capa encima" class:oculta={busqueda.consulta !== ""}>
           <Cuadricula vista={navegacion.seccion} activa={!busqueda.consulta} />
+        </div>
+      {/key}
+    {/if}
+    <!-- Álbumes (spec 014): la lista, o un álbum con la misma cuadrícula. -->
+    {#if navegacion.seccion === "albumes" && !busqueda.consulta}
+      {#key `${info.root}#${importacion.version}#${navegacion.album}`}
+        <div class="capa encima">
+          {#if navegacion.album === null}
+            <Albumes />
+          {:else}
+            <Cuadricula vista={{ album: navegacion.album }} activa={!busqueda.consulta} />
+          {/if}
         </div>
       {/key}
     {/if}

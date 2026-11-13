@@ -145,8 +145,9 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 4. [x] Capturas del diseño (pantalla Álbumes, dentro de un álbum, «Añadir a
        álbum» y eliminar), en claro y oscuro, aprobadas por Paulo el 12 nov
        (`capturas/014-*.png`).
-5. [ ] Pantalla Álbumes y entrada del menú (`lib/albumes/`), con «Nuevo álbum»
-       y estado vacío; pruebas.
+5. [x] Pantalla Álbumes y entrada del menú (`lib/albumes/`), con «Nuevo álbum»
+       y estado vacío; pruebas. Al pulsar una tarjeta se abre el álbum con la
+       cuadrícula (`navegacion.album`); su cabecera es la tarea 6.
 6. [ ] Vista de un álbum: cabecera, cambiar nombre, eliminar y cuadrícula;
        pruebas.
 7. [ ] Barra de selección: «Añadir a álbum» con su lista y «Quitar del álbum»
