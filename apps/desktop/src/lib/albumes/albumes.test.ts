@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { nombreValido, textoAlbumes, textoFotos } from "./albumes";
+import { nombreValido, rangoFechas, subtituloAlbum, textoAlbumes, textoFotos } from "./albumes";
+
+const dia = (a: number, m: number, d: number) => new Date(a, m - 1, d, 12).getTime() / 1000;
+const corto = (a: number, m: number, d: number) =>
+  new Date(a, m - 1, d).toLocaleDateString("es", { day: "numeric", month: "short" });
 
 describe("álbumes", () => {
   it("cuenta álbumes en singular y plural", () => {
@@ -18,5 +22,21 @@ describe("álbumes", () => {
   it("no deja crear un álbum sin nombre", () => {
     expect(nombreValido("   ")).toBeNull();
     expect(nombreValido("  Picos de Europa ")).toBe("Picos de Europa");
+  });
+
+  it("escribe el rango de fechas del álbum", () => {
+    expect(rangoFechas(null, null)).toBe("");
+    expect(rangoFechas(dia(2024, 9, 7), dia(2024, 9, 7))).toBe(`${corto(2024, 9, 7)} 2024`);
+    expect(rangoFechas(dia(2024, 8, 18), dia(2024, 9, 7))).toBe(
+      `${corto(2024, 8, 18)} – ${corto(2024, 9, 7)} 2024`,
+    );
+    expect(rangoFechas(dia(2023, 12, 3), dia(2024, 1, 5))).toBe(
+      `${corto(2023, 12, 3)} 2023 – ${corto(2024, 1, 5)} 2024`,
+    );
+  });
+
+  it("junta número y fechas en el subtítulo", () => {
+    expect(subtituloAlbum(0, null, null)).toBe("Vacío");
+    expect(subtituloAlbum(2, dia(2024, 9, 7), dia(2024, 9, 7))).toBe(`2 fotos · ${corto(2024, 9, 7)} 2024`);
   });
 });

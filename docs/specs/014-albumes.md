@@ -148,8 +148,9 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 5. [x] Pantalla Álbumes y entrada del menú (`lib/albumes/`), con «Nuevo álbum»
        y estado vacío; pruebas. Al pulsar una tarjeta se abre el álbum con la
        cuadrícula (`navegacion.album`); su cabecera es la tarea 6.
-6. [ ] Vista de un álbum: cabecera, cambiar nombre, eliminar y cuadrícula;
-       pruebas.
+6. [x] Vista de un álbum: cabecera, cambiar nombre, eliminar y cuadrícula;
+       pruebas. `CabeceraAlbum.svelte`: «Álbumes» para volver, nombre editable
+       en el sitio, «N fotos · rango» y menú ⋮; `Esc` vuelve a Álbumes.
 7. [ ] Barra de selección: «Añadir a álbum» con su lista y «Quitar del álbum»
        con «Deshacer»; pruebas.
 8. [ ] Prueba de originales intactos con álbumes y `docs/progreso.md`.

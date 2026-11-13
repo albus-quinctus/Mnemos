@@ -12,6 +12,7 @@
     exportar: "M12 15V4m0 0-4 4m4-4 4 4M5 14v6h14v-6",
     cerrar: "M6 6l12 12M18 6 6 18",
     mas: "M12 5v14M5 12h14",
+    puntos: "M12 5.5h.01M12 12h.01M12 18.5h.01",
     anterior: "M15 5l-7 7 7 7",
     siguiente: "M9 5l7 7-7 7",
     duplicados: "M8 8h11v11H8zM5 16V5h11",
