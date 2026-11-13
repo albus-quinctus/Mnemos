@@ -89,7 +89,8 @@ jobs:
           [ "$GITHUB_REF_TYPE" = tag ] || version="dev-${GITHUB_SHA::7}"
           mkdir disco
           for t in artefactos/*/*.tar; do tar -xf "$t" -C disco; done
-          cp empaquetado/LEEME.txt empaquetado/mnemos-portatil.json disco/
+          cp empaquetado/LEEME.txt empaquetado/mnemos-portatil.json empaquetado/MNEMOS.sh disco/
+          chmod +x disco/MNEMOS.sh
           ls -la disco
           (cd disco && zip -r -y "../MNEMOS-portatil-$version.zip" .)
           echo "ZIP=MNEMOS-portatil-$version.zip" >> "$GITHUB_ENV"

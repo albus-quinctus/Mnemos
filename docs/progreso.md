@@ -22,6 +22,8 @@ Fase **F1 Biblioteca y navegación**, en curso.
 12. Spec 016, etiquetas (`docs/specs/016-etiquetas.md`), en borrador: pantalla Etiquetas, etiquetar desde la barra de selección y desde el visor, y búsqueda por etiqueta. Migración reservada: 0013.
 11. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
 
+12. AppImage en Sway: la GTK empaquetada abortaba al arrancar con el tema de cursor de GSettings vacío. Ahora la app, al arrancar desde la AppImage en Wayland fuera de GNOME, KDE y escritorios parecidos, se vuelve a ejecutar con `GSETTINGS_BACKEND=memory` (`apps/desktop/src-tauri/src/entorno_linux.rs`, sin `unsafe`). Un gancho en `apprun-hooks/` no sirve: `bundle.linux.appimage.files` no lo mete en la AppImage. El zip lleva `MNEMOS.sh`, que abre la AppImage de su carpeta. Falta probarlo con doble clic en el Sway de Paulo.
+
 ## Pendientes / ideas aparcadas
 - Botón de Ajustes en el menú lateral, encima de «Añadir a este equipo», para el modo claro u oscuro y otras preferencias (pedido por Paulo el 2026-11-12).
 - Pantalla completa con F11 (pedido por Paulo el 2026-11-12).
