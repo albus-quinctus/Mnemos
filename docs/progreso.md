@@ -23,9 +23,12 @@ Fase **F1 Biblioteca y navegación**, en curso.
 12. Spec 016, etiquetas (`docs/specs/016-etiquetas.md`), en borrador: pantalla Etiquetas, etiquetar desde la barra de selección y desde el visor, y búsqueda por etiqueta. Migración reservada: 0013.
 13. Spec 018, aviso de ediciones compartidas entre duplicados (`docs/specs/018-aviso-receta-compartida.md`), en curso: las copias idénticas comparten la receta, así que «Guardar como original» avisa con «Seguir editando», «Guardar como copia aparte» y «Aplicar a las dos/todas», y Detalles dice con cuántas copias se comparten las ediciones. Núcleo `identical_copies` (en `duplicates.rs`), comando `copias_identicas` e interfaz hechos; Paulo aprobó las capturas (`capturas/018-*.png`) el 12 nov. Falta probarlo en la app real.
 14. Probar con 10 000 fotos reales desde un HDD externo y medir indexado, miniaturas y visor dentro de Tauri (pendiente en `docs/rendimiento.md`).
+
 15. AppImage en Sway: la GTK empaquetada abortaba al arrancar con el tema de cursor de GSettings vacío. Ahora la app, al arrancar desde la AppImage en Wayland fuera de GNOME, KDE y escritorios parecidos, se vuelve a ejecutar con `GSETTINGS_BACKEND=memory` (`apps/desktop/src-tauri/src/entorno_linux.rs`, sin `unsafe`). Un gancho en `apprun-hooks/` no sirve: `bundle.linux.appimage.files` no lo mete en la AppImage. El zip lleva `MNEMOS.sh`, que abre la AppImage de su carpeta. Falta probarlo con doble clic en el Sway de Paulo.
 
 ## Pendientes / ideas aparcadas
+- Botón de Ajustes en el menú lateral, encima de «Añadir a este equipo», para el modo claro u oscuro y otras preferencias (pedido por Paulo el 2026-11-12).
+- Pantalla completa con F11 (pedido por Paulo el 2026-11-12).
 - Revisar e instalar las skills de `docs/skills.md`.
 - Crear `tests/fixtures/` con imágenes de ejemplo sin datos personales.
 - Decidir qué hacer con las fotos desaparecidas (hoy solo se cuentan).
