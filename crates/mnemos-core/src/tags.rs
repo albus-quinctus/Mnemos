@@ -649,4 +649,57 @@ pub(crate) mod tests {
         );
         assert_eq!(lib.tag(playa.id).unwrap().cover, Some(40_000));
     }
+
+    #[test]
+    fn la_vista_de_una_etiqueta_pagina_e_incluye_las_archivadas() {
+        use crate::selection::Scope;
+        use crate::timeline::View;
+
+        let (_dir, mut lib) = library(6);
+        let playa = lib.create_tag("Playa").unwrap();
+        let otra = lib.create_tag("Otra").unwrap();
+        lib.add_tag(&[1, 3, 4, 6], playa.id).unwrap();
+        lib.add_tag(&[2], otra.id).unwrap();
+        lib.set_archived(&[4], true).unwrap();
+
+        let vista = View::Tag(playa.id);
+        let total: u64 = lib
+            .view_months(vista)
+            .unwrap()
+            .iter()
+            .map(|m| m.photos)
+            .sum();
+        assert_eq!(total, 4);
+
+        // De la más reciente (id mayor) a la más antigua, de dos en dos.
+        let primera = lib.view_page(vista, None, 2).unwrap();
+        let ids: Vec<i64> = primera.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [6, 4]);
+        assert!(primera.photos[1].archived);
+        let segunda = lib.view_page(vista, primera.next, 2).unwrap();
+        let ids: Vec<i64> = segunda.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [3, 1]);
+        assert!(segunda.next.is_none());
+
+        assert_eq!(lib.select_all(Scope::View(vista)).unwrap(), [6, 4, 3, 1]);
+        assert!(
+            lib.view_page(View::Tag(999), None, 10)
+                .unwrap()
+                .photos
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn la_vista_de_una_etiqueta_viaja_como_objeto() {
+        use crate::timeline::View;
+        let v: View = serde_json::from_str(r#"{"etiqueta": 7}"#).unwrap();
+        assert_eq!(v, View::Tag(7));
+        let v: View = serde_json::from_str(r#""favoritos""#).unwrap();
+        assert_eq!(v, View::Favorites);
+        assert_eq!(
+            serde_json::to_string(&View::Tag(7)).unwrap(),
+            r#"{"etiqueta":7}"#
+        );
+    }
 }
