@@ -4,6 +4,8 @@
   import MenuLateral from "$lib/componentes/MenuLateral.svelte";
   import { escucharImportacion } from "$lib/importacion/importacion.svelte";
   import ProgresoImportacion from "$lib/importacion/ProgresoImportacion.svelte";
+  import Ajustes from "$lib/ajustes/Ajustes.svelte";
+  import { ajustes } from "$lib/ajustes/estado.svelte";
   import { esTeclaPantallaCompleta, pantallaCompleta } from "$lib/ajustes/pantalla";
   import Aviso from "$lib/seleccion/Aviso.svelte";
   import BarraSeleccion from "$lib/seleccion/BarraSeleccion.svelte";
@@ -20,7 +22,10 @@
   function alPulsar(e: KeyboardEvent) {
     if (!esTeclaPantallaCompleta(e)) return;
     e.preventDefault();
-    pantallaCompleta();
+    // Con Ajustes abierta, el interruptor sigue a la tecla.
+    pantallaCompleta().then((estado) => {
+      if (estado !== null) ajustes.pantallaCompleta = estado;
+    });
   }
 </script>
 
@@ -41,6 +46,7 @@
 </div>
 
 <ProgresoImportacion />
+<Ajustes />
 <Aviso />
 
 <style>
