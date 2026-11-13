@@ -1,6 +1,6 @@
 # 013 · Ajustes y pantalla completa
 
-- Estado: borrador
+- Estado: en curso
 - Fase: F2 (personalización de la interfaz)
 
 ## Qué y por qué
@@ -112,10 +112,11 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
 2. [x] Comandos `alternar_pantalla_completa` y `pantalla_completa`; atajo `F11`
        (y `Ctrl` + `Cmd` + `F` en macOS) en `+layout.svelte`; envoltorios en
        `biblioteca.ts`; pruebas (`lib/ajustes/pantalla.ts`).
-3. [ ] Capturas del diseño de la entrada y de la ventana de Ajustes (claro y
-       oscuro), para que Paulo las apruebe (`capturas/013-*.png`).
-4. [ ] Tokens con `data-tema` en `tokens.css` y estado del tema en
-       `lib/ajustes/`; pruebas.
+3. [x] Capturas del diseño de la entrada y de la ventana de Ajustes (claro y
+       oscuro), aprobadas por Paulo el 12 nov (`capturas/013-*.png`).
+4. [x] Tokens con `data-tema` en `tokens.css` y estado del tema en
+       `lib/ajustes/tema.svelte.ts`; pruebas (incluida una que comprueba
+       que los dos bloques oscuros de `tokens.css` son iguales).
 5. [ ] Entrada «Ajustes» en `MenuLateral.svelte` y ventana de Ajustes
        (`lib/ajustes/Ajustes.svelte`); pruebas.
 6. [ ] Prueba en la app real (Linux con Sway; Windows si se puede) y
