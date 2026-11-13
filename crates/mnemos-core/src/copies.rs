@@ -124,6 +124,7 @@ impl Library {
             ),
             params![copy_id, original_id],
         )?;
+        crate::tags::copy_tags(&tx, original_id, copy_id)?;
         tx.commit()?;
         Ok(copy_id)
     }
@@ -132,7 +133,7 @@ impl Library {
 /// Nombre y extensión de la copia: los del original si el formato no
 /// cambia (`IMG_1234.JPG` sigue en `.JPG`), o la extensión del formato de la
 /// copia (`IMG_1234.CR2` pasa a `.jpg`).
-fn copy_name(src: &Path, format: CopyFormat) -> Result<(String, String)> {
+pub(crate) fn copy_name(src: &Path, format: CopyFormat) -> Result<(String, String)> {
     let stem = src
         .file_stem()
         .and_then(|s| s.to_str())
@@ -374,6 +375,36 @@ mod tests {
         assert_eq!((report.added, report.updated, report.unchanged), (0, 0, 3));
         assert_eq!(copied_data(&s.lib, copy_id), copied_data(&s.lib, s.id));
         assert_eq!(file_state(&original), before);
+    }
+
+    #[test]
+    fn la_copia_lleva_las_etiquetas_del_original() {
+        let mut s = setup("IMG_1234.jpg", image::ImageFormat::Jpeg);
+        let playa = s.lib.create_tag("Playa").unwrap();
+        let abuela = s.lib.create_tag("Abuela").unwrap();
+        s.lib.add_tag(&[s.id], playa.id).unwrap();
+        s.lib.add_tag(&[s.id], abuela.id).unwrap();
+
+        let copy_id = s.lib.save_edit_as_copy(s.id, &giro()).unwrap();
+        let nombres = |id| -> Vec<String> {
+            s.lib
+                .photo_tags(id)
+                .unwrap()
+                .into_iter()
+                .map(|t| t.name)
+                .collect()
+        };
+        assert_eq!(nombres(copy_id), ["Abuela", "Playa"]);
+        let mut encontradas: Vec<i64> = s
+            .lib
+            .search_page(&crate::SearchQuery::parse("abuela"), None, 10)
+            .unwrap()
+            .photos
+            .iter()
+            .map(|p| p.id)
+            .collect();
+        encontradas.sort();
+        assert_eq!(encontradas, [s.id, copy_id]);
     }
 
     #[test]
