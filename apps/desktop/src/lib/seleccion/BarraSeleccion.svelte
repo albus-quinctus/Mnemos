@@ -7,12 +7,15 @@
     alternarFavoritos,
     avisos,
     enArchivo,
+    enPapelera,
+    enviarSeleccionAPapelera,
     todasFavoritas,
   } from "./acciones.svelte";
 
   const cuantas = $derived(seleccion.ids.size);
   const quitar = $derived(todasFavoritas());
   const desarchivar = $derived(enArchivo());
+  const papelera = $derived(enPapelera());
 </script>
 
 <header>
@@ -47,6 +50,18 @@
     <Icono nombre={desarchivar ? "desarchivar" : "archivo"} />
     <span>{desarchivar ? "Desarchivar" : "Archivar"}</span>
   </button>
+  {#if !papelera}
+    <button
+      type="button"
+      class="boton"
+      title="Enviar a la papelera (Supr)"
+      disabled={avisos.ocupado}
+      onclick={enviarSeleccionAPapelera}
+    >
+      <Icono nombre="papelera" />
+      <span>Papelera</span>
+    </button>
+  {/if}
 </header>
 
 <style>
