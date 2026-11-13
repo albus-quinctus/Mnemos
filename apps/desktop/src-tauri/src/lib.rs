@@ -4,6 +4,7 @@ mod duplicados;
 mod exportacion;
 #[cfg(target_os = "linux")]
 mod entorno_linux;
+mod etiquetas;
 mod media;
 mod organizacion;
 mod portatil;
@@ -119,17 +120,51 @@ fn recordar(app: &AppHandle, root: &Path) {
         Some(raiz) => portatil::para_guardar(raiz, root),
         None => root.to_owned(),
     };
-    let config = configuracion::Configuracion {
-        ultima_biblioteca: Some(ruta),
-    };
-    let guardado = carpeta_config(app).and_then(|carpeta| {
-        config
-            .guardar(&carpeta)
-            .map_err(|e| format!("no se pudo guardar la configuración: {e}"))
-    });
-    if let Err(e) = guardado {
+    if let Err(e) = cambiar_config(app, |config| config.ultima_biblioteca = Some(ruta)) {
         eprintln!("{e}");
     }
+}
+
+/// Cambia un campo de la configuración sin perder los demás.
+fn cambiar_config(
+    app: &AppHandle,
+    cambio: impl FnOnce(&mut configuracion::Configuracion),
+) -> Result<(), String> {
+    let carpeta = carpeta_config(app)?;
+    configuracion::Configuracion::cambiar(&carpeta, cambio)
+        .map_err(|e| format!("no se pudo guardar la configuración: {e}"))
+}
+
+/// Alterna la pantalla completa de la ventana (spec 013, tecla F11) y
+/// devuelve el estado pedido. En Wayland el compositor la concede después, así
+/// que `is_fullscreen` justo ahora aún daría el anterior; el interruptor de
+/// Ajustes vuelve a preguntar con `pantalla_completa` al abrirse.
+#[tauri::command]
+fn alternar_pantalla_completa(window: tauri::WebviewWindow) -> Result<bool, String> {
+    let ahora = window.is_fullscreen().map_err(|e| e.to_string())?;
+    window
+        .set_fullscreen(!ahora)
+        .map_err(|e| format!("no se pudo cambiar la pantalla completa: {e}"))?;
+    Ok(!ahora)
+}
+
+/// ¿Está la ventana en pantalla completa? Para el interruptor de Ajustes.
+#[tauri::command]
+fn pantalla_completa(window: tauri::WebviewWindow) -> Result<bool, String> {
+    window.is_fullscreen().map_err(|e| e.to_string())
+}
+
+/// Cambia el tema de la interfaz (spec 013): ajusta el tema nativo de la
+/// ventana y lo guarda para el próximo arranque. La página ya lo ha aplicado.
+#[tauri::command]
+fn poner_tema(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    tema: configuracion::Tema,
+) -> Result<(), String> {
+    // Si el sistema no admite cambiar el tema nativo, la página sigue bien.
+    let _ = window.set_theme(tema.nativo());
+    cambiar_config(&app, |config| config.tema = tema)
 }
 
 /// Arranca la cola de miniaturas y le pasa en segundo plano las que faltan:
@@ -494,11 +529,19 @@ fn serve(
 
 /// Crea la ventana principal. En modo portátil, los datos del WebView (caché,
 /// almacenamiento local) se guardan en el disco y no en el perfil del usuario.
+/// El tema elegido en Ajustes se aplica antes de cargar la página (spec 013).
 fn crear_ventana(app: &AppHandle, raiz: Option<&Path>) -> tauri::Result<()> {
+    let tema = carpeta_config(app)
+        .map(|carpeta| configuracion::Configuracion::leer(&carpeta).tema)
+        .unwrap_or_default();
     let mut ventana = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
         .title("MNEMOS")
         .inner_size(1200.0, 800.0)
-        .min_inner_size(640.0, 480.0);
+        .min_inner_size(640.0, 480.0)
+        .theme(tema.nativo());
+    if let Some(guion) = tema.guion_inicial() {
+        ventana = ventana.initialization_script(guion);
+    }
     if let Some(raiz) = raiz {
         ventana = ventana.data_directory(portatil::carpeta_webview(raiz));
     }
@@ -552,6 +595,9 @@ pub fn run() {
             cancelar_importacion,
             exportacion::exportar_varias,
             exportacion::cancelar_exportacion,
+            poner_tema,
+            alternar_pantalla_completa,
+            pantalla_completa,
             acceso_directo::acceso_directo_estado,
             acceso_directo::crear_acceso_directo,
             acceso_directo::quitar_acceso_directo,
@@ -566,7 +612,16 @@ pub fn run() {
             organizacion::seleccionar_dia,
             organizacion::seleccionar_rango,
             organizacion::titulos_dia,
-            organizacion::poner_titulo_dia
+            organizacion::poner_titulo_dia,
+            etiquetas::etiquetas,
+            etiquetas::crear_etiqueta,
+            etiquetas::renombrar_etiqueta,
+            etiquetas::unir_etiquetas,
+            etiquetas::borrar_etiqueta,
+            etiquetas::poner_etiqueta,
+            etiquetas::quitar_etiqueta,
+            etiquetas::etiquetas_de_foto,
+            etiquetas::uso_etiquetas
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");

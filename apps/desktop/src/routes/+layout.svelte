@@ -6,6 +6,9 @@
   import ProgresoExportacion from "$lib/exportacion/ProgresoExportacion.svelte";
   import { escucharImportacion } from "$lib/importacion/importacion.svelte";
   import ProgresoImportacion from "$lib/importacion/ProgresoImportacion.svelte";
+  import Ajustes from "$lib/ajustes/Ajustes.svelte";
+  import { ajustes } from "$lib/ajustes/estado.svelte";
+  import { esTeclaPantallaCompleta, pantallaCompleta } from "$lib/ajustes/pantalla";
   import Aviso from "$lib/seleccion/Aviso.svelte";
   import BarraSeleccion from "$lib/seleccion/BarraSeleccion.svelte";
   import { haySeleccion } from "$lib/seleccion/seleccion.svelte";
@@ -17,7 +20,21 @@
     escucharImportacion();
     escucharExportacion();
   });
+
+  // F11 alterna la pantalla completa en cualquier pantalla (spec 013): en la
+  // fase de captura, para que valga también en el visor, el editor y los campos
+  // de texto, y sin escribir nada en ellos.
+  function alPulsar(e: KeyboardEvent) {
+    if (!esTeclaPantallaCompleta(e)) return;
+    e.preventDefault();
+    // Con Ajustes abierta, el interruptor sigue a la tecla.
+    pantallaCompleta().then((estado) => {
+      if (estado !== null) ajustes.pantallaCompleta = estado;
+    });
+  }
 </script>
+
+<svelte:window onkeydowncapture={alPulsar} />
 
 <div class="galeria">
   <MenuLateral />
@@ -35,6 +52,7 @@
 
 <ProgresoImportacion />
 <ProgresoExportacion />
+<Ajustes />
 <Aviso />
 
 <style>
