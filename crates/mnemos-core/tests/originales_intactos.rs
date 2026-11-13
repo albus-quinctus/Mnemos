@@ -188,6 +188,38 @@ fn ninguna_accion_toca_los_originales() {
     );
     comprobar("eliminar un álbum");
 
+    // Etiquetas (spec 016): crear (con operadores de FTS5 en el nombre),
+    // poner, quitar, renombrar, unir y borrar. Solo cambia la base de datos;
+    // borrar una etiqueta no quita fotos.
+    let playa = lib.create_tag("Playa \"AND\" * / 🏖️").unwrap();
+    let viaje = lib.create_tag("Viaje").unwrap();
+    assert_eq!(lib.add_tag(&ids, playa.id).unwrap(), ids);
+    lib.add_tag(&ids[..1], viaje.id).unwrap();
+    comprobar("poner etiquetas");
+    lib.set_archived(&ids[..1], true).unwrap();
+    let dentro = lib
+        .view_page(View::Tag(playa.id), None, 100)
+        .unwrap()
+        .photos;
+    assert_eq!(dentro.len(), ids.len());
+    lib.set_archived(&ids[..1], false).unwrap();
+    lib.tag_usage(&ids).unwrap();
+    lib.photo_tags(ids[0]).unwrap();
+    lib.remove_tag(&ids[..1], playa.id).unwrap();
+    comprobar("quitar una etiqueta");
+    lib.rename_tag(playa.id, "..").unwrap();
+    comprobar("renombrar una etiqueta");
+    lib.merge_tags(viaje.id, playa.id).unwrap();
+    comprobar("unir etiquetas");
+    lib.delete_tag(playa.id).unwrap();
+    assert!(lib.tags().unwrap().is_empty());
+    assert_eq!(
+        lib.view_page(View::Photos, None, 100).unwrap().photos.len(),
+        ids.len(),
+        "borrar una etiqueta no quita fotos de la biblioteca"
+    );
+    comprobar("borrar una etiqueta");
+
     // Ver las vistas.
     for vista in [View::Photos, View::Favorites, View::Archive, View::Trash] {
         lib.view_months(vista).unwrap();

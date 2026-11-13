@@ -1,6 +1,6 @@
 # 016 · Etiquetas
 
-- Estado: en curso (diseño aprobado el 13 nov)
+- Estado: hecha, a falta de probarla en la app real (diseño aprobado el 13 nov)
 - Fase: F2
 
 ## Qué y por qué
@@ -115,21 +115,21 @@ existen desde la migración 0001 y siguen vacías.
   momento (menos de 50 ms con 500 etiquetas y 10 000 fotos).
 
 ## Criterios de aceptación
-- [ ] Crear, renombrar, unir y borrar etiquetas, con la regla de nombres
+- [x] Crear, renombrar, unir y borrar etiquetas, con la regla de nombres
   (prueba automática).
-- [ ] Poner y quitar una etiqueta a varias fotos en una transacción devuelve
+- [x] Poner y quitar una etiqueta a varias fotos en una transacción devuelve
   las fotos que han cambiado, y «Deshacer» las deja como estaban (prueba
   automática).
-- [ ] Buscar `playa` encuentra una foto con la etiqueta «Playa» y deja de
+- [x] Buscar `playa` encuentra una foto con la etiqueta «Playa» y deja de
   encontrarla al quitársela, renombrar la etiqueta o borrarla (prueba
   automática).
-- [ ] La vista de una etiqueta pagina con el mismo cursor que la cuadrícula e
+- [x] La vista de una etiqueta pagina con el mismo cursor que la cuadrícula e
   incluye las archivadas (prueba automática).
-- [ ] Guardar como copia conserva las etiquetas (prueba automática).
-- [ ] Etiquetar 10 000 fotos sintéticas tarda menos de 300 ms (en
+- [x] Guardar como copia conserva las etiquetas (prueba automática).
+- [x] Etiquetar 10 000 fotos sintéticas tarda menos de 300 ms (en
   `docs/rendimiento.md`).
 - [x] Paulo aprueba las capturas del diseño antes de programar la interfaz.
-- [ ] Los originales no se modifican (prueba automática).
+- [x] Los originales no se modifican (prueba automática).
 
 ## Fuera de alcance
 - Escribir las etiquetas en los archivos (XMP, IPTC) o leerlas de ellos.
@@ -158,5 +158,5 @@ existen desde la migración 0001 y siguen vacías.
 7. [x] Botón Etiquetar en la barra de selección, con su desplegable,
    «Quitar de la etiqueta» y el aviso con «Deshacer».
 8. [x] Sección Etiquetas en el panel Detalles del visor y tecla `T`.
-9. [ ] Prueba de que ninguna acción de etiquetas cambia los originales,
+9. [x] Prueba de que ninguna acción de etiquetas cambia los originales,
    `docs/arquitectura.md` y `docs/progreso.md`.
