@@ -136,7 +136,10 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
        Takeout se añade si su `.json` se aplica en esta importación (la foto
        suele venir en la carpeta del año y en la del álbum); sin `.json`, como
        antes.
-3. [ ] Comandos de Tauri y envoltorios en `biblioteca.ts`.
+3. [x] Comandos de Tauri y envoltorios en `biblioteca.ts`: `albumes`, `album`,
+       `crear_album` (con fotos o vacío), `renombrar_album`, `eliminar_album`,
+       `anadir_a_album` y `quitar_de_album` (`src-tauri/src/albumes.rs`); la
+       portada lleva su versión de edición (`cover_edit_version`).
 4. [x] Capturas del diseño (pantalla Álbumes, dentro de un álbum, «Añadir a
        álbum» y eliminar), en claro y oscuro, aprobadas por Paulo el 12 nov
        (`capturas/014-*.png`).

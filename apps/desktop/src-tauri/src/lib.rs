@@ -1,4 +1,5 @@
 mod acceso_directo;
+mod albumes;
 mod configuracion;
 mod duplicados;
 #[cfg(target_os = "linux")]
@@ -613,6 +614,13 @@ pub fn run() {
             organizacion::seleccionar_rango,
             organizacion::titulos_dia,
             organizacion::poner_titulo_dia,
+            albumes::albumes,
+            albumes::album,
+            albumes::crear_album,
+            albumes::renombrar_album,
+            albumes::eliminar_album,
+            albumes::anadir_a_album,
+            albumes::quitar_de_album,
             etiquetas::etiquetas,
             etiquetas::crear_etiqueta,
             etiquetas::renombrar_etiqueta,
