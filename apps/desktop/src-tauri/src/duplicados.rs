@@ -1,7 +1,7 @@
 //! Comandos de la vista de duplicados (spec 010). Solo consultan: ninguno
 //! borra, mueve ni marca fotos.
 
-use mnemos_core::{DuplicateCursor, DuplicatePage, DuplicateSummary, Library};
+use mnemos_core::{DuplicateCopy, DuplicateCursor, DuplicatePage, DuplicateSummary, Library};
 use tauri::State;
 
 use crate::{OpenLibrary, with_library};
@@ -23,4 +23,14 @@ pub fn duplicados_grupos(
     with_library(&estado, |lib| {
         lib.duplicate_groups(despues.as_ref(), limite)
     })
+}
+
+/// Las otras fotos con la misma huella que `id` (spec 018): comparten su
+/// receta, así que el editor avisa antes de guardar como original.
+#[tauri::command]
+pub fn copias_identicas(
+    id: i64,
+    estado: State<'_, OpenLibrary>,
+) -> Result<Vec<DuplicateCopy>, String> {
+    with_library(&estado, |lib| lib.identical_copies(id))
 }
