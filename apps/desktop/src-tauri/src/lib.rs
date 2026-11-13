@@ -1,10 +1,10 @@
 mod acceso_directo;
 mod configuracion;
 mod duplicados;
-mod exportacion;
 #[cfg(target_os = "linux")]
 mod entorno_linux;
 mod etiquetas;
+mod exportacion;
 mod media;
 mod organizacion;
 mod portatil;
