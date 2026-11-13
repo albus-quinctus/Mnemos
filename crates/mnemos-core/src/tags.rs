@@ -180,6 +180,111 @@ impl Library {
     }
 }
 
+/// Cuántas fotos de una selección tienen cada etiqueta, para las casillas
+/// del desplegable «Etiquetar»: todas, algunas o ninguna.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TagUsage {
+    pub tag: i64,
+    pub photos: u64,
+}
+
+impl Library {
+    /// Pone la etiqueta `tag` a las fotos `ids` en una transacción. Devuelve
+    /// las que no la tenían, en el orden recibido y sin repetir, para
+    /// «Deshacer». Los ids que no existen se ignoran.
+    pub fn add_tag(&mut self, ids: &[i64], tag: i64) -> Result<Vec<i64>> {
+        self.change_tag(
+            ids,
+            tag,
+            "INSERT OR IGNORE INTO photo_tags (photo_id, tag_id)
+             SELECT id, ?2 FROM photos WHERE id = ?1",
+        )
+    }
+
+    /// Quita la etiqueta `tag` a las fotos `ids` en una transacción. Devuelve
+    /// las que la tenían, para «Deshacer».
+    pub fn remove_tag(&mut self, ids: &[i64], tag: i64) -> Result<Vec<i64>> {
+        self.change_tag(
+            ids,
+            tag,
+            "DELETE FROM photo_tags WHERE photo_id = ?1 AND tag_id = ?2",
+        )
+    }
+
+    fn change_tag(&mut self, ids: &[i64], tag: i64, sql: &str) -> Result<Vec<i64>> {
+        let tx = self.conn.transaction()?;
+        ensure_exists(&tx, tag)?;
+        let mut changed = Vec::new();
+        {
+            // Una fila por sentencia, como en Favoritos: sin límite de
+            // parámetros con selecciones de decenas de miles de fotos.
+            let mut stmt = tx.prepare(sql)?;
+            for &id in ids {
+                if stmt.execute([id, tag])? > 0 {
+                    changed.push(id);
+                }
+            }
+        }
+        refresh_search(&tx, &changed)?;
+        tx.commit()?;
+        Ok(changed)
+    }
+
+    /// Etiquetas de una foto, por nombre.
+    pub fn photo_tags(&self, photo: i64) -> Result<Vec<Tag>> {
+        self.tags_where(
+            "WHERE t.id IN (SELECT tag_id FROM photo_tags WHERE photo_id = ?1)",
+            [photo],
+        )
+    }
+
+    /// Cuántas de las fotos `ids` tiene cada etiqueta. Solo salen las
+    /// etiquetas que tiene alguna; las demás no las tiene ninguna.
+    pub fn tag_usage(&self, ids: &[i64]) -> Result<Vec<TagUsage>> {
+        // La selección va a una tabla temporal, que vive en memoria y no
+        // toca el archivo de la biblioteca.
+        self.conn.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS tag_usage_ids (id INTEGER PRIMARY KEY);
+             DELETE FROM temp.tag_usage_ids;",
+        )?;
+        {
+            let mut insert = self
+                .conn
+                .prepare("INSERT OR IGNORE INTO temp.tag_usage_ids (id) VALUES (?1)")?;
+            for &id in ids {
+                insert.execute([id])?;
+            }
+        }
+        let usage = self
+            .conn
+            .prepare(
+                "SELECT pt.tag_id, count(*) FROM temp.tag_usage_ids s
+                   JOIN photo_tags pt ON pt.photo_id = s.id
+                  GROUP BY pt.tag_id ORDER BY pt.tag_id",
+            )?
+            .query_map([], |r| {
+                Ok(TagUsage {
+                    tag: r.get(0)?,
+                    photos: r.get::<_, i64>(1)? as u64,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        self.conn.execute("DELETE FROM temp.tag_usage_ids", [])?;
+        Ok(usage)
+    }
+}
+
+/// Pasa a la foto `copy` las etiquetas de `original` (guardar como copia,
+/// spec 009) y rehace su fila del índice de búsqueda.
+pub(crate) fn copy_tags(tx: &Transaction<'_>, original: i64, copy: i64) -> Result<()> {
+    tx.execute(
+        "INSERT OR IGNORE INTO photo_tags (photo_id, tag_id)
+         SELECT ?2, tag_id FROM photo_tags WHERE photo_id = ?1",
+        params![original, copy],
+    )?;
+    refresh_search(tx, &[copy])
+}
+
 fn find_by_name(conn: &Connection, name: &str) -> Result<Option<i64>> {
     // Lo normal es que coincida tal cual o en ASCII sin mayúsculas: lo
     // resuelve el índice único. Si no, se comparan todos los nombres en
@@ -439,5 +544,164 @@ pub(crate) mod tests {
                 .unwrap();
         }
         assert_eq!(found(&lib, "c'est"), [1]);
+    }
+
+    #[test]
+    fn poner_y_quitar_devuelve_lo_que_cambia_y_deshacer_lo_deja_igual() {
+        let (_dir, mut lib) = library(5);
+        let playa = lib.create_tag("Playa").unwrap();
+        assert_eq!(lib.add_tag(&[1], playa.id).unwrap(), [1]);
+        // Selección mixta: la 1 ya la tenía, la 99 no existe y la 3 va repetida.
+        let puestas = lib.add_tag(&[1, 3, 99, 3, 2], playa.id).unwrap();
+        assert_eq!(puestas, [3, 2]);
+        assert_eq!(found(&lib, "playa"), [1, 2, 3]);
+
+        // Deshacer quita solo las que se pusieron.
+        assert_eq!(lib.remove_tag(&puestas, playa.id).unwrap(), [3, 2]);
+        assert_eq!(found(&lib, "playa"), [1]);
+        assert!(lib.remove_tag(&[4, 5], playa.id).unwrap().is_empty());
+        assert!(matches!(
+            lib.add_tag(&[1], 999),
+            Err(Error::TagNotFound(999))
+        ));
+    }
+
+    #[test]
+    fn la_busqueda_combina_ruta_etiquetas_y_fecha() {
+        let (_dir, mut lib) = library(3);
+        let playa = lib.create_tag("Playa de Málaga").unwrap();
+        let abuela = lib.create_tag("Abuela").unwrap();
+        lib.add_tag(&[1, 2], playa.id).unwrap();
+        lib.add_tag(&[2], abuela.id).unwrap();
+        assert_eq!(found(&lib, "malaga"), [1, 2]);
+        assert_eq!(found(&lib, "PLA abu"), [2]);
+        assert_eq!(found(&lib, "originales abuela"), [2]);
+    }
+
+    #[test]
+    fn etiquetas_de_una_foto_y_uso_en_una_seleccion() {
+        let (_dir, mut lib) = library(4);
+        let playa = lib.create_tag("Playa").unwrap();
+        let abuela = lib.create_tag("Abuela").unwrap();
+        lib.create_tag("Gatos").unwrap();
+        lib.add_tag(&[1, 2, 3], playa.id).unwrap();
+        lib.add_tag(&[2], abuela.id).unwrap();
+
+        let de_la_2: Vec<String> = lib
+            .photo_tags(2)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.name)
+            .collect();
+        assert_eq!(de_la_2, ["Abuela", "Playa"]);
+        assert!(lib.photo_tags(4).unwrap().is_empty());
+
+        let uso = lib.tag_usage(&[2, 3, 4, 2]).unwrap();
+        assert_eq!(
+            uso,
+            [
+                TagUsage {
+                    tag: playa.id,
+                    photos: 2
+                },
+                TagUsage {
+                    tag: abuela.id,
+                    photos: 1
+                },
+            ]
+        );
+        assert!(lib.tag_usage(&[]).unwrap().is_empty());
+        // Otra selección no arrastra la anterior.
+        assert_eq!(
+            lib.tag_usage(&[1]).unwrap(),
+            [TagUsage {
+                tag: playa.id,
+                photos: 1
+            }]
+        );
+    }
+
+    #[test]
+    fn si_falla_a_mitad_no_cambia_ninguna_foto() {
+        let (_dir, mut lib) = library(5);
+        let playa = lib.create_tag("Playa").unwrap();
+        lib.conn
+            .execute_batch(
+                "CREATE TRIGGER fallo BEFORE INSERT ON photo_tags WHEN NEW.photo_id = 4
+                 BEGIN SELECT RAISE(ABORT, 'disco desconectado'); END;",
+            )
+            .unwrap();
+        assert!(lib.add_tag(&[1, 2, 3, 4, 5], playa.id).is_err());
+        assert_eq!(lib.tag(playa.id).unwrap().photos, 0);
+        assert!(found(&lib, "playa").is_empty());
+    }
+
+    #[test]
+    fn selecciones_enormes() {
+        let (_dir, mut lib) = library(40_000);
+        let playa = lib.create_tag("Playa").unwrap();
+        let todas: Vec<i64> = (1..=40_000).collect();
+        assert_eq!(lib.add_tag(&todas, playa.id).unwrap().len(), 40_000);
+        assert_eq!(
+            lib.tag_usage(&todas).unwrap(),
+            [TagUsage {
+                tag: playa.id,
+                photos: 40_000
+            }]
+        );
+        assert_eq!(lib.tag(playa.id).unwrap().cover, Some(40_000));
+    }
+
+    #[test]
+    fn la_vista_de_una_etiqueta_pagina_e_incluye_las_archivadas() {
+        use crate::selection::Scope;
+        use crate::timeline::View;
+
+        let (_dir, mut lib) = library(6);
+        let playa = lib.create_tag("Playa").unwrap();
+        let otra = lib.create_tag("Otra").unwrap();
+        lib.add_tag(&[1, 3, 4, 6], playa.id).unwrap();
+        lib.add_tag(&[2], otra.id).unwrap();
+        lib.set_archived(&[4], true).unwrap();
+
+        let vista = View::Tag(playa.id);
+        let total: u64 = lib
+            .view_months(vista)
+            .unwrap()
+            .iter()
+            .map(|m| m.photos)
+            .sum();
+        assert_eq!(total, 4);
+
+        // De la más reciente (id mayor) a la más antigua, de dos en dos.
+        let primera = lib.view_page(vista, None, 2).unwrap();
+        let ids: Vec<i64> = primera.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [6, 4]);
+        assert!(primera.photos[1].archived);
+        let segunda = lib.view_page(vista, primera.next, 2).unwrap();
+        let ids: Vec<i64> = segunda.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [3, 1]);
+        assert!(segunda.next.is_none());
+
+        assert_eq!(lib.select_all(Scope::View(vista)).unwrap(), [6, 4, 3, 1]);
+        assert!(
+            lib.view_page(View::Tag(999), None, 10)
+                .unwrap()
+                .photos
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn la_vista_de_una_etiqueta_viaja_como_objeto() {
+        use crate::timeline::View;
+        let v: View = serde_json::from_str(r#"{"etiqueta": 7}"#).unwrap();
+        assert_eq!(v, View::Tag(7));
+        let v: View = serde_json::from_str(r#""favoritos""#).unwrap();
+        assert_eq!(v, View::Favorites);
+        assert_eq!(
+            serde_json::to_string(&View::Tag(7)).unwrap(),
+            r#"{"etiqueta":7}"#
+        );
     }
 }

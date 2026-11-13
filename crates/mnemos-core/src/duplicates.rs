@@ -7,7 +7,7 @@
 
 use std::io;
 
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -147,9 +147,7 @@ impl Library {
                 .collect::<rusqlite::Result<Vec<_>>>()?
                 .into_iter()
                 .map(|mut c| {
-                    c.exists = RelPath::new(&c.rel_path)
-                        .map(|p| p.to_path(&self.root).is_file())
-                        .unwrap_or(false);
+                    c.exists = self.copy_exists(&c.rel_path);
                     c
                 })
                 .collect();
@@ -168,6 +166,54 @@ impl Library {
             None
         };
         Ok(DuplicatePage { groups, next })
+    }
+
+    /// Las otras fotos con la misma huella que `id`, sin incluirla, por orden
+    /// de llegada (spec 018). Comparten su receta de edición, así que el
+    /// editor avisa antes de guardar. Solo consulta; una foto sin huella
+    /// devuelve una lista vacía.
+    pub fn identical_copies(&self, id: i64) -> Result<Vec<DuplicateCopy>> {
+        let hash: Option<String> = self
+            .conn
+            .query_row("SELECT content_hash FROM photos WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()?
+            .ok_or(Error::PhotoNotFound(id))?;
+        let Some(hash) = hash else {
+            return Ok(Vec::new());
+        };
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL
+             FROM photos WHERE content_hash = ?1 AND id <> ?2
+             ORDER BY imported_at, id"
+        ))?;
+        let copies = stmt
+            .query_map(params![hash, id], |r| {
+                Ok(DuplicateCopy {
+                    id: r.get(0)?,
+                    rel_path: r.get(1)?,
+                    size_bytes: r.get(2)?,
+                    date: r.get(3)?,
+                    favorite: r.get(4)?,
+                    archived: r.get(5)?,
+                    exists: false,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .map(|mut c| {
+                c.exists = self.copy_exists(&c.rel_path);
+                c
+            })
+            .collect();
+        Ok(copies)
+    }
+
+    fn copy_exists(&self, rel_path: &str) -> bool {
+        RelPath::new(rel_path)
+            .map(|p| p.to_path(&self.root).is_file())
+            .unwrap_or(false)
     }
 }
 
@@ -297,6 +343,90 @@ mod tests {
         }
         assert_eq!(lib.duplicate_summary().unwrap().groups, 0);
         assert!(lib.duplicate_groups(None, 10).unwrap().groups.is_empty());
+    }
+
+    fn id_of(lib: &Library, rel: &str) -> i64 {
+        lib.conn
+            .query_row("SELECT id FROM photos WHERE rel_path = ?1", [rel], |r| {
+                r.get(0)
+            })
+            .unwrap()
+    }
+
+    #[test]
+    fn copias_identicas_de_una_foto_sin_incluirla_y_en_orden() {
+        let (dir, mut lib) = library();
+        let o = originals(&dir);
+        for rel in ["a/1.png", "b/2.png", "c/3.png"] {
+            write_png(&o.join(rel), 4, 4, b"igual");
+        }
+        write_png(&o.join("sola.png"), 4, 4, b"otra");
+        lib.index().unwrap();
+        fs::remove_file(o.join("c/3.png")).unwrap();
+
+        let segunda = id_of(&lib, "Originales/b/2.png");
+        let copias = lib.identical_copies(segunda).unwrap();
+        let mut esperadas: Vec<i64> = ["Originales/a/1.png", "Originales/c/3.png"]
+            .iter()
+            .map(|r| id_of(&lib, r))
+            .collect();
+        esperadas.sort();
+        let mut ids: Vec<i64> = copias.iter().map(|c| c.id).collect();
+        let en_orden = ids.clone();
+        ids.sort();
+        assert_eq!(ids, esperadas);
+        assert!(!copias.iter().any(|c| c.id == segunda));
+        // Orden de llegada: el mismo que en los grupos de la spec 010.
+        let grupo: Vec<i64> = all_groups(&lib, 10)[0]
+            .copies
+            .iter()
+            .map(|c| c.id)
+            .filter(|&i| i != segunda)
+            .collect();
+        assert_eq!(en_orden, grupo);
+        let desaparecida = copias
+            .iter()
+            .find(|c| c.rel_path == "Originales/c/3.png")
+            .unwrap();
+        assert!(!desaparecida.exists);
+
+        let sola = id_of(&lib, "Originales/sola.png");
+        assert!(lib.identical_copies(sola).unwrap().is_empty());
+        assert!(matches!(
+            lib.identical_copies(9999),
+            Err(Error::PhotoNotFound(9999))
+        ));
+    }
+
+    #[test]
+    fn una_foto_sin_huella_no_tiene_copias_identicas() {
+        let (_dir, lib) = library();
+        for rel in ["Originales/a.png", "Originales/b.png"] {
+            lib.conn
+                .execute(
+                    "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at)
+                     VALUES (?1, 10, 0, 0)",
+                    [rel],
+                )
+                .unwrap();
+        }
+        let id = id_of(&lib, "Originales/a.png");
+        assert!(lib.identical_copies(id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn buscar_copias_identicas_no_cambia_nada() {
+        let (dir, mut lib) = library();
+        let o = originals(&dir);
+        write_png(&o.join("x.png"), 4, 4, b"x");
+        write_png(&o.join("y.png"), 4, 4, b"x");
+        lib.index().unwrap();
+        let antes = snapshot(dir.path());
+        let cambios = lib.conn.total_changes();
+        let id = id_of(&lib, "Originales/x.png");
+        assert_eq!(lib.identical_copies(id).unwrap().len(), 1);
+        assert_eq!(lib.conn.total_changes(), cambios);
+        assert_eq!(snapshot(dir.path()), antes);
     }
 
     #[test]

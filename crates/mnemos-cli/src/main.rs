@@ -14,7 +14,8 @@ const USAGE: &str = "Uso:
   mnemos index <biblioteca>           Registra las fotos que hay en Originales/
   mnemos import <biblioteca> <origen> Copia las fotos de <origen> a la biblioteca
   mnemos miniaturas <biblioteca>      Genera las miniaturas que faltan
-  mnemos duplicados <biblioteca>      Lista las fotos repetidas (no borra nada)";
+  mnemos duplicados <biblioteca>      Lista las fotos repetidas (no borra nada)
+  mnemos etiquetas <biblioteca>       Lista las etiquetas y cuántas fotos tienen";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -32,6 +33,7 @@ fn main() -> ExitCode {
             .and_then(|lib| lib.generate_thumbnails())
             .map(|r| print_thumbnails(&r)),
         ["duplicados", lib] => Library::open(Path::new(lib)).and_then(|lib| print_duplicates(&lib)),
+        ["etiquetas", lib] => Library::open(Path::new(lib)).and_then(|lib| print_tags(&lib)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -85,6 +87,19 @@ fn print_thumbnails(r: &ThumbnailReport) -> bool {
 }
 
 /// Lista los grupos de fotos repetidas. Solo consulta: no toca nada.
+fn print_tags(lib: &Library) -> Result<bool> {
+    let tags = lib.tags()?;
+    if tags.is_empty() {
+        println!("No hay etiquetas.");
+        return Ok(true);
+    }
+    for tag in &tags {
+        let fotos = if tag.photos == 1 { "foto" } else { "fotos" };
+        println!("{:>7} {fotos:<5}  {}", tag.photos, tag.name);
+    }
+    Ok(true)
+}
+
 fn print_duplicates(lib: &Library) -> Result<bool> {
     let s = lib.duplicate_summary()?;
     if s.groups == 0 {
