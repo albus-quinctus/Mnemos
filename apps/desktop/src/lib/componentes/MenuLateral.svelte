@@ -1,6 +1,7 @@
 <script lang="ts">
   import { irA, navegacion, type Seccion } from "$lib/navegacion.svelte";
   import AccesoDirecto from "$lib/acceso-directo/AccesoDirecto.svelte";
+  import { abrirAjustes, ajustes } from "$lib/ajustes/estado.svelte";
   import Icono, { type NombreIcono } from "./Icono.svelte";
 
   type Entrada = { nombre: string; icono: NombreIcono; seccion?: Seccion };
@@ -49,6 +50,16 @@
   <hr />
   {@render lista(utilidades)}
   <div class="relleno"></div>
+  <hr />
+  <button
+    type="button"
+    class:actual={ajustes.abierta}
+    aria-haspopup="dialog"
+    onclick={abrirAjustes}
+  >
+    <Icono nombre="ajustes" />
+    <span>Ajustes</span>
+  </button>
   <AccesoDirecto />
 </nav>
 
