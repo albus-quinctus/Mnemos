@@ -1,5 +1,5 @@
-/* Tokens de color y tipografía (decisión 003). Claro por defecto y oscuro
-   según la preferencia del sistema; los componentes solo usan variables. */
+/* Tokens de color y tipografía (decisión 003). Claro u oscuro según el
+   sistema o lo elegido en Ajustes (spec 013); los componentes solo usan variables. */
 
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
@@ -36,8 +36,10 @@
   --barra-alto: 64px;
 }
 
+/* Oscuro según el sistema, salvo que se elija Claro en Ajustes (spec 013);
+   con Oscuro elegido, siempre. Las dos listas deben ser iguales. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --fondo: #121315;
     --superficie: #1a1b1e;
     --superficie-alta: #25272b;
@@ -50,6 +52,25 @@
     --hueco: #222428;
     --error: #f2938c;
   }
+}
+
+:root[data-tema="oscuro"] {
+  --fondo: #121315;
+  --superficie: #1a1b1e;
+  --superficie-alta: #25272b;
+  --texto: #e8e9eb;
+  --texto-suave: #a3a7ae;
+  --borde: #33363b;
+  --acento: #7aa7f5;
+  --acento-texto: #0d1a33;
+  --acento-suave: #1d2a40;
+  --hueco: #222428;
+  --error: #f2938c;
+  color-scheme: dark;
+}
+
+:root[data-tema="claro"] {
+  color-scheme: light;
 }
 
 *,
