@@ -149,7 +149,7 @@ fn verify(dest: PathBuf, hash: &str, src: &Path) -> Result<PathBuf> {
 }
 
 /// Indica si `dir` es la biblioteca de `root` o está dentro de ella.
-fn inside(root: &Path, dir: &Path) -> Result<bool> {
+pub(crate) fn inside(root: &Path, dir: &Path) -> Result<bool> {
     let root = fs::canonicalize(root)?;
     let dir = fs::canonicalize(dir)?;
     Ok(dir.starts_with(root))
