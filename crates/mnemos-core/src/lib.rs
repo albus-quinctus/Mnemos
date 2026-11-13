@@ -25,6 +25,7 @@ mod taken;
 mod takeout;
 pub mod thumbnails;
 pub mod timeline;
+pub mod trash;
 
 pub use albums::{Album, MAX_ALBUM_NAME};
 pub use day_titles::{DayTitle, MAX_DAY_TITLE};
@@ -43,3 +44,4 @@ pub use selection::Scope;
 pub use tags::{MAX_TAG_NAME, Tag, TagUsage};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
 pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage, View};
+pub use trash::{AutoEmpty, DeleteFailure, DeleteReport, TRASH_DAYS, TrashEntry};

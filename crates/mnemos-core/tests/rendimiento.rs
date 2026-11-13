@@ -203,6 +203,28 @@ fn biblioteca_de_10000_fotos() {
     }
     lib.set_archived(&todas, false).unwrap();
 
+    // Papelera (spec 015): enviar y restaurar la biblioteca entera, y la vista
+    // Papelera llena, que es su peor caso.
+    let (_, tiempo_enviar) = medir("enviar todas a la Papelera", || {
+        lib.send_to_trash(&todas).unwrap()
+    });
+    let ((meses, pagina), tiempo_vista_papelera) =
+        medir("vista Papelera: meses y 1.ª página", || {
+            (
+                lib.view_months(View::Trash).unwrap(),
+                lib.view_page(View::Trash, None, PAGINA).unwrap(),
+            )
+        });
+    assert_eq!(
+        meses.iter().map(|m| m.photos as usize).sum::<usize>(),
+        total
+    );
+    assert_eq!(pagina.photos.len(), PAGINA as usize);
+    let (_, tiempo_restaurar) = medir("restaurar todas", || {
+        lib.restore_from_trash(&todas).unwrap()
+    });
+    let peor_vista = peor_vista.max(tiempo_vista_papelera);
+
     // Selección sin cargar páginas: Ctrl + A y un rango de punta a punta.
     let fotos = Scope::View(View::Photos);
     let (seleccion, tiempo_todo) = medir("seleccionar todo (Ctrl + A)", || {
@@ -258,6 +280,10 @@ fn biblioteca_de_10000_fotos() {
     assert!(
         tiempo_favoritos.max(tiempo_archivar) < Duration::from_secs(1),
         "{tiempo_favoritos:?} {tiempo_archivar:?}"
+    );
+    assert!(
+        tiempo_enviar.max(tiempo_restaurar) < Duration::from_secs(1),
+        "{tiempo_enviar:?} {tiempo_restaurar:?}"
     );
     assert!(peor_vista < Duration::from_millis(200), "{peor_vista:?}");
     assert!(

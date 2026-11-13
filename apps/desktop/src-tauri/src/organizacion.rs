@@ -1,4 +1,5 @@
-//! Comandos de la spec 006: vistas Fotos, Favoritos y Archivo, selección
+//! Comandos de la spec 006: vistas Fotos, Favoritos, Archivo (y Papelera, spec
+//! 015), selección
 //! múltiple, favoritos, archivo y títulos de día. Solo cambian la base de
 //! datos; ninguno toca los archivos.
 
@@ -127,6 +128,7 @@ mod tests {
         assert!(matches!(vista, Ambito::Vista(View::Archive)));
         let busqueda: Ambito = serde_json::from_str(r#"{"busqueda": "playa 2024"}"#).unwrap();
         assert!(matches!(busqueda, Ambito::Busqueda(ref t) if t == "playa 2024"));
-        assert!(serde_json::from_str::<Ambito>(r#"{"vista": "papelera"}"#).is_err());
+        let papelera: Ambito = serde_json::from_str(r#"{"vista": "papelera"}"#).unwrap();
+        assert!(matches!(papelera, Ambito::Vista(View::Trash)));
     }
 }

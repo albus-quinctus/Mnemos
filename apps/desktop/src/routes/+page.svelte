@@ -9,6 +9,7 @@
   import { navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
+  import { vaciarCaducadas } from "$lib/papelera/papelera.svelte";
 
   type LibraryInfo = {
     root: string;
@@ -34,6 +35,8 @@
     error = "";
     try {
       info = await invoke<LibraryInfo>(comando, { ruta });
+      // Lo que lleva 30 días en la Papelera se elimina al abrir y cada hora.
+      vaciarCaducadas();
     } catch (e) {
       error = String(e);
     } finally {
@@ -94,8 +97,8 @@
         <Cuadricula activa={!tapada} />
       </div>
     {/key}
-    <!-- Favoritos y Archivo empiezan de cero cada vez que se abren. -->
-    {#if navegacion.seccion === "favoritos" || navegacion.seccion === "archivo"}
+    <!-- Favoritos, Archivo y Papelera empiezan de cero cada vez que se abren. -->
+    {#if navegacion.seccion === "favoritos" || navegacion.seccion === "archivo" || navegacion.seccion === "papelera"}
       {#key `${info.root}#${importacion.version}#${navegacion.seccion}`}
         <div class="capa encima" class:oculta={busqueda.consulta !== ""}>
           <Cuadricula vista={navegacion.seccion} activa={!busqueda.consulta} />
