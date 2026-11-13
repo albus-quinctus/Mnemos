@@ -157,6 +157,6 @@ existen desde la migración 0001 y siguen vacías.
    lateral.
 7. [x] Botón Etiquetar en la barra de selección, con su desplegable,
    «Quitar de la etiqueta» y el aviso con «Deshacer».
-8. [ ] Sección Etiquetas en el panel Detalles del visor y tecla `T`.
+8. [x] Sección Etiquetas en el panel Detalles del visor y tecla `T`.
 9. [ ] Prueba de que ninguna acción de etiquetas cambia los originales,
    `docs/arquitectura.md` y `docs/progreso.md`.
