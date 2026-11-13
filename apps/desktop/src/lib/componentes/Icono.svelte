@@ -26,6 +26,9 @@
     vertical: "M7 4h10v16H7zM19 9l2 2-2 2M5 9l-2 2 2 2",
     desplegar: "m6 9 6 6 6-6",
     acceso: "M3 5h18v11H3zM9 20h6M12 16v4M12 8v5M9.5 10.5h5",
+    ajustes:
+      "M18.5 9.3 20.8 10v4l-2.3.7 1.1 2.1-2.8 2.8-2.1-1.1-.7 2.3h-4l-.7-2.3-2.1 1.1-2.8-2.8 1.1-2.1-2.3-.7v-4l2.3-.7-1.1-2.1 2.8-2.8 2.1 1.1.7-2.3h4l.7 2.3 2.1-1.1 2.8 2.8-1.1 2.1ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+    pantalla: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;
