@@ -219,16 +219,24 @@ fn is_year_folder(name: &str) -> bool {
 ///
 /// La descripción, la ubicación, la favorita y el archivo se aplican una sola
 /// vez por foto (`takeout_at`), para no deshacer lo que el usuario cambie
-/// después. El álbum se añade siempre, sin repetir entradas.
+/// después. El álbum también se aplica una sola vez (spec 014), para que
+/// volver a importar no resucite un álbum eliminado ni devuelva a él las
+/// fotos quitadas a mano: se añade si el `.json` se aplica ahora o se aplicó
+/// antes en esta misma importación (`fresh`; la foto suele estar en la
+/// carpeta del año y en la del álbum). Sin `.json` no hay forma de saberlo y
+/// el álbum se añade, sin repetir entradas. Devuelve si el `.json` se aplicó
+/// ahora.
 pub(crate) fn apply(
     conn: &Connection,
     hash: &str,
     meta: Option<&PhotoMeta>,
     album: Option<&str>,
-) -> Result<()> {
+    fresh: bool,
+) -> Result<bool> {
+    let mut applied = false;
     if let Some(meta) = meta {
         let geo = meta.geo;
-        conn.execute(
+        applied = conn.execute(
             "UPDATE photos SET
                  description = coalesce(description, ?2),
                  latitude    = CASE WHEN latitude IS NULL THEN ?3 ELSE latitude END,
@@ -248,9 +256,9 @@ pub(crate) fn apply(
                 meta.favorited,
                 meta.archived,
             ],
-        )?;
+        )? > 0;
     }
-    if let Some(name) = album {
+    if let Some(name) = album.filter(|_| meta.is_none() || applied || fresh) {
         let album_id = album_id(conn, name)?;
         conn.execute(
             "INSERT OR IGNORE INTO album_photos (album_id, photo_id, position)
@@ -260,7 +268,7 @@ pub(crate) fn apply(
             params![album_id, hash],
         )?;
     }
-    Ok(())
+    Ok(applied)
 }
 
 /// Id del álbum con este nombre; si no existe, lo crea.

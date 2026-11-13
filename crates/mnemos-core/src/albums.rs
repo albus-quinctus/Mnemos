@@ -21,7 +21,7 @@ pub const MAX_ALBUM_NAME: usize = 100;
 pub struct Album {
     pub id: i64,
     pub name: String,
-    /// Número de fotos, archivadas incluidas.
+    /// Número de fotos, archivadas incluidas y sin las de la Papelera.
     pub photos: u64,
     /// La foto más reciente del álbum, que hace de portada. `None` si está
     /// vacío.
@@ -40,7 +40,7 @@ const SELECT: &str = "
     SELECT a.id, a.name, count(p.id),
            (SELECT p2.id FROM album_photos ap2
                 JOIN photos p2 ON p2.id = ap2.photo_id
-            WHERE ap2.album_id = a.id
+            WHERE ap2.album_id = a.id AND p2.trashed_at IS NULL
             ORDER BY coalesce(p2.taken_at, p2.modified_at) DESC, p2.id DESC
             LIMIT 1),
            min(coalesce(p.taken_at, p.modified_at)),
@@ -48,7 +48,7 @@ const SELECT: &str = "
            a.updated_at
     FROM albums a
          LEFT JOIN album_photos ap ON ap.album_id = a.id
-         LEFT JOIN photos p ON p.id = ap.photo_id";
+         LEFT JOIN photos p ON p.id = ap.photo_id AND p.trashed_at IS NULL";
 
 fn album_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Album> {
     Ok(Album {
@@ -127,6 +127,68 @@ impl Library {
         }
         Ok(())
     }
+
+    /// Añade las fotos `ids` al final del álbum `album` en una transacción.
+    /// Devuelve las que no estaban, en el orden recibido y sin repetir. Los
+    /// ids que no existen se ignoran. Si cambia algo, el álbum sube arriba
+    /// en la pantalla Álbumes.
+    pub fn add_to_album(&mut self, album: i64, ids: &[i64]) -> Result<Vec<i64>> {
+        self.change_album(album, ids, true)
+    }
+
+    /// Quita las fotos `ids` del álbum `album` (no de la biblioteca) en una
+    /// transacción. Devuelve las que estaban, para «Deshacer».
+    pub fn remove_from_album(&mut self, album: i64, ids: &[i64]) -> Result<Vec<i64>> {
+        self.change_album(album, ids, false)
+    }
+
+    fn change_album(&mut self, album: i64, ids: &[i64], add: bool) -> Result<Vec<i64>> {
+        let tx = self.conn.transaction()?;
+        let exists = tx
+            .query_row("SELECT 1 FROM albums WHERE id = ?1", [album], |_| Ok(()))
+            .optional()?
+            .is_some();
+        if !exists {
+            return Err(Error::AlbumNotFound(album));
+        }
+        let mut changed = Vec::new();
+        {
+            // Una fila por sentencia, como en Favoritos y Etiquetas: sin
+            // límite de parámetros con selecciones de decenas de miles de
+            // fotos. Las nuevas van al final, numeradas aquí para no buscar
+            // la última posición en cada fila.
+            let mut next: i64 = tx.query_row(
+                "SELECT coalesce(max(position) + 1, 0) FROM album_photos WHERE album_id = ?1",
+                [album],
+                |r| r.get(0),
+            )?;
+            let mut insert = tx.prepare(
+                "INSERT OR IGNORE INTO album_photos (album_id, photo_id, position)
+                 SELECT ?1, id, ?3 FROM photos WHERE id = ?2",
+            )?;
+            let mut delete =
+                tx.prepare("DELETE FROM album_photos WHERE album_id = ?1 AND photo_id = ?2")?;
+            for &id in ids {
+                let rows = if add {
+                    insert.execute([album, id, next])?
+                } else {
+                    delete.execute([album, id])?
+                };
+                if rows > 0 {
+                    changed.push(id);
+                    next += 1;
+                }
+            }
+        }
+        if !changed.is_empty() {
+            tx.execute(
+                "UPDATE albums SET updated_at = ?2 WHERE id = ?1",
+                (album, unix_secs(SystemTime::now())),
+            )?;
+        }
+        tx.commit()?;
+        Ok(changed)
+    }
 }
 
 fn normalize(name: &str) -> Result<String> {
@@ -150,6 +212,7 @@ fn normalize(name: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::timeline::View;
     use rusqlite::params;
 
     /// Biblioteca con `n` fotos; la foto `i` tiene fecha `i * 100`.
@@ -187,6 +250,121 @@ mod tests {
                 (album, at),
             )
             .unwrap();
+    }
+
+    fn ids(lib: &Library, album: i64) -> Vec<i64> {
+        let pagina = lib.view_page(View::Album(album), None, 100).unwrap();
+        pagina.photos.iter().map(|p| p.id).collect()
+    }
+
+    #[test]
+    fn anade_y_quita_fotos() {
+        let (_dir, mut lib) = library(5);
+        let a = lib.create_album("A").unwrap();
+        set_updated(&lib, a, 1);
+        assert_eq!(lib.add_to_album(a, &[2, 4, 4, 999]).unwrap(), [2, 4]);
+        assert!(lib.album(a).unwrap().unwrap().updated_at > 1);
+        // Las que ya estaban no se repiten ni cuentan.
+        assert_eq!(lib.add_to_album(a, &[4, 1]).unwrap(), [1]);
+        assert_eq!(ids(&lib, a), [4, 2, 1]);
+        let posiciones: Vec<i64> = lib
+            .conn
+            .prepare("SELECT position FROM album_photos WHERE album_id = ?1 ORDER BY photo_id")
+            .unwrap()
+            .query_map([a], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(posiciones, [2, 0, 1]);
+
+        set_updated(&lib, a, 1);
+        assert_eq!(lib.remove_from_album(a, &[2, 3]).unwrap(), [2]);
+        assert!(lib.album(a).unwrap().unwrap().updated_at > 1);
+        assert_eq!(ids(&lib, a), [4, 1]);
+        // Quitar no borra la foto.
+        assert!(lib.view_page(View::Photos, None, 100).unwrap().photos.len() == 5);
+
+        // Sin cambios, el álbum no sube.
+        set_updated(&lib, a, 1);
+        assert!(lib.remove_from_album(a, &[2]).unwrap().is_empty());
+        assert_eq!(lib.album(a).unwrap().unwrap().updated_at, 1);
+    }
+
+    #[test]
+    fn anade_y_quita_10000_fotos_en_menos_de_un_segundo() {
+        let (_dir, mut lib) = library(10_000);
+        let a = lib.create_album("Todo").unwrap();
+        let todas: Vec<i64> = (1..=10_000).collect();
+        let inicio = std::time::Instant::now();
+        assert_eq!(lib.add_to_album(a, &todas).unwrap().len(), 10_000);
+        let anadir = inicio.elapsed();
+        let inicio = std::time::Instant::now();
+        assert_eq!(lib.remove_from_album(a, &todas).unwrap().len(), 10_000);
+        let quitar = inicio.elapsed();
+        // Holgado para el modo de depuración; en release es mucho menos.
+        assert!(
+            anadir.max(quitar) < std::time::Duration::from_secs(1),
+            "{anadir:?} {quitar:?}"
+        );
+    }
+
+    #[test]
+    fn anadir_a_un_album_que_no_existe_es_un_error() {
+        let (_dir, mut lib) = library(2);
+        assert!(matches!(
+            lib.add_to_album(7, &[1]),
+            Err(Error::AlbumNotFound(7))
+        ));
+        assert!(matches!(
+            lib.remove_from_album(7, &[1]),
+            Err(Error::AlbumNotFound(7))
+        ));
+    }
+
+    #[test]
+    fn la_vista_de_un_album_incluye_las_archivadas() {
+        use crate::selection::Scope;
+
+        let (_dir, mut lib) = library(6);
+        let a = lib.create_album("A").unwrap();
+        let b = lib.create_album("B").unwrap();
+        lib.add_to_album(a, &[1, 3, 4, 6]).unwrap();
+        lib.add_to_album(b, &[2]).unwrap();
+        lib.set_archived(&[4], true).unwrap();
+
+        let vista = View::Album(a);
+        let total: u64 = lib
+            .view_months(vista)
+            .unwrap()
+            .iter()
+            .map(|m| m.photos)
+            .sum();
+        assert_eq!(total, 4);
+        let primera = lib.view_page(vista, None, 2).unwrap();
+        let ids: Vec<i64> = primera.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [6, 4]);
+        assert!(primera.photos[1].archived);
+        let segunda = lib.view_page(vista, primera.next, 2).unwrap();
+        let ids: Vec<i64> = segunda.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [3, 1]);
+        assert!(segunda.next.is_none());
+        assert_eq!(lib.select_all(Scope::View(vista)).unwrap(), [6, 4, 3, 1]);
+        assert!(
+            lib.view_page(View::Album(999), None, 10)
+                .unwrap()
+                .photos
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn la_vista_de_un_album_viaja_como_objeto() {
+        let v: View = serde_json::from_str(r#"{"album": 7}"#).unwrap();
+        assert_eq!(v, View::Album(7));
+        assert_eq!(
+            serde_json::to_string(&View::Album(7)).unwrap(),
+            r#"{"album":7}"#
+        );
     }
 
     #[test]
@@ -310,6 +488,22 @@ mod tests {
             .unwrap();
         assert_eq!(filas, 2);
         assert_eq!(lib.album(b).unwrap().unwrap().photos, 2);
+    }
+
+    #[test]
+    fn las_fotos_de_la_papelera_no_cuentan_ni_se_ven() {
+        let (_dir, mut lib) = library(3);
+        let a = lib.create_album("A").unwrap();
+        lib.add_to_album(a, &[1, 2, 3]).unwrap();
+        lib.conn
+            .execute("UPDATE photos SET trashed_at = 1 WHERE id = 3", [])
+            .unwrap();
+        let album = lib.album(a).unwrap().unwrap();
+        assert_eq!(
+            (album.photos, album.cover, album.last),
+            (2, Some(2), Some(200))
+        );
+        assert_eq!(ids(&lib, a), [2, 1]);
     }
 
     #[test]
