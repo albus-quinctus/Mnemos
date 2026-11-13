@@ -1,6 +1,6 @@
 # 014 · Álbumes
 
-- Estado: aprobada
+- Estado: en curso
 - Fase: F2
 
 ## Qué y por qué
@@ -126,8 +126,9 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 - Añadir a un álbum desde el visor (solo desde la barra de selección).
 
 ## Tareas (≤1 h cada una)
-1. [ ] Migración 0012 y núcleo: listar (portada, número, rango de fechas),
-       crear, renombrar y eliminar álbumes; pruebas.
+1. [x] Migración 0012 y núcleo: listar (portada, número, rango de fechas),
+       crear, renombrar y eliminar álbumes; pruebas. `crates/mnemos-core/src/albums.rs`
+       (`albums`, `album`, `create_album`, `rename_album`, `delete_album`).
 2. [ ] `View::Album` en meses, páginas y `Scope`; `add_to_album` y
        `remove_from_album`; álbum del Takeout una sola vez por foto; pruebas,
        también con 10 000 fotos.
