@@ -13,6 +13,8 @@
     cerrar: "M6 6l12 12M18 6 6 18",
     mas: "M12 5v14M5 12h14",
     puntos: "M12 5.5h.01M12 12h.01M12 18.5h.01",
+    "album-mas": "M4 7h16v12H4zM7 4h10M12 10v6M9 13h6",
+    "album-menos": "M4 7h16v12H4zM7 4h10M9 13h6",
     anterior: "M15 5l-7 7 7 7",
     siguiente: "M9 5l7 7-7 7",
     duplicados: "M8 8h11v11H8zM5 16V5h11",
@@ -59,3 +61,10 @@
 >
   <path d={trazos[nombre]} />
 </svg>
+
+<style>
+  /* Que un texto largo al lado no encoja el icono. */
+  svg {
+    flex: none;
+  }
+</style>

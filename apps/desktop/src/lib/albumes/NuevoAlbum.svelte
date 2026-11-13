@@ -1,9 +1,17 @@
 <script lang="ts">
   // Diálogo «Nuevo álbum» (spec 014): solo pide el nombre. Intro crea y Esc
-  // cancela.
+  // cancela. Se usa desde la pantalla Álbumes y desde la barra de selección.
   import { tick } from "svelte";
   import { MAX_NOMBRE, nombreValido } from "./albumes";
-  import { cancelarNuevoAlbum, confirmarNuevoAlbum } from "./estado.svelte";
+
+  let {
+    onCrear,
+    onCancelar,
+  }: {
+    /** Crea el álbum; devuelve el error para enseñarlo, o null. */
+    onCrear: (nombre: string) => Promise<string | null>;
+    onCancelar: () => void;
+  } = $props();
 
   let nombre = $state("");
   let error = $state("");
@@ -19,7 +27,7 @@
     e.preventDefault();
     if (!valido || ocupado) return;
     ocupado = true;
-    error = (await confirmarNuevoAlbum(valido)) ?? "";
+    error = (await onCrear(valido)) ?? "";
     ocupado = false;
   }
 
@@ -27,7 +35,7 @@
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
-      cancelarNuevoAlbum();
+      onCancelar();
     }
   }
 </script>
@@ -49,7 +57,7 @@
         <p class="error" role="alert">{error}</p>
       {/if}
       <div class="acciones">
-        <button type="button" class="cancelar" onclick={cancelarNuevoAlbum}>Cancelar</button>
+        <button type="button" class="cancelar" onclick={onCancelar}>Cancelar</button>
         <button type="submit" class="crear" disabled={!valido || ocupado}>Crear</button>
       </div>
     </form>

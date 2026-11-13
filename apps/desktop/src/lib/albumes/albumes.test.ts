@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { nombreValido, rangoFechas, subtituloAlbum, textoAlbumes, textoFotos } from "./albumes";
+import {
+  filtrarAlbumes,
+  nombreValido,
+  rangoFechas,
+  subtituloAlbum,
+  textoAlbumes,
+  textoFotos,
+} from "./albumes";
 
 const dia = (a: number, m: number, d: number) => new Date(a, m - 1, d, 12).getTime() / 1000;
 const corto = (a: number, m: number, d: number) =>
@@ -38,5 +45,19 @@ describe("álbumes", () => {
   it("junta número y fechas en el subtítulo", () => {
     expect(subtituloAlbum(0, null, null)).toBe("Vacío");
     expect(subtituloAlbum(2, dia(2024, 9, 7), dia(2024, 9, 7))).toBe(`2 fotos · ${corto(2024, 9, 7)} 2024`);
+  });
+});
+
+describe("filtrarAlbumes", () => {
+  const lista = [{ name: "Cumpleaños de mamá" }, { name: "Picos de Europa" }, { name: "Navidad" }];
+  it("sin texto devuelve todos", () => {
+    expect(filtrarAlbumes(lista, "  ")).toEqual(lista);
+  });
+  it("ignora mayúsculas y tildes", () => {
+    expect(filtrarAlbumes(lista, "MAMA")).toEqual([lista[0]]);
+    expect(filtrarAlbumes(lista, "pícos")).toEqual([lista[1]]);
+  });
+  it("sin coincidencias devuelve una lista vacía", () => {
+    expect(filtrarAlbumes(lista, "playa")).toEqual([]);
   });
 });

@@ -43,3 +43,15 @@ export function subtituloAlbum(fotos: number, primera: number | null, ultima: nu
   const rango = rangoFechas(primera, ultima);
   return rango ? `${textoFotos(fotos)} · ${rango}` : textoFotos(fotos);
 }
+
+/** A partir de cuántos álbumes la lista de «Añadir a álbum» trae buscador. */
+export const ALBUMES_SIN_BUSCADOR = 8;
+
+const sinTildes = (t: string) =>
+  t.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es");
+
+/** Filtra por nombre sin distinguir mayúsculas ni tildes. */
+export function filtrarAlbumes<T extends { name: string }>(lista: T[], texto: string): T[] {
+  const buscado = sinTildes(texto.trim());
+  return buscado ? lista.filter((a) => sinTildes(a.name).includes(buscado)) : lista;
+}

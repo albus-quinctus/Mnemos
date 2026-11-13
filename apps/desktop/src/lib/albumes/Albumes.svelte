@@ -5,7 +5,13 @@
   import { miniaturaUrl } from "$lib/media";
   import { abrirAlbum } from "$lib/navegacion.svelte";
   import { textoAlbumes, textoFotos } from "./albumes";
-  import { cargarAlbumes, estadoAlbumes, pedirNuevoAlbum } from "./estado.svelte";
+  import {
+    cancelarNuevoAlbum,
+    cargarAlbumes,
+    confirmarNuevoAlbum,
+    estadoAlbumes,
+    pedirNuevoAlbum,
+  } from "./estado.svelte";
   import NuevoAlbum from "./NuevoAlbum.svelte";
 
   // Portadas que no se pudieron cargar: se ve el recuadro gris.
@@ -65,7 +71,7 @@
 </section>
 
 {#if estadoAlbumes.creando}
-  <NuevoAlbum />
+  <NuevoAlbum onCrear={confirmarNuevoAlbum} onCancelar={cancelarNuevoAlbum} />
 {/if}
 
 <style>

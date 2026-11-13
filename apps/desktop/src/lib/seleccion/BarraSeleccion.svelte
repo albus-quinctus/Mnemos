@@ -1,14 +1,17 @@
 <script lang="ts">
   // Sustituye a la barra superior mientras hay selección (spec 006).
   import Icono from "$lib/componentes/Icono.svelte";
+  import MenuAnadirAlbum from "$lib/albumes/MenuAnadirAlbum.svelte";
   import { limpiarSeleccion, seleccion } from "./seleccion.svelte";
   import {
+    albumAbierto,
     alternarArchivo,
     alternarFavoritos,
     avisos,
     enArchivo,
     enPapelera,
     enviarSeleccionAPapelera,
+    quitarSeleccionDeAlbum,
     restaurarSeleccion,
     todasFavoritas,
   } from "./acciones.svelte";
@@ -20,6 +23,7 @@
   const quitar = $derived(todasFavoritas());
   const desarchivar = $derived(enArchivo());
   const papelera = $derived(enPapelera());
+  const enAlbum = $derived(albumAbierto() !== null);
 
   // Exportar (spec 017): el mismo menú que el visor.
   let menuExportar = $state(false);
@@ -44,7 +48,7 @@
 
 <svelte:window onpointerdown={alPulsarFuera} onkeydowncapture={alPulsarTecla} />
 
-<header>
+<header class:en-album={enAlbum}>
   <button
     type="button"
     class="boton solo"
@@ -79,9 +83,24 @@
       <span>Eliminar para siempre</span>
     </button>
   {:else}
+    <!-- Álbumes (spec 014). -->
+    <MenuAnadirAlbum />
+    {#if enAlbum}
+      <button
+        type="button"
+        class="boton"
+        title="Quitar del álbum"
+        disabled={avisos.ocupado}
+        onclick={quitarSeleccionDeAlbum}
+      >
+        <Icono nombre="album-menos" />
+        <span>Quitar del álbum</span>
+      </button>
+    {/if}
     <button
       type="button"
       class="boton"
+      title={quitar ? "Quitar de Favoritos" : "Añadir a Favoritos"}
       disabled={avisos.ocupado}
       onclick={alternarFavoritos}
     >
@@ -91,6 +110,7 @@
     <button
       type="button"
       class="boton"
+      title={desarchivar ? "Desarchivar" : "Archivar"}
       disabled={avisos.ocupado}
       onclick={alternarArchivo}
     >
@@ -115,6 +135,7 @@
       class:activo={menuExportar}
       aria-haspopup="menu"
       aria-expanded={menuExportar}
+      title="Exportar"
       disabled={enCurso()}
       onclick={() => (menuExportar = !menuExportar)}
     >
@@ -138,6 +159,8 @@
 
 <style>
   header {
+    /* Con muchos botones y poco ancho, los botones se quedan en icono. */
+    container-type: inline-size;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -150,6 +173,7 @@
 
   .cuenta {
     margin-right: auto;
+    white-space: nowrap;
     font-size: 1rem;
     font-weight: 600;
   }
@@ -167,7 +191,41 @@
     background: transparent;
     color: var(--texto);
     font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
+  }
+
+  /* El texto se oculta a la vista, no a los lectores de pantalla; el
+     `title` del botón lo enseña al pasar el ratón. */
+  @container (max-width: 1000px) {
+    header :global(.boton > span) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+
+    header :global(.boton) {
+      width: var(--objetivo);
+      padding: 0;
+    }
+  }
+
+  /* Dentro de un álbum hay un botón más. */
+  @container (max-width: 1180px) {
+    header.en-album :global(.boton > span) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+
+    header.en-album :global(.boton) {
+      width: var(--objetivo);
+      padding: 0;
+    }
   }
 
   .boton.solo {
