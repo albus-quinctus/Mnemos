@@ -1,6 +1,6 @@
 # 017 · Exportar varias fotos a la vez
 
-- Estado: aprobada
+- Estado: en curso
 - Fase: F2
 
 ## Qué y por qué
@@ -72,14 +72,14 @@ el mismo núcleo.
   (lo cubre la spec 008).
 
 ## Criterios de aceptación
-- [ ] Exportar un lote deja una copia de cada foto en el destino, con los nombres repetidos como `nombre (N).ext` y sin tocar los archivos que ya había (prueba automática).
-- [ ] Una foto que falta o que no se puede reducir se salta, sale en el resumen con su motivo y el resto se exporta (prueba automática).
-- [ ] Un error al escribir en el destino detiene el lote y lo ya exportado se queda entero (prueba automática).
-- [ ] Cancelar para tras la foto en curso sin dejar archivos a medias (prueba automática).
-- [ ] Una foto con versión editada se exporta igual que desde el visor (prueba automática, cuando exista la exportación de editadas).
+- [x] Exportar un lote deja una copia de cada foto en el destino, con los nombres repetidos como `nombre (N).ext` y sin tocar los archivos que ya había (prueba automática).
+- [x] Una foto que falta o que no se puede reducir se salta, sale en el resumen con su motivo y el resto se exporta (prueba automática).
+- [x] Un error al escribir en el destino detiene el lote y lo ya exportado se queda entero (prueba automática).
+- [x] Cancelar para tras la foto en curso sin dejar archivos a medias (prueba automática).
+- [x] Una foto con versión editada se exporta igual que desde el visor (prueba automática).
 - [ ] El botón, el menú, el progreso, «Cancelar» y «Ver» funcionan con ratón y teclado.
 - [x] Capturas del botón, el progreso y el resumen aprobadas por Paulo.
-- [ ] Los originales y la base de datos no se modifican (prueba automática).
+- [x] Los originales y la base de datos no se modifican (prueba automática).
 
 ## Fuera de alcance
 - Comprimir en un `.zip`.
@@ -91,7 +91,7 @@ el mismo núcleo.
 
 ## Tareas (≤1 h cada una)
 1. [x] Spec y capturas del diseño (aprobadas por Paulo el 12 nov; `capturas/017-*.png` en los archivos del proyecto).
-2. [ ] `mnemos-core`: `export_many` en un módulo aparte, con progreso, cancelación y la regla de saltar o parar. Pruebas. Llama a la exportación de una foto de la spec 008 (con la versión editada, cuando esté).
+2. [x] `mnemos-core`: `export_many` en un módulo aparte, con progreso, cancelación y la regla de saltar o parar. Pruebas. Llama a la exportación de una foto de la spec 008, que ya saca la versión editada. En `crates/mnemos-core/src/export_many.rs`, con `Library::export_items` para los ids en el orden de la cuadrícula.
 3. [ ] App: comandos `exportar_varias` y `cancelar_exportacion` con el evento `exportacion` (en curso, terminada, cancelada, detenida), en un hilo aparte como la importación.
 4. [ ] Barra de selección: botón y menú, selector de carpeta, progreso con «Cancelar», resumen y «Ver». Pruebas de la interfaz.
 5. [ ] Probarlo en la app real con el HDD (Paulo).

@@ -10,6 +10,7 @@ pub mod duplicates;
 pub mod edits;
 pub mod error;
 pub mod export;
+pub mod export_many;
 mod files;
 pub mod import;
 pub mod index;
