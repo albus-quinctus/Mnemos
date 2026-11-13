@@ -3,6 +3,7 @@
 //! Gestiona la biblioteca portátil: su estructura en disco, la base de datos
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
+pub mod albums;
 mod copies;
 pub mod day_titles;
 pub mod db;
@@ -25,6 +26,7 @@ pub mod thumbnails;
 pub mod timeline;
 pub mod trash;
 
+pub use albums::{Album, MAX_ALBUM_NAME};
 pub use day_titles::{DayTitle, MAX_DAY_TITLE};
 pub use duplicates::{
     DuplicateCopy, DuplicateCursor, DuplicateGroup, DuplicatePage, DuplicateSummary,
@@ -38,6 +40,6 @@ pub use library::{Library, LibraryInfo, MediaEdit, PhotoDetails, PhotoMedia};
 pub use paths::RelPath;
 pub use search::{DateFilter, SearchQuery};
 pub use selection::Scope;
-pub use tags::{MAX_TAG_NAME, Tag};
+pub use tags::{MAX_TAG_NAME, Tag, TagUsage};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
 pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage, View};
