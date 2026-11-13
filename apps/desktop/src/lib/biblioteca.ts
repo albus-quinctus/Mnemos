@@ -44,10 +44,7 @@ export function fotos(
 // Vistas, selección, favoritos, archivo y títulos de día (spec 006). Reflejan
 // `mnemos_core::{View, Scope, DayTitle}`.
 // En la Papelera (spec 015), `date` de cada foto es la fecha en que se envió.
-export type Vista = "fotos" | "favoritos" | "archivo" | "papelera";
-}
-
-export type Vista = "fotos" | "favoritos" | "archivo" | { etiqueta: number };
+export type Vista = "fotos" | "favoritos" | "archivo" | "papelera" | { etiqueta: number };
 
 // Dónde se selecciona: una vista o los resultados de una búsqueda.
 export type Ambito = { vista: Vista } | { busqueda: string };
