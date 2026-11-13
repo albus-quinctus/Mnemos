@@ -11,7 +11,7 @@
     { nombre: "Fotos", icono: "fotos", seccion: "fotos" },
     { nombre: "Explorar", icono: "explorar" },
     { nombre: "Álbumes", icono: "albumes", seccion: "albumes" },
-    { nombre: "Etiquetas", icono: "etiquetas" },
+    { nombre: "Etiquetas", icono: "etiquetas", seccion: "etiquetas" },
     { nombre: "Favoritos", icono: "estrella", seccion: "favoritos" },
     { nombre: "Archivo", icono: "archivo", seccion: "archivo" },
     { nombre: "Papelera", icono: "papelera", seccion: "papelera" },

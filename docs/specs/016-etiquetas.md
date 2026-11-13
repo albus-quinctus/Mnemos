@@ -1,6 +1,6 @@
 # 016 · Etiquetas
 
-- Estado: borrador
+- Estado: en curso (diseño aprobado el 13 nov)
 - Fase: F2
 
 ## Qué y por qué
@@ -128,7 +128,7 @@ existen desde la migración 0001 y siguen vacías.
 - [ ] Guardar como copia conserva las etiquetas (prueba automática).
 - [ ] Etiquetar 10 000 fotos sintéticas tarda menos de 300 ms (en
   `docs/rendimiento.md`).
-- [ ] Paulo aprueba las capturas del diseño antes de programar la interfaz.
+- [x] Paulo aprueba las capturas del diseño antes de programar la interfaz.
 - [ ] Los originales no se modifican (prueba automática).
 
 ## Fuera de alcance
@@ -151,9 +151,9 @@ existen desde la migración 0001 y siguen vacías.
 3. [x] Núcleo: fotos de una etiqueta (meses, páginas y `Scope` para la
    selección) y la búsqueda por etiqueta. Comando `mnemos etiquetas` en la CLI.
 4. [x] Comandos de Tauri y sus envoltorios en `biblioteca.ts`.
-5. [ ] Capturas del diseño (pantalla, fotos de una etiqueta, desplegable de la
+5. [x] Capturas del diseño (pantalla, fotos de una etiqueta, desplegable de la
    barra de selección y sección del visor) para que Paulo las apruebe.
-6. [ ] Pantalla Etiquetas y fotos de una etiqueta; activar la entrada del menú
+6. [x] Pantalla Etiquetas y fotos de una etiqueta; activar la entrada del menú
    lateral.
 7. [ ] Botón Etiquetar en la barra de selección, con su desplegable,
    «Quitar de la etiqueta» y el aviso con «Deshacer».
