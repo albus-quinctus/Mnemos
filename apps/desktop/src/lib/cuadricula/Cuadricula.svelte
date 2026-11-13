@@ -57,8 +57,10 @@
   const pedirMeses = () => (texto ? buscarMeses(texto) : vistaMeses(vista));
   const pedirFotos = (despues: Cursor | null, limite: number) =>
     texto ? buscarFotos(texto, despues, limite) : vistaFotos(vista, despues, limite);
-  // En la búsqueda y en Favoritos salen archivadas: llevan la caja.
-  const marcaArchivadas = $derived(texto !== "" || vista === "favoritos");
+  // En la búsqueda, en Favoritos y en un álbum salen archivadas: llevan la caja.
+  const marcaArchivadas = $derived(
+    texto !== "" || vista === "favoritos" || (typeof vista === "object" && "album" in vista),
+  );
   const papelera = $derived(!texto && vista === "papelera");
 
   const PAGINA = 500;
@@ -386,6 +388,11 @@
       <div class="sin-resultados">
         <p class="titulo">La papelera está vacía</p>
         <p>Las fotos que envíes aquí se eliminan para siempre a los 30 días.</p>
+      </div>
+    {:else if typeof vista === "object" && "album" in vista}
+      <div class="sin-resultados">
+        <p class="titulo">Este álbum está vacío</p>
+        <p>Ve a Fotos, selecciona algunas y pulsa «Añadir a álbum».</p>
       </div>
     {:else if vista === "archivo"}
       <p class="aviso">

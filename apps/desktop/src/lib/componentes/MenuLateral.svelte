@@ -10,7 +10,7 @@
   const entradas: Entrada[] = [
     { nombre: "Fotos", icono: "fotos", seccion: "fotos" },
     { nombre: "Explorar", icono: "explorar" },
-    { nombre: "Álbumes", icono: "albumes" },
+    { nombre: "Álbumes", icono: "albumes", seccion: "albumes" },
     { nombre: "Etiquetas", icono: "etiquetas" },
     { nombre: "Favoritos", icono: "estrella", seccion: "favoritos" },
     { nombre: "Archivo", icono: "archivo", seccion: "archivo" },
