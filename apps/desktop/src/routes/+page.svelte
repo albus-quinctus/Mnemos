@@ -6,8 +6,9 @@
   import Cuadricula from "$lib/cuadricula/Cuadricula.svelte";
   import { olvidarTitulos } from "$lib/cuadricula/titulos.svelte";
   import Albumes from "$lib/albumes/Albumes.svelte";
+  import CabeceraAlbum from "$lib/albumes/CabeceraAlbum.svelte";
   import Duplicados from "$lib/duplicados/Duplicados.svelte";
-  import { navegacion } from "$lib/navegacion.svelte";
+  import { irA, navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
   import { vaciarCaducadas } from "$lib/papelera/papelera.svelte";
@@ -116,7 +117,16 @@
           {#if navegacion.album === null}
             <Albumes />
           {:else}
-            <Cuadricula vista={{ album: navegacion.album }} activa={!busqueda.consulta} />
+            <div class="album">
+              <CabeceraAlbum id={navegacion.album} />
+              <div class="album-fotos">
+                <Cuadricula
+                  vista={{ album: navegacion.album }}
+                  activa={!busqueda.consulta}
+                  onSalir={() => irA("albumes")}
+                />
+              </div>
+            </div>
           {/if}
         </div>
       {/key}
@@ -171,6 +181,19 @@
   .capa {
     position: absolute;
     inset: 0;
+  }
+
+  /* Un álbum: su cabecera arriba y la cuadrícula, con su propio scroll, debajo. */
+  .album {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .album-fotos {
+    position: relative;
+    flex: 1;
+    min-height: 0;
   }
 
   .oculta {
