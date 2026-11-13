@@ -51,6 +51,7 @@ Linux (x86_64)
    ejecuta (muchos lo abren como texto), prueba clic derecho > "Ejecutar"
    o, en una terminal:
        ./MNEMOS-linux.AppImage
+   También vale "sh MNEMOS.sh", que abre la AppImage de su misma carpeta.
 2. Si no se abre y dice que falta FUSE:
        ./MNEMOS-linux.AppImage --appimage-extract-and-run
 3. Para abrirlo desde el menú de aplicaciones la próxima vez: dentro de

@@ -17,6 +17,7 @@ const USAGE: &str = "Uso:
   mnemos import <biblioteca> <origen> Copia las fotos de <origen> a la biblioteca
   mnemos miniaturas <biblioteca>      Genera las miniaturas que faltan
   mnemos duplicados <biblioteca>      Lista las fotos repetidas (no borra nada)
+  mnemos etiquetas <biblioteca>       Lista las etiquetas y cuántas fotos tienen
   mnemos papelera <biblioteca>        Lista la papelera y cuándo se elimina cada foto
   mnemos papelera vaciar <biblioteca> [--confirmar]
                                       Elimina PARA SIEMPRE las fotos de la papelera";
@@ -37,6 +38,7 @@ fn main() -> ExitCode {
             .and_then(|lib| lib.generate_thumbnails())
             .map(|r| print_thumbnails(&r)),
         ["duplicados", lib] => Library::open(Path::new(lib)).and_then(|lib| print_duplicates(&lib)),
+        ["etiquetas", lib] => Library::open(Path::new(lib)).and_then(|lib| print_tags(&lib)),
         ["papelera", "vaciar", lib] => empty_trash(Path::new(lib), false),
         ["papelera", "vaciar", lib, "--confirmar"] => empty_trash(Path::new(lib), true),
         ["papelera", lib] => Library::open(Path::new(lib)).and_then(|lib| print_trash(&lib)),
@@ -93,6 +95,19 @@ fn print_thumbnails(r: &ThumbnailReport) -> bool {
 }
 
 /// Lista los grupos de fotos repetidas. Solo consulta: no toca nada.
+fn print_tags(lib: &Library) -> Result<bool> {
+    let tags = lib.tags()?;
+    if tags.is_empty() {
+        println!("No hay etiquetas.");
+        return Ok(true);
+    }
+    for tag in &tags {
+        let fotos = if tag.photos == 1 { "foto" } else { "fotos" };
+        println!("{:>7} {fotos:<5}  {}", tag.photos, tag.name);
+    }
+    Ok(true)
+}
+
 fn print_duplicates(lib: &Library) -> Result<bool> {
     let s = lib.duplicate_summary()?;
     if s.groups == 0 {

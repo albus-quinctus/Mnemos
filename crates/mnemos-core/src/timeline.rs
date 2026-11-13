@@ -59,17 +59,30 @@ pub enum View {
     /// en esta vista, `GridPhoto::date` es esa fecha.
     #[serde(rename = "papelera")]
     Trash,
+    /// Las fotos de una etiqueta, archivadas o no (spec 016).
+    #[serde(rename = "etiqueta")]
+    Tag(i64),
 }
 
 impl View {
-    /// Condición de la vista. Es SQL fijo, sin parámetros, y repite la de su
-    /// índice parcial (migración 0014) para que SQLite lo use.
+    /// Condición de la vista. Las de la spec 006 son SQL fijo, sin
+    /// parámetros, y repiten la de su índice parcial (migración 0014) para que
+    /// SQLite lo use. La de una etiqueta usa el índice `photo_tags_tag`. Ninguna
+    /// enseña las fotos de la papelera.
     pub(crate) fn filter(self) -> Filter {
         let (sql, order) = match self {
             View::Photos => (" AND archived_at IS NULL AND trashed_at IS NULL", DATE),
             View::Favorites => (" AND favorite = 1 AND trashed_at IS NULL", DATE),
             View::Archive => (" AND archived_at IS NOT NULL AND trashed_at IS NULL", DATE),
             View::Trash => (" AND trashed_at IS NOT NULL", "trashed_at"),
+            View::Tag(tag) => {
+                return Filter {
+                    sql: " AND trashed_at IS NULL AND id IN (SELECT photo_id FROM photo_tags WHERE tag_id = ?)"
+                        .to_owned(),
+                    params: vec![Value::from(tag)],
+                    order: DATE,
+                };
+            }
         };
         Filter {
             sql: sql.to_owned(),
