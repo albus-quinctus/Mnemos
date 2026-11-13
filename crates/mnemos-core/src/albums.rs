@@ -21,7 +21,7 @@ pub const MAX_ALBUM_NAME: usize = 100;
 pub struct Album {
     pub id: i64,
     pub name: String,
-    /// Número de fotos, archivadas incluidas.
+    /// Número de fotos, archivadas incluidas y sin las de la Papelera.
     pub photos: u64,
     /// La foto más reciente del álbum, que hace de portada. `None` si está
     /// vacío.
@@ -43,7 +43,7 @@ const SELECT: &str = "
     SELECT a.id, a.name, count(p.id),
            (SELECT p2.id FROM album_photos ap2
                 JOIN photos p2 ON p2.id = ap2.photo_id
-            WHERE ap2.album_id = a.id
+            WHERE ap2.album_id = a.id AND p2.trashed_at IS NULL
             ORDER BY coalesce(p2.taken_at, p2.modified_at) DESC, p2.id DESC
             LIMIT 1),
            min(coalesce(p.taken_at, p.modified_at)),
@@ -51,12 +51,12 @@ const SELECT: &str = "
            a.updated_at,
            (SELECT p2.edit_version FROM album_photos ap2
                 JOIN photos p2 ON p2.id = ap2.photo_id
-            WHERE ap2.album_id = a.id
+            WHERE ap2.album_id = a.id AND p2.trashed_at IS NULL
             ORDER BY coalesce(p2.taken_at, p2.modified_at) DESC, p2.id DESC
             LIMIT 1)
     FROM albums a
          LEFT JOIN album_photos ap ON ap.album_id = a.id
-         LEFT JOIN photos p ON p.id = ap.photo_id";
+         LEFT JOIN photos p ON p.id = ap.photo_id AND p.trashed_at IS NULL";
 
 fn album_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Album> {
     Ok(Album {
@@ -502,6 +502,22 @@ mod tests {
             .unwrap();
         assert_eq!(filas, 2);
         assert_eq!(lib.album(b).unwrap().unwrap().photos, 2);
+    }
+
+    #[test]
+    fn las_fotos_de_la_papelera_no_cuentan_ni_se_ven() {
+        let (_dir, mut lib) = library(3);
+        let a = lib.create_album("A").unwrap();
+        lib.add_to_album(a, &[1, 2, 3]).unwrap();
+        lib.conn
+            .execute("UPDATE photos SET trashed_at = 1 WHERE id = 3", [])
+            .unwrap();
+        let album = lib.album(a).unwrap().unwrap();
+        assert_eq!(
+            (album.photos, album.cover, album.last),
+            (2, Some(2), Some(200))
+        );
+        assert_eq!(ids(&lib, a), [2, 1]);
     }
 
     #[test]

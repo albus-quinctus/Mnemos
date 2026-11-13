@@ -11,7 +11,7 @@ use rusqlite::types::Value;
 use crate::error::Result;
 use crate::library::Library;
 use crate::search::SearchQuery;
-use crate::timeline::{DATE, Filter, TimelineCursor, View};
+use crate::timeline::{Filter, TimelineCursor, View};
 
 /// Dónde se está seleccionando: una vista o los resultados de una búsqueda.
 #[derive(Debug, Clone, Copy)]
@@ -23,7 +23,7 @@ pub enum Scope<'a> {
 impl Library {
     /// Todas las fotos de `scope` (`Ctrl` + `A`).
     pub fn select_all(&self, scope: Scope<'_>) -> Result<Vec<i64>> {
-        self.select_where(scope, "", Vec::new())
+        self.select_where(scope, |_| String::new(), Vec::new())
     }
 
     /// Las fotos de `scope` de un día en hora local, `"2024-10-12"`, como
@@ -31,7 +31,7 @@ impl Library {
     pub fn select_day(&self, scope: Scope<'_>, day: &str) -> Result<Vec<i64>> {
         self.select_where(
             scope,
-            &format!(" AND strftime('%Y-%m-%d', {DATE}, 'unixepoch', 'localtime') = ?"),
+            |order| format!(" AND strftime('%Y-%m-%d', {order}, 'unixepoch', 'localtime') = ?"),
             vec![Value::from(day.to_owned())],
         )
     }
@@ -52,7 +52,7 @@ impl Library {
         };
         self.select_where(
             scope,
-            &format!(" AND ({DATE}, id) <= (?, ?) AND ({DATE}, id) >= (?, ?)"),
+            |order| format!(" AND ({order}, id) <= (?, ?) AND ({order}, id) >= (?, ?)"),
             vec![
                 Value::from(newer.date),
                 Value::from(newer.id),
@@ -62,7 +62,14 @@ impl Library {
         )
     }
 
-    fn select_where(&self, scope: Scope<'_>, sql: &str, params: Vec<Value>) -> Result<Vec<i64>> {
+    /// `sql` recibe la fecha por la que ordena la vista (la de la Papelera no
+    /// es la de captura) y devuelve la condición extra.
+    fn select_where(
+        &self,
+        scope: Scope<'_>,
+        sql: impl FnOnce(&str) -> String,
+        params: Vec<Value>,
+    ) -> Result<Vec<i64>> {
         let filter = match scope {
             Scope::View(view) => view.filter(),
             Scope::Search(query) => match self.search_filter(query)? {
@@ -73,9 +80,11 @@ impl Library {
         let Filter {
             sql: scope_sql,
             params: scope_params,
+            order,
         } = filter;
+        let sql = sql(order);
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id FROM photos WHERE 1 {scope_sql} {sql} ORDER BY {DATE} DESC, id DESC"
+            "SELECT id FROM photos WHERE 1 {scope_sql} {sql} ORDER BY {order} DESC, id DESC"
         ))?;
         let ids = stmt
             .query_map(
@@ -90,6 +99,7 @@ impl Library {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::timeline::DATE;
     use rusqlite::params;
 
     /// 2024-10-12 12:00 UTC: a mediodía, para que la zona horaria del equipo

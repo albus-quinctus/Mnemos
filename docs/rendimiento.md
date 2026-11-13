@@ -61,6 +61,16 @@ Spec 016, tarea 2. Solo filas en la base de datos (las etiquetas no abren archiv
 | Uso de las etiquetas en 10 000 seleccionadas | 25 ms | menos de 50 ms |
 | Buscar el nombre de la etiqueta (10 000 resultados) | 11 ms | menos de 100 ms |
 
+### Papelera en el núcleo, 10 000 fotos (2026-11-13)
+Spec 015, tarea 3. Contenedor de desarrollo, en modo release. El objetivo es menos de 1 s.
+
+| Acción sobre las 10 000 fotos | Tiempo |
+|---|---|
+| Enviar a la Papelera | 30 ms |
+| Restaurar | 30 ms |
+
+Con las 10 000 en la Papelera (su peor caso), los meses y la primera página de la vista Papelera tardan 4,7 ms.
+
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
 |---|---|---|

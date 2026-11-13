@@ -27,6 +27,9 @@ pub struct ImportReport {
     pub copied: u64,
     /// Fotos cuyo contenido ya estaba en la biblioteca o repetido en el origen.
     pub duplicates: u64,
+    /// Fotos que ya estaban en la biblioteca, pero solo en la Papelera (spec
+    /// 015): no entran otra vez. No cuentan en `duplicates`.
+    pub in_trash: u64,
     pub errors: Vec<FileError>,
     /// Si se paró a petición del usuario. Lo ya copiado se conserva.
     pub cancelled: bool,
@@ -43,6 +46,7 @@ pub struct Progreso {
 enum Outcome {
     Copied,
     Duplicate,
+    InTrash,
 }
 
 impl Library {
@@ -92,6 +96,7 @@ impl Library {
             match import_file(&self.conn, &self.root, &tmp, archivo, seen) {
                 Ok(Outcome::Copied) => report.copied += 1,
                 Ok(Outcome::Duplicate) => report.duplicates += 1,
+                Ok(Outcome::InTrash) => report.in_trash += 1,
                 Err(err) => report.errors.push(FileError::new(archivo, err)),
             }
             progreso(
@@ -142,6 +147,16 @@ struct Seen<'a> {
     takeout_applied: &'a mut HashSet<String>,
 }
 
+/// Todas las fotos con esta huella están en la Papelera (spec 015).
+fn only_in_trash(conn: &Connection, hash: &str) -> Result<bool> {
+    let outside: bool = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM photos WHERE content_hash = ?1 AND trashed_at IS NULL)",
+        [hash],
+        |r| r.get(0),
+    )?;
+    Ok(!outside)
+}
+
 fn import_file(
     conn: &Connection,
     root: &Path,
@@ -166,9 +181,12 @@ fn import_file(
         improve_taken(&tx, &hash, &taken)?;
         let fresh = seen.takeout_applied.contains(&hash);
         if takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref(), fresh)? {
-            seen.takeout_applied.insert(hash);
+            seen.takeout_applied.insert(hash.clone());
         }
         tx.commit()?;
+        if !seen.imported.contains(&hash) && only_in_trash(conn, &hash)? {
+            return Ok(Outcome::InTrash);
+        }
         return Ok(Outcome::Duplicate);
     }
 

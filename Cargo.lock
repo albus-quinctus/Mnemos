@@ -1967,6 +1967,7 @@ name = "mnemos-cli"
 version = "0.0.1"
 dependencies = [
  "mnemos-core",
+ "tempfile",
 ]
 
 [[package]]

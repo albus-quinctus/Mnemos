@@ -8,6 +8,7 @@ mod etiquetas;
 mod exportacion;
 mod media;
 mod organizacion;
+mod papelera;
 mod portatil;
 
 use std::path::{Path, PathBuf};
@@ -389,6 +390,8 @@ struct EventoImportacion {
     procesadas: u64,
     copiadas: u64,
     duplicadas: u64,
+    /// Ya estaban en la biblioteca, pero en la Papelera (spec 015).
+    en_papelera: u64,
     errores: usize,
     mensaje: Option<String>,
 }
@@ -401,6 +404,7 @@ impl EventoImportacion {
             procesadas: progreso.procesadas,
             copiadas: parcial.copied,
             duplicadas: parcial.duplicates,
+            en_papelera: parcial.in_trash,
             errores: parcial.errors.len(),
             mensaje: None,
         }
@@ -415,6 +419,7 @@ impl EventoImportacion {
             },
             copiadas: informe.copied,
             duplicadas: informe.duplicates,
+            en_papelera: informe.in_trash,
             errores: informe.errors.len(),
             ..Self::default()
         }
@@ -567,6 +572,7 @@ pub fn run() {
         .manage(OpenLibrary::default())
         .manage(Thumbnails::default())
         .manage(Importacion::default())
+        .manage(papelera::Borrado::default())
         .manage(exportacion::Exportacion::default())
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("mnemos", |ctx, request, responder| {
@@ -621,6 +627,11 @@ pub fn run() {
             albumes::eliminar_album,
             albumes::anadir_a_album,
             albumes::quitar_de_album,
+            papelera::enviar_a_papelera,
+            papelera::restaurar,
+            papelera::eliminar_para_siempre,
+            papelera::vaciar_papelera,
+            papelera::vaciado_automatico,
             etiquetas::etiquetas,
             etiquetas::crear_etiqueta,
             etiquetas::renombrar_etiqueta,

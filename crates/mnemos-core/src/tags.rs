@@ -69,9 +69,11 @@ impl Library {
     fn tags_where<P: rusqlite::Params>(&self, condition: &str, params: P) -> Result<Vec<Tag>> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT t.id, t.name,
-                    (SELECT count(*) FROM photo_tags WHERE tag_id = t.id),
+                    (SELECT count(*) FROM photo_tags pt JOIN photos p ON p.id = pt.photo_id
+                      WHERE pt.tag_id = t.id AND p.trashed_at IS NULL),
                     (SELECT p.id FROM photo_tags pt JOIN photos p ON p.id = pt.photo_id
-                      WHERE pt.tag_id = t.id ORDER BY {DATE} DESC, p.id DESC LIMIT 1) AS cover
+                      WHERE pt.tag_id = t.id AND p.trashed_at IS NULL
+                      ORDER BY {DATE} DESC, p.id DESC LIMIT 1) AS cover
                FROM tags t {condition}
               ORDER BY t.name COLLATE NOCASE, t.id"
         ))?;

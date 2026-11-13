@@ -24,6 +24,8 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0013_etiquetas.sql"),
     // La 0012 (álbumes) se fusionó después de la 0013 (etiquetas).
     include_str!("migrations/0012_albumes.sql"),
+    // Papelera (spec 015). Va después de la 0012 (álbumes), que se fusiona antes.
+    include_str!("migrations/0014_papelera.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -440,5 +442,48 @@ mod tests {
             )
             .unwrap();
         assert_eq!(indice, 1);
+    }
+
+    #[test]
+    fn la_migracion_de_la_papelera_conserva_favoritos_y_archivo() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        {
+            // Biblioteca justo antes de la papelera, con una favorita
+            // archivada.
+            let mut conn = Connection::open(&path).unwrap();
+            let before = MIGRATIONS
+                .iter()
+                .position(|m| m.contains("Papelera (spec 015)"))
+                .unwrap();
+            for (i, sql) in MIGRATIONS[..before].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at,
+                                     favorite, archived_at)
+                 VALUES ('a.jpg', 1, 1, 1, 1, 5)",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+        let fila: (i64, Option<i64>, Option<i64>) = conn
+            .query_row(
+                "SELECT favorite, archived_at, trashed_at FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(fila, (1, Some(5), None));
+        let meta: i64 = conn
+            .query_row("SELECT count(*) FROM library_meta", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(meta, 0);
     }
 }

@@ -127,8 +127,7 @@ Salvaguardas que la acompañan:
   - Rehace los índices parciales de la línea de tiempo (migración 0007) para
     excluir las fotos en la Papelera, y añade `photos_papelera` sobre
     `(trashed_at DESC, id DESC) WHERE trashed_at IS NOT NULL`.
-  - Tabla de ajustes de la biblioteca (o la que ya exista) con
-    `ultima_apertura`.
+  - Tabla `library_meta` (clave y valor) con `ultima_apertura`.
 - `View` gana `Papelera`; todas las vistas, la búsqueda, los duplicados, los
   álbumes y las etiquetas filtran `trashed_at IS NULL`. Las specs 014
   (álbumes) y 016 (etiquetas) tienen que respetarlo: la que se fusione después
@@ -163,25 +162,27 @@ Salvaguardas que la acompañan:
   solo maneja ids y el núcleo usa rutas relativas.
 
 ## Criterios de aceptación
-- [ ] Enviar a la Papelera y restaurar no cambian huella, tamaño ni fecha del
+- [x] Enviar a la Papelera y restaurar no cambian huella, tamaño ni fecha del
   original (prueba automática).
-- [ ] Ninguna acción que no sea eliminar desde la Papelera borra un archivo:
+- [x] Ninguna acción que no sea eliminar desde la Papelera borra un archivo:
   importar, indexar, editar, copiar, exportar, archivar, favoritos (prueba
   automática ampliando `originales_intactos.rs`).
-- [ ] Solo `trash.rs` contiene código que borra originales (prueba que
-  recorre el código fuente).
-- [ ] Eliminar para siempre borra exactamente esos archivos y filas y nada
+- [x] Solo `trash.rs` contiene código que borra originales (prueba que
+  recorre el código fuente: `tests/solo_la_papelera_borra.rs`).
+- [x] Eliminar para siempre borra exactamente esos archivos y filas y nada
   más; un archivo cambiado fuera de la app no se borra (prueba automática).
-- [ ] El vaciado automático borra solo lo que lleva 30 días o más, y no hace
+- [x] El vaciado automático borra solo lo que lleva 30 días o más, y no hace
   nada con el reloj adelantado más de 60 días (prueba automática con reloj
   simulado).
-- [ ] Las fotos en la Papelera no salen en Fotos, Favoritos, Archivo,
+- [x] Las fotos en la Papelera no salen en Fotos, Favoritos, Archivo,
   búsqueda, barra de meses ni Duplicados (prueba automática).
-- [ ] Restaurar devuelve favorito, archivo y edición (prueba automática).
-- [ ] Enviar o restaurar 10 000 fotos tarda menos de 1 s.
+- [x] Restaurar devuelve favorito, archivo y edición (pruebas en `trash.rs` y
+  `tests/originales_intactos.rs`).
+- [x] Enviar o restaurar 10 000 fotos tarda menos de 1 s (30 ms,
+  `docs/rendimiento.md`).
 - [x] Capturas de la Papelera, la barra de selección y el diálogo aprobadas
   por Paulo antes de cerrar la interfaz.
-- [ ] Los originales no se modifican salvo al eliminar para siempre (prueba
+- [x] Los originales no se modifican salvo al eliminar para siempre (prueba
   automática).
 
 ## Fuera de alcance
@@ -196,26 +197,27 @@ Salvaguardas que la acompañan:
 ## Tareas (≤1 h cada una)
 1. [x] Aprobación de Paulo de la excepción a la regla 1 y cambio de la regla
    en `CLAUDE.md`.
-2. [ ] Migración `0014_papelera.sql` (`trashed_at`, índices, última
-   apertura) y `View::Papelera`; filtros en vistas, búsqueda, barra de meses y
-   duplicados, con pruebas.
-3. [ ] Núcleo: `send_to_trash` y `restore` sobre un `Scope`, en una
-   transacción, con pruebas y medida con 10 000 fotos.
-4. [ ] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación
+2. [x] Migración `0014_papelera.sql` (`trashed_at`, índices y tabla
+   `library_meta` para la última apertura); filtros en las vistas, la
+   búsqueda, la barra de meses, la selección y los duplicados, con pruebas.
+3. [x] Núcleo: `send_to_trash` y `restore_from_trash` sobre un `Scope`, en una
+   transacción, y la vista Papelera ordenada por fecha de envío (con su
+   cursor y su selección), con pruebas y medida con 10 000 fotos.
+4. [x] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación
    de tamaño y fecha, recetas y miniaturas sin otra foto con la huella), con
    pruebas y la prueba que recorre el código fuente.
-5. [ ] Núcleo: vaciado a los 30 días con reloj inyectable y salvaguarda del
+5. [x] Núcleo: vaciado a los 30 días con reloj inyectable y salvaguarda del
    reloj adelantado; informe de importación con «ya estaban en la papelera».
-6. [ ] CLI `mnemos papelera` y `mnemos papelera vaciar`.
-7. [ ] Comandos de Tauri (`enviar_a_papelera`, `restaurar`,
+6. [x] CLI `mnemos papelera` y `mnemos papelera vaciar`.
+7. [x] Comandos de Tauri (`enviar_a_papelera`, `restaurar`,
    `eliminar_para_siempre`, `vaciar_papelera`, vaciado al abrir) con
    progreso, y envoltorios en `biblioteca.ts`.
 8. [x] Capturas del diseño para Paulo (aprobadas el 2026-11-12;
    `capturas/015-*.png`).
-9. [ ] Interfaz: botón y tecla `Supr` en la barra de selección y en el visor,
+9. [x] Interfaz: botón y tecla `Supr` en la barra de selección y en el visor,
    con aviso y «Deshacer».
-10. [ ] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
+10. [x] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
     vacía), barra con Restaurar y Eliminar para siempre, visor de la Papelera
     y diálogo de confirmación.
-11. [ ] Prueba de punta a punta ampliando `originales_intactos.rs` y
+11. [x] Prueba de punta a punta ampliando `originales_intactos.rs` y
     `docs/arquitectura.md`; actualizar `docs/progreso.md`.

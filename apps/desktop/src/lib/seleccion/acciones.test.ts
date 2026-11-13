@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Núcleo simulado con el estado de 6 fotos: devuelve los ids que cambian.
-const estado = new Map<number, { favorite: boolean; archived: boolean }>();
+const estado = new Map<number, { favorite: boolean; archived: boolean; trashed?: boolean }>();
 let fallar = false;
 
 vi.mock("../biblioteca", () => ({
@@ -15,6 +15,17 @@ vi.mock("../biblioteca", () => ({
     if (fallar) throw new Error("disco desconectado");
     const cambian = ids.filter((id) => estado.get(id)!.archived !== archivar);
     for (const id of cambian) estado.get(id)!.archived = archivar;
+    return cambian;
+  }),
+  enviarAPapelera: vi.fn(async (ids: number[]) => {
+    if (fallar) throw new Error("disco desconectado");
+    const cambian = ids.filter((id) => !estado.get(id)!.trashed);
+    for (const id of cambian) estado.get(id)!.trashed = true;
+    return cambian;
+  }),
+  restaurar: vi.fn(async (ids: number[]) => {
+    const cambian = ids.filter((id) => estado.get(id)!.trashed);
+    for (const id of cambian) estado.get(id)!.trashed = false;
     return cambian;
   }),
   seleccionarTodo: vi.fn(),
@@ -32,6 +43,10 @@ import {
   avisos,
   cerrarAviso,
   deshacer,
+  enPapelera,
+  enviarFotoAPapelera,
+  enviarSeleccionAPapelera,
+  esTeclaPapelera,
   registrarFotos,
   todasFavoritas,
 } from "./acciones.svelte";
@@ -40,6 +55,7 @@ import { alternar, cambiarAmbito, limpiarSeleccion, seleccion } from "./seleccio
 const marcar = (...ids: number[]) => ids.forEach((id) => alternar({ id, date: 0 }));
 const favoritas = () => [...estado].filter(([, e]) => e.favorite).map(([id]) => id);
 const archivadas = () => [...estado].filter(([, e]) => e.archived).map(([id]) => id);
+const enLaPapelera = () => [...estado].filter(([, e]) => e.trashed).map(([id]) => id);
 
 // La cuadrícula solo tiene cargadas las fotos 1 a 4.
 const cargadas = (id: number) =>
@@ -161,3 +177,60 @@ describe("acciones de la selección", () => {
 });
 
 void quitarFuente;
+
+describe("papelera (spec 015)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fallar = false;
+    for (let id = 1; id <= 6; id++) estado.set(id, { favorite: false, archived: false });
+    cambiarAmbito({ vista: "fotos" });
+    limpiarSeleccion();
+    cerrarAviso();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("envía la selección sin pedir confirmación y se puede deshacer", async () => {
+    estado.get(2)!.trashed = true;
+    marcar(1, 2, 3);
+    const antes = cambios.version;
+    await enviarSeleccionAPapelera();
+    expect(enLaPapelera()).toEqual([1, 2, 3]);
+    // Solo cuenta las que cambiaron; la 2 ya estaba.
+    expect(avisos.actual?.texto).toBe("2 fotos movidas a la papelera");
+    expect(seleccion.ids.size).toBe(0);
+    expect(cambios.version).toBeGreaterThan(antes);
+
+    await deshacer();
+    // Deshacer solo saca las que se enviaron ahora.
+    expect(enLaPapelera()).toEqual([2]);
+  });
+
+  it("si falla, nada cambia y la selección se conserva", async () => {
+    fallar = true;
+    marcar(1, 2);
+    await enviarSeleccionAPapelera();
+    expect(enLaPapelera()).toEqual([]);
+    expect(avisos.actual?.error).toBe(true);
+    expect(seleccion.ids.size).toBe(2);
+  });
+
+  it("desde el visor, una foto con «Deshacer»", async () => {
+    expect(await enviarFotoAPapelera(4)).toBe(true);
+    expect(avisos.actual?.texto).toBe("1 foto movida a la papelera");
+    await deshacer();
+    expect(enLaPapelera()).toEqual([]);
+  });
+
+  it("sabe si la selección es de la Papelera", () => {
+    expect(enPapelera()).toBe(false);
+    cambiarAmbito({ vista: "papelera" });
+    expect(enPapelera()).toBe(true);
+  });
+
+  it("Supr y Retroceso envían a la papelera", () => {
+    const tecla = (key: string) => esTeclaPapelera({ key } as KeyboardEvent);
+    expect(tecla("Delete")).toBe(true);
+    expect(tecla("Backspace")).toBe(true);
+    expect(tecla("d")).toBe(false);
+  });
+});

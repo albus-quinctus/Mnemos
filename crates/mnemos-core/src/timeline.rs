@@ -18,19 +18,34 @@ pub const MAX_PAGE: u32 = 1000;
 /// Fecha por la que se ordena: la de captura o, si falta, la de modificación.
 pub(crate) const DATE: &str = "coalesce(taken_at, modified_at)";
 
-/// Condición extra sobre `photos` para la búsqueda: un trozo de SQL que
-/// empieza por `AND`, con parámetros anónimos (`?`), y sus valores.
-#[derive(Debug, Default)]
+/// Condición extra sobre `photos` para una vista o la búsqueda: un trozo de
+/// SQL que empieza por `AND`, con parámetros anónimos (`?`), sus valores y la
+/// fecha por la que se ordena y se agrupa por días y meses.
+#[derive(Debug)]
 pub(crate) struct Filter {
     pub sql: String,
     pub params: Vec<Value>,
+    /// `DATE` en todas las vistas menos la Papelera, que va por la fecha en
+    /// que se envió cada foto (`trashed_at`).
+    pub order: &'static str,
+}
+
+impl Default for Filter {
+    fn default() -> Self {
+        Self {
+            sql: String::new(),
+            params: Vec::new(),
+            order: DATE,
+        }
+    }
 }
 
 /// Vistas de la línea de tiempo (spec 006). Todas usan la misma cuadrícula,
 /// el mismo orden y el mismo cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum View {
-    /// La biblioteca sin las fotos archivadas.
+    /// La biblioteca sin las fotos archivadas. Ninguna vista incluye las
+    /// fotos de la Papelera (spec 015).
     #[default]
     #[serde(rename = "fotos")]
     Photos,
@@ -40,6 +55,10 @@ pub enum View {
     /// Solo las archivadas.
     #[serde(rename = "archivo")]
     Archive,
+    /// Solo las de la Papelera (spec 015), por la fecha en que se enviaron:
+    /// en esta vista, `GridPhoto::date` es esa fecha.
+    #[serde(rename = "papelera")]
+    Trash,
     /// Las fotos de una etiqueta, archivadas o no (spec 016).
     #[serde(rename = "etiqueta")]
     Tag(i64),
@@ -50,30 +69,37 @@ pub enum View {
 
 impl View {
     /// Condición de la vista. Las de la spec 006 son SQL fijo, sin
-    /// parámetros, y repiten la de su índice parcial (migración 0007) para que
-    /// SQLite lo use. La de una etiqueta usa el índice `photo_tags_tag`.
+    /// parámetros, y repiten la de su índice parcial (migración 0014) para que
+    /// SQLite lo use. La de una etiqueta usa el índice `photo_tags_tag`. Ninguna
+    /// enseña las fotos de la papelera.
     pub(crate) fn filter(self) -> Filter {
-        let sql = match self {
-            View::Photos => " AND archived_at IS NULL",
-            View::Favorites => " AND favorite = 1",
-            View::Archive => " AND archived_at IS NOT NULL",
+        let (sql, order) = match self {
+            View::Photos => (" AND archived_at IS NULL AND trashed_at IS NULL", DATE),
+            View::Favorites => (" AND favorite = 1 AND trashed_at IS NULL", DATE),
+            View::Archive => (" AND archived_at IS NOT NULL AND trashed_at IS NULL", DATE),
+            View::Trash => (" AND trashed_at IS NOT NULL", "trashed_at"),
             View::Tag(tag) => {
                 return Filter {
-                    sql: " AND id IN (SELECT photo_id FROM photo_tags WHERE tag_id = ?)".to_owned(),
+                    sql: " AND trashed_at IS NULL AND id IN (SELECT photo_id FROM photo_tags WHERE tag_id = ?)"
+                        .to_owned(),
                     params: vec![Value::from(tag)],
+                    order: DATE,
                 };
             }
             View::Album(album) => {
                 return Filter {
-                    sql: " AND id IN (SELECT photo_id FROM album_photos WHERE album_id = ?)"
+                    sql: " AND trashed_at IS NULL \
+                          AND id IN (SELECT photo_id FROM album_photos WHERE album_id = ?)"
                         .to_owned(),
                     params: vec![Value::from(album)],
+                    order: DATE,
                 };
             }
         };
         Filter {
             sql: sql.to_owned(),
             params: Vec::new(),
+            order,
         }
     }
 }
@@ -151,8 +177,9 @@ impl Library {
     }
 
     pub(crate) fn months_where(&self, filter: &Filter) -> Result<Vec<Month>> {
+        let order = filter.order;
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT strftime('%Y-%m', {DATE}, 'unixepoch', 'localtime') AS month, count(*)
+            "SELECT strftime('%Y-%m', {order}, 'unixepoch', 'localtime') AS month, count(*)
              FROM photos WHERE 1 {} GROUP BY month ORDER BY month DESC",
             filter.sql
         ))?;
@@ -175,15 +202,16 @@ impl Library {
     ) -> Result<TimelinePage> {
         let limit = limit.clamp(1, MAX_PAGE);
         let (date, id) = after.map_or((i64::MAX, i64::MAX), |c| (c.date, c.id));
+        let order = filter.order;
         // Se pide una de más para saber si hay página siguiente.
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, {DATE}, strftime('%Y-%m', {DATE}, 'unixepoch', 'localtime'),
+            "SELECT id, {order}, strftime('%Y-%m', {order}, 'unixepoch', 'localtime'),
                     width, height, coalesce(orientation, 1),
                     content_hash IN (SELECT content_hash FROM thumbnail_failures),
                     rel_path, favorite, archived_at IS NOT NULL, edit_version, content_hash
              FROM photos
-             WHERE ({DATE}, id) < (?, ?) {}
-             ORDER BY {DATE} DESC, id DESC
+             WHERE ({order}, id) < (?, ?) {}
+             ORDER BY {order} DESC, id DESC
              LIMIT ?",
             filter.sql
         ))?;

@@ -7,14 +7,19 @@
     alternarFavoritos,
     avisos,
     enArchivo,
+    enPapelera,
+    enviarSeleccionAPapelera,
+    restaurarSeleccion,
     todasFavoritas,
   } from "./acciones.svelte";
+  import { borrado, pedirEliminar } from "$lib/papelera/papelera.svelte";
   import type { TamanoExportacion } from "$lib/biblioteca";
   import { enCurso, exportarVarias } from "$lib/exportacion/exportacion.svelte";
 
   const cuantas = $derived(seleccion.ids.size);
   const quitar = $derived(todasFavoritas());
   const desarchivar = $derived(enArchivo());
+  const papelera = $derived(enPapelera());
 
   // Exportar (spec 017): el mismo menú que el visor.
   let menuExportar = $state(false);
@@ -53,24 +58,56 @@
     {cuantas.toLocaleString("es")}
     {cuantas === 1 ? "seleccionada" : "seleccionadas"}
   </span>
-  <button
-    type="button"
-    class="boton"
-    disabled={avisos.ocupado}
-    onclick={alternarFavoritos}
-  >
-    <Icono nombre="estrella" relleno={quitar} />
-    <span>{quitar ? "Quitar de Favoritos" : "Añadir a Favoritos"}</span>
-  </button>
-  <button
-    type="button"
-    class="boton"
-    disabled={avisos.ocupado}
-    onclick={alternarArchivo}
-  >
-    <Icono nombre={desarchivar ? "desarchivar" : "archivo"} />
-    <span>{desarchivar ? "Desarchivar" : "Archivar"}</span>
-  </button>
+  {#if papelera}
+    <!-- En la Papelera (spec 015): restaurar o borrar del disco. -->
+    <button
+      type="button"
+      class="boton"
+      disabled={avisos.ocupado || borrado.enCurso}
+      onclick={restaurarSeleccion}
+    >
+      <Icono nombre="restaurar" />
+      <span>Restaurar</span>
+    </button>
+    <button
+      type="button"
+      class="boton peligro"
+      disabled={avisos.ocupado || borrado.enCurso}
+      onclick={() => pedirEliminar([...seleccion.ids])}
+    >
+      <Icono nombre="papelera" />
+      <span>Eliminar para siempre</span>
+    </button>
+  {:else}
+    <button
+      type="button"
+      class="boton"
+      disabled={avisos.ocupado}
+      onclick={alternarFavoritos}
+    >
+      <Icono nombre="estrella" relleno={quitar} />
+      <span>{quitar ? "Quitar de Favoritos" : "Añadir a Favoritos"}</span>
+    </button>
+    <button
+      type="button"
+      class="boton"
+      disabled={avisos.ocupado}
+      onclick={alternarArchivo}
+    >
+      <Icono nombre={desarchivar ? "desarchivar" : "archivo"} />
+      <span>{desarchivar ? "Desarchivar" : "Archivar"}</span>
+    </button>
+    <button
+      type="button"
+      class="boton"
+      title="Enviar a la papelera (Supr)"
+      disabled={avisos.ocupado}
+      onclick={enviarSeleccionAPapelera}
+    >
+      <Icono nombre="papelera" />
+      <span>Papelera</span>
+    </button>
+  {/if}
   <div class="exportar" bind:this={menu}>
     <button
       type="button"
@@ -140,6 +177,10 @@
 
   .boton:hover:not(:disabled) {
     background: var(--superficie-alta);
+  }
+
+  .boton.peligro {
+    color: var(--error);
   }
 
   .boton.activo {

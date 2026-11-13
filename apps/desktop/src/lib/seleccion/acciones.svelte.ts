@@ -2,7 +2,13 @@
 // de 8 s para deshacer. Cada acción va al núcleo en una sola transacción: si
 // falla, nada cambia y la selección se conserva para reintentar.
 
-import { archivar, marcarFavoritos, type FotoCuadricula } from "../biblioteca";
+import {
+  archivar,
+  enviarAPapelera,
+  marcarFavoritos,
+  restaurar,
+  type FotoCuadricula,
+} from "../biblioteca";
 import { avisarCambio } from "../cambios.svelte";
 import { alFallar, limpiarSeleccion, seleccion } from "./seleccion.svelte";
 
@@ -67,6 +73,11 @@ export function enArchivo(): boolean {
   return "vista" in seleccion.ambito && seleccion.ambito.vista === "archivo";
 }
 
+/** En la Papelera (spec 015) la barra restaura y elimina para siempre. */
+export function enPapelera(): boolean {
+  return "vista" in seleccion.ambito && seleccion.ambito.vista === "papelera";
+}
+
 // «1 foto archivada», «3 fotos archivadas».
 function fotosTexto(n: number, participio: string): string {
   return n === 1 ? `1 foto ${participio}` : `${n.toLocaleString("es")} fotos ${participio}s`;
@@ -117,6 +128,45 @@ export function alternarArchivo() {
       () => archivar(cambiadas, !archivada),
     );
   });
+}
+
+/**
+ * Envía la selección a la Papelera (spec 015). No toca los archivos, así
+ * que no pide confirmación: el aviso permite deshacer.
+ */
+export function enviarSeleccionAPapelera() {
+  return ejecutar(async () => {
+    const cambiadas = await enviarAPapelera([...seleccion.ids]);
+    terminar(`${fotosTexto(cambiadas.length, "movida")} a la papelera`, () =>
+      restaurar(cambiadas),
+    );
+  });
+}
+
+/** Saca la selección de la Papelera, con «Deshacer». */
+export function restaurarSeleccion() {
+  return ejecutar(async () => {
+    const cambiadas = await restaurar([...seleccion.ids]);
+    terminar(fotosTexto(cambiadas.length, "restaurada"), () => enviarAPapelera(cambiadas));
+  });
+}
+
+/** Restaurar desde el visor de la Papelera, con «Deshacer». */
+export async function restaurarFoto(id: number): Promise<boolean> {
+  try {
+    await restaurar([id]);
+  } catch (e) {
+    mostrarAviso({ texto: mensajeDeError(e), error: true });
+    return false;
+  }
+  mostrarAviso({
+    texto: fotosTexto(1, "restaurada"),
+    deshacer: async () => {
+      await enviarAPapelera([id]);
+      avisarCambio();
+    },
+  });
+  return true;
 }
 
 // Tras una acción correcta se quita la selección y las cuadrículas recargan.
@@ -170,4 +220,27 @@ export async function archivarFoto(id: number, archivada: boolean): Promise<bool
     },
   });
   return true;
+}
+
+/** Enviar a la Papelera desde el visor (spec 015), con «Deshacer». */
+export async function enviarFotoAPapelera(id: number): Promise<boolean> {
+  try {
+    await enviarAPapelera([id]);
+  } catch (e) {
+    mostrarAviso({ texto: mensajeDeError(e), error: true });
+    return false;
+  }
+  mostrarAviso({
+    texto: `${fotosTexto(1, "movida")} a la papelera`,
+    deshacer: async () => {
+      await restaurar([id]);
+      avisarCambio();
+    },
+  });
+  return true;
+}
+
+/** Tecla de enviar a la Papelera: `Supr`, o `Retroceso` (macOS no tiene `Supr`). */
+export function esTeclaPapelera(e: KeyboardEvent): boolean {
+  return e.key === "Delete" || e.key === "Backspace";
 }
