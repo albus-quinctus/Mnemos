@@ -276,7 +276,8 @@ fn album_id(conn: &Connection, name: &str) -> Result<i64> {
         return Ok(id);
     }
     conn.execute(
-        "INSERT INTO albums (name, created_at) VALUES (?1, unixepoch())",
+        "INSERT INTO albums (name, created_at, updated_at)
+         VALUES (?1, unixepoch(), unixepoch())",
         [name],
     )?;
     Ok(conn.last_insert_rowid())
