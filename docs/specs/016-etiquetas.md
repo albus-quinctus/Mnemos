@@ -140,7 +140,7 @@ existen desde la migración 0001 y siguen vacías.
 - Sugerencias de etiquetas mientras se escribe en el campo de búsqueda.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Migración `0013_etiquetas.sql` (índice de `photo_tags` por etiqueta y
+1. [x] Migración `0013_etiquetas.sql` (índice de `photo_tags` por etiqueta y
    reconstrucción de `photo_search.tags`) y núcleo: crear, renombrar, unir,
    borrar y listar con recuento y foto de portada. Cada cambio rehace
    `photo_search.tags` de las fotos afectadas. Con pruebas.
