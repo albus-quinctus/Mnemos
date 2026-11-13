@@ -44,7 +44,13 @@ export function fotos(
 // Vistas, selección, favoritos, archivo y títulos de día (spec 006). Reflejan
 // `mnemos_core::{View, Scope, DayTitle}`.
 // En la Papelera (spec 015), `date` de cada foto es la fecha en que se envió.
-export type Vista = "fotos" | "favoritos" | "archivo" | "papelera" | { etiqueta: number };
+export type Vista =
+  | "fotos"
+  | "favoritos"
+  | "archivo"
+  | "papelera"
+  | { etiqueta: number }
+  | { album: number };
 
 // Dónde se selecciona: una vista o los resultados de una búsqueda.
 export type Ambito = { vista: Vista } | { busqueda: string };
@@ -483,4 +489,54 @@ export function usoEtiquetas(ids: number[]): Promise<UsoEtiqueta[]> {
 // edición: el editor avisa antes de guardar como original.
 export function copiasIdenticas(id: number): Promise<CopiaDuplicada[]> {
   return invoke("copias_identicas", { id });
+}
+
+// Álbumes (spec 014). Solo cambian la base de datos: ninguno borra fotos.
+
+export interface Album {
+  id: number;
+  name: string;
+  /** Número de fotos, archivadas incluidas. */
+  photos: number;
+  /** La foto más reciente, que hace de portada; `null` si está vacío. */
+  cover: number | null;
+  cover_edit_version: number | null;
+  /** Fechas (segundos Unix) de la foto más antigua y la más reciente. */
+  first: number | null;
+  last: number | null;
+  updated_at: number;
+}
+
+/** Del modificado más recientemente al más antiguo. */
+export function albumes(): Promise<Album[]> {
+  return invoke("albumes");
+}
+
+export function album(id: number): Promise<Album> {
+  return invoke("album", { id });
+}
+
+/** Crea un álbum con las fotos `ids` (o vacío). */
+export function crearAlbum(nombre: string, ids: number[] = []): Promise<Album> {
+  return invoke("crear_album", { nombre, ids });
+}
+
+/** Devuelve el nombre tal como ha quedado. */
+export function renombrarAlbum(id: number, nombre: string): Promise<string> {
+  return invoke("renombrar_album", { id, nombre });
+}
+
+/** Elimina el álbum; sus fotos siguen en la biblioteca. */
+export function eliminarAlbum(id: number): Promise<void> {
+  return invoke("eliminar_album", { id });
+}
+
+/** Devuelve las fotos que no estaban en el álbum. */
+export function anadirAAlbum(album: number, ids: number[]): Promise<number[]> {
+  return invoke("anadir_a_album", { album, ids });
+}
+
+/** Devuelve las fotos que estaban, para «Deshacer». */
+export function quitarDeAlbum(album: number, ids: number[]): Promise<number[]> {
+  return invoke("quitar_de_album", { album, ids });
 }

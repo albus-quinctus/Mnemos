@@ -26,6 +26,9 @@ pub struct Album {
     /// La foto más reciente del álbum, que hace de portada. `None` si está
     /// vacío.
     pub cover: Option<i64>,
+    /// Versión de la edición que se ve de la portada (spec 009), para pedir
+    /// su miniatura editada.
+    pub cover_edit_version: Option<u32>,
     /// Fecha (segundos Unix) de la foto más antigua y de la más reciente,
     /// para el rango de la cabecera. `None` si está vacío.
     pub first: Option<i64>,
@@ -45,7 +48,12 @@ const SELECT: &str = "
             LIMIT 1),
            min(coalesce(p.taken_at, p.modified_at)),
            max(coalesce(p.taken_at, p.modified_at)),
-           a.updated_at
+           a.updated_at,
+           (SELECT p2.edit_version FROM album_photos ap2
+                JOIN photos p2 ON p2.id = ap2.photo_id
+            WHERE ap2.album_id = a.id AND p2.trashed_at IS NULL
+            ORDER BY coalesce(p2.taken_at, p2.modified_at) DESC, p2.id DESC
+            LIMIT 1)
     FROM albums a
          LEFT JOIN album_photos ap ON ap.album_id = a.id
          LEFT JOIN photos p ON p.id = ap.photo_id AND p.trashed_at IS NULL";
@@ -59,6 +67,7 @@ fn album_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Album> {
         first: r.get(4)?,
         last: r.get(5)?,
         updated_at: r.get(6)?,
+        cover_edit_version: r.get(7)?,
     })
 }
 
@@ -393,7 +402,12 @@ mod tests {
         let album = lib.album(id).unwrap().unwrap();
         assert_eq!(album.photos, 3);
         assert_eq!(album.cover, Some(4));
+        assert_eq!(album.cover_edit_version, None);
         assert_eq!((album.first, album.last), (Some(200), Some(400)));
+        lib.conn
+            .execute("UPDATE photos SET edit_version = 2 WHERE id = 4", [])
+            .unwrap();
+        assert_eq!(lib.album(id).unwrap().unwrap().cover_edit_version, Some(2));
 
         // La fecha de captura manda sobre la de modificación.
         lib.conn
