@@ -216,7 +216,7 @@ Salvaguardas que la acompañan:
    `capturas/015-*.png`).
 9. [x] Interfaz: botón y tecla `Supr` en la barra de selección y en el visor,
    con aviso y «Deshacer».
-10. [ ] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
+10. [x] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
     vacía), barra con Restaurar y Eliminar para siempre, visor de la Papelera
     y diálogo de confirmación.
 11. [ ] Prueba de punta a punta ampliando `originales_intactos.rs` y

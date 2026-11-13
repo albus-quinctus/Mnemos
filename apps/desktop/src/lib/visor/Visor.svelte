@@ -32,7 +32,10 @@
     enviarFotoAPapelera,
     esTeclaPapelera,
     marcarFavorita,
+    restaurarFoto,
   } from "$lib/seleccion/acciones.svelte";
+  import { seEliminaraEl } from "$lib/papelera/fechas";
+  import { borrado } from "$lib/papelera/papelera.svelte";
   import { CacheImagenes, vecinas } from "./cache";
   import { fechas } from "./fechas.svelte";
   import {
@@ -60,6 +63,8 @@
     enArchivo = false,
     onArchivada,
     onEnviadaPapelera,
+    onRestaurada,
+    onEliminar,
   }: {
     fotos: FotoCuadricula[];
     indice: number;
@@ -75,7 +80,14 @@
     // Tras enviarla a la Papelera (spec 015): la cuadrícula la quita y el
     // visor pasa a la siguiente. Sin él, no se ofrece el botón.
     onEnviadaPapelera?: (indice: number) => void;
+    // Visor de la Papelera (spec 015): solo restaurar o eliminar para
+    // siempre; no se edita, ni se marca, ni se archiva. `date` de cada foto
+    // es la fecha en que se envió.
+    onRestaurada?: (indice: number) => void;
+    onEliminar?: (id: number) => void;
   } = $props();
+
+  const enPapelera = $derived(onRestaurada !== undefined);
 
   type Completa = {
     img: HTMLImageElement;
@@ -185,6 +197,16 @@
     if (await enviarFotoAPapelera(foto.id)) {
       datosCambiados = true;
       onEnviadaPapelera(indice);
+    }
+    marcando = false;
+  }
+
+  async function sacarDePapelera() {
+    if (!foto || marcando || !onRestaurada) return;
+    marcando = true;
+    if (await restaurarFoto(foto.id)) {
+      datosCambiados = true;
+      onRestaurada(indice);
     }
     marcando = false;
   }
@@ -465,6 +487,9 @@
     if (e.key === "Escape" && menuExportar) menuExportar = false;
     else if (e.key === "Escape") onCerrar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
+    else if (enPapelera && esTeclaPapelera(e)) {
+      if (foto && !borrado.enCurso) onEliminar?.(foto.id);
+    } else if (enPapelera && !["ArrowRight", "ArrowLeft"].includes(e.key)) return;
     else if ((e.key === "e" || e.key === "E") && !e.shiftKey) abrirEditor();
     else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
@@ -508,6 +533,31 @@
       <Icono nombre="cerrar" />
     </button>
     <span class="nombre">{foto?.name}</span>
+    {#if enPapelera && foto}
+      <span class="caduca">{seEliminaraEl(foto.date)}</span>
+    {/if}
+    {#if enPapelera}
+      <button
+        type="button"
+        class="boton texto"
+        title="Restaurar"
+        disabled={marcando}
+        onclick={sacarDePapelera}
+      >
+        <Icono nombre="restaurar" />
+        <span>Restaurar</span>
+      </button>
+      <button
+        type="button"
+        class="boton texto peligro"
+        title="Eliminar para siempre (Supr)"
+        disabled={borrado.enCurso}
+        onclick={() => foto && onEliminar?.(foto.id)}
+      >
+        <Icono nombre="papelera" />
+        <span>Eliminar para siempre</span>
+      </button>
+    {:else}
     <button
       type="button"
       class="boton editar"
@@ -582,6 +632,7 @@
       >
         <Icono nombre="papelera" />
       </button>
+    {/if}
     {/if}
     <button
       type="button"
@@ -1085,6 +1136,33 @@
 
   .boton:hover {
     background: var(--visor-superficie);
+  }
+
+  /* Visor de la Papelera (spec 015): botones con texto. */
+  .caduca {
+    margin-right: auto;
+    color: var(--visor-texto-suave);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .boton.texto {
+    display: inline-flex;
+    gap: 0.5rem;
+    width: auto;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .boton.peligro {
+    color: var(--visor-error);
+  }
+
+  .boton:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   .boton.favorita {

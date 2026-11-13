@@ -39,10 +39,13 @@
   import { cargarTitulos } from "./titulos.svelte";
   import TituloDia from "./TituloDia.svelte";
   import { diaDe, disponer, nombreDia, visibles, type Opciones } from "./disposicion";
+  import { cuandoSeEliminan, enviadasEl } from "$lib/papelera/fechas";
+  import { borrado, pedirEliminar, pedirVaciar } from "$lib/papelera/papelera.svelte";
 
   // Con `texto`, la cuadrícula muestra solo los resultados de esa búsqueda.
   // `onSalir` se llama con Esc cuando el visor no está abierto.
-  // Sin `texto`, muestra una vista: Fotos, Favoritos o Archivo (spec 006).
+  // Sin `texto`, muestra una vista: Fotos, Favoritos o Archivo (spec 006), o
+  // la Papelera (spec 015), agrupada por el día en que se envió cada foto.
   // `activa` es falso mientras otra capa la tapa: entonces no atiende teclas.
   let {
     texto = "",
@@ -56,6 +59,7 @@
     texto ? buscarFotos(texto, despues, limite) : vistaFotos(vista, despues, limite);
   // En la búsqueda y en Favoritos salen archivadas: llevan la caja.
   const marcaArchivadas = $derived(texto !== "" || vista === "favoritos");
+  const papelera = $derived(!texto && vista === "papelera");
 
   const PAGINA = 500;
   // Margen por encima y por debajo de la pantalla que también se pinta, para
@@ -227,6 +231,10 @@
     } finally {
       cargando = false;
     }
+    // Si se eliminó la foto abierta (Papelera, spec 015), el visor pasa a la
+    // que ha quedado en su sitio, o se cierra si ya no queda ninguna.
+    if (abierta !== null && abierta >= fotos.length)
+      abierta = fotos.length > 0 ? fotos.length - 1 : null;
     const indice = fotos.findIndex((f) => f.id === ultimaVista);
     if (indice >= 0 && abierta === null) {
       await tick();
@@ -336,6 +344,14 @@
     if (e.key === "Escape" && abierta === null && !haySeleccion()) onSalir?.();
   }}
 >
+{#if papelera && listo && !error && total > 0}
+  <div class="franja">
+    <span>Las fotos de la papelera se eliminan para siempre a los 30 días.</span>
+    <button type="button" disabled={borrado.enCurso} onclick={() => pedirVaciar(total)}>
+      Vaciar papelera
+    </button>
+  </div>
+{/if}
 {#if texto && listo && !error && total > 0}
   <p class="resumen">
     {total.toLocaleString("es")}
@@ -366,6 +382,11 @@
       <p class="aviso">
         Aún no tienes favoritos. Pulsa la estrella o la tecla F en una foto para añadirla.
       </p>
+    {:else if vista === "papelera"}
+      <div class="sin-resultados">
+        <p class="titulo">La papelera está vacía</p>
+        <p>Las fotos que envíes aquí se eliminan para siempre a los 30 días.</p>
+      </div>
     {:else if vista === "archivo"}
       <p class="aviso">
         No hay nada archivado. Las fotos archivadas no salen en Fotos, pero siguen en tu
@@ -404,8 +425,13 @@
                   {#if completo}<Icono nombre="marca" tamano={14} grosor={3} />{/if}
                 </button>
               {/if}
-              <span class="fecha">{nombreDia(titulo.dia)}</span>
-              <TituloDia dia={titulo.dia} />
+              {#if papelera}
+                <span class="fecha">{enviadasEl(titulo.dia)}</span>
+                <span class="quedan">· {cuandoSeEliminan(titulo.dia)}</span>
+              {:else}
+                <span class="fecha">{nombreDia(titulo.dia)}</span>
+                <TituloDia dia={titulo.dia} />
+              {/if}
             </h2>
           {/each}
           {#each bloque.celdas as celda (fotos[celda.indice].id)}
@@ -506,7 +532,9 @@
     onPedirMas={cargarPagina}
     enArchivo={!texto && vista === "archivo"}
     onArchivada={alArchivarEnVisor}
-    onEnviadaPapelera={quitarDelVisor}
+    onEnviadaPapelera={papelera ? undefined : quitarDelVisor}
+    onRestaurada={papelera ? quitarDelVisor : undefined}
+    onEliminar={papelera ? (id) => pedirEliminar([id]) : undefined}
   />
 {/if}
 
@@ -521,6 +549,46 @@
     position: relative;
     flex: 1;
     min-height: 0;
+  }
+
+  .franja {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 1rem 64px 0.25rem 24px;
+    padding: 0.6rem 0.6rem 0.6rem 1rem;
+    border-radius: var(--radio);
+    background: var(--superficie-alta);
+    color: var(--texto-suave);
+  }
+
+  .franja span {
+    flex: 1;
+    min-width: 12rem;
+  }
+
+  .franja button {
+    min-height: var(--objetivo);
+    padding: 0 1rem;
+    border: 1px solid var(--borde);
+    border-radius: 999px;
+    background: var(--superficie);
+    color: var(--texto);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .franja button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .quedan {
+    flex: none;
+    margin-left: 0.35rem;
+    color: var(--texto-suave);
+    font-weight: 400;
   }
 
   .resumen {
