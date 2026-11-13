@@ -9,11 +9,35 @@
     enArchivo,
     todasFavoritas,
   } from "./acciones.svelte";
+  import type { TamanoExportacion } from "$lib/biblioteca";
+  import { enCurso, exportarVarias } from "$lib/exportacion/exportacion.svelte";
 
   const cuantas = $derived(seleccion.ids.size);
   const quitar = $derived(todasFavoritas());
   const desarchivar = $derived(enArchivo());
+
+  // Exportar (spec 017): el mismo menú que el visor.
+  let menuExportar = $state(false);
+  let menu = $state<HTMLDivElement>();
+
+  function exportarComo(tamano: TamanoExportacion) {
+    menuExportar = false;
+    void exportarVarias([...seleccion.ids], tamano);
+  }
+
+  function alPulsarFuera(e: PointerEvent) {
+    if (menuExportar && menu && !menu.contains(e.target as Node)) menuExportar = false;
+  }
+
+  function alPulsarTecla(e: KeyboardEvent) {
+    if (e.key === "Escape" && menuExportar) {
+      menuExportar = false;
+      e.stopPropagation();
+    }
+  }
 </script>
+
+<svelte:window onpointerdown={alPulsarFuera} onkeydowncapture={alPulsarTecla} />
 
 <header>
   <button
@@ -47,6 +71,32 @@
     <Icono nombre={desarchivar ? "desarchivar" : "archivo"} />
     <span>{desarchivar ? "Desarchivar" : "Archivar"}</span>
   </button>
+  <div class="exportar" bind:this={menu}>
+    <button
+      type="button"
+      class="boton"
+      class:activo={menuExportar}
+      aria-haspopup="menu"
+      aria-expanded={menuExportar}
+      disabled={enCurso()}
+      onclick={() => (menuExportar = !menuExportar)}
+    >
+      <Icono nombre="exportar" />
+      <span>Exportar</span>
+    </button>
+    {#if menuExportar}
+      <div class="menu" role="menu" aria-label="Exportar">
+        <button type="button" role="menuitem" onclick={() => exportarComo("original")}>
+          Tamaño original
+          <span>Los archivos tal cual, con sus datos</span>
+        </button>
+        <button type="button" role="menuitem" onclick={() => exportarComo("reducida")}>
+          Tamaño reducido (2048 px)
+          <span>JPEG para compartir, sin ubicación</span>
+        </button>
+      </div>
+    {/if}
+  </div>
 </header>
 
 <style>
@@ -90,6 +140,52 @@
 
   .boton:hover:not(:disabled) {
     background: var(--superficie-alta);
+  }
+
+  .boton.activo {
+    background: var(--superficie-alta);
+  }
+
+  .exportar {
+    position: relative;
+  }
+
+  .menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 5;
+    display: grid;
+    min-width: 270px;
+    padding: 6px;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    background: var(--superficie);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  }
+
+  .menu button {
+    display: grid;
+    gap: 2px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: calc(var(--radio) - 2px);
+    background: transparent;
+    color: var(--texto);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .menu button:hover,
+  .menu button:focus-visible {
+    background: var(--superficie-alta);
+    outline: none;
+  }
+
+  .menu span {
+    color: var(--texto-suave);
+    font-size: 0.8rem;
   }
 
   .boton:disabled {

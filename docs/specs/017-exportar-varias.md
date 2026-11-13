@@ -77,7 +77,7 @@ el mismo núcleo.
 - [x] Un error al escribir en el destino detiene el lote y lo ya exportado se queda entero (prueba automática).
 - [x] Cancelar para tras la foto en curso sin dejar archivos a medias (prueba automática).
 - [x] Una foto con versión editada se exporta igual que desde el visor (prueba automática).
-- [ ] El botón, el menú, el progreso, «Cancelar» y «Ver» funcionan con ratón y teclado.
+- [x] El botón, el menú, el progreso, «Cancelar» y «Ver» funcionan con ratón y teclado.
 - [x] Capturas del botón, el progreso y el resumen aprobadas por Paulo.
 - [x] Los originales y la base de datos no se modifican (prueba automática).
 
@@ -93,5 +93,5 @@ el mismo núcleo.
 1. [x] Spec y capturas del diseño (aprobadas por Paulo el 12 nov; `capturas/017-*.png` en los archivos del proyecto).
 2. [x] `mnemos-core`: `export_many` en un módulo aparte, con progreso, cancelación y la regla de saltar o parar. Pruebas. Llama a la exportación de una foto de la spec 008, que ya saca la versión editada. En `crates/mnemos-core/src/export_many.rs`, con `Library::export_items` para los ids en el orden de la cuadrícula.
 3. [x] App: comandos `exportar_varias` y `cancelar_exportacion` con el evento `exportacion` (en curso, terminada, cancelada, detenida), en un hilo aparte como la importación. Hecha en `apps/desktop/src-tauri/src/exportacion.rs` (progreso como mucho cada 100 ms; una sola exportación de varias a la vez).
-4. [ ] Barra de selección: botón y menú, selector de carpeta, progreso con «Cancelar», resumen y «Ver». Pruebas de la interfaz.
+4. [x] Barra de selección: botón y menú, selector de carpeta, progreso con «Cancelar», resumen y «Ver». Pruebas de la interfaz. Hecha en `lib/exportacion/` (estado, tarjeta `ProgresoExportacion.svelte`) y `BarraSeleccion.svelte`; la última carpeta se comparte con el visor.
 5. [ ] Probarlo en la app real con el HDD (Paulo).
