@@ -150,7 +150,7 @@ existen desde la migración 0001 y siguen vacías.
    Medición con 10 000 fotos.
 3. [x] Núcleo: fotos de una etiqueta (meses, páginas y `Scope` para la
    selección) y la búsqueda por etiqueta. Comando `mnemos etiquetas` en la CLI.
-4. [ ] Comandos de Tauri y sus envoltorios en `biblioteca.ts`.
+4. [x] Comandos de Tauri y sus envoltorios en `biblioteca.ts`.
 5. [ ] Capturas del diseño (pantalla, fotos de una etiqueta, desplegable de la
    barra de selección y sección del visor) para que Paulo las apruebe.
 6. [ ] Pantalla Etiquetas y fotos de una etiqueta; activar la entrada del menú
