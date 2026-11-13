@@ -6,12 +6,17 @@
   import ProgresoImportacion from "$lib/importacion/ProgresoImportacion.svelte";
   import Aviso from "$lib/seleccion/Aviso.svelte";
   import BarraSeleccion from "$lib/seleccion/BarraSeleccion.svelte";
+  import Confirmar from "$lib/papelera/Confirmar.svelte";
+  import { escucharPapelera } from "$lib/papelera/papelera.svelte";
   import { haySeleccion } from "$lib/seleccion/seleccion.svelte";
   import { onMount } from "svelte";
 
   let { children } = $props();
 
-  onMount(escucharImportacion);
+  onMount(() => {
+    escucharImportacion();
+    escucharPapelera();
+  });
 </script>
 
 <div class="galeria">
@@ -30,6 +35,7 @@
 
 <ProgresoImportacion />
 <Aviso />
+<Confirmar />
 
 <style>
   .galeria {

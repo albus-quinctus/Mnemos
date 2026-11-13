@@ -13,7 +13,7 @@
     { nombre: "Etiquetas", icono: "etiquetas" },
     { nombre: "Favoritos", icono: "estrella", seccion: "favoritos" },
     { nombre: "Archivo", icono: "archivo", seccion: "archivo" },
-    { nombre: "Papelera", icono: "papelera" },
+    { nombre: "Papelera", icono: "papelera", seccion: "papelera" },
   ];
 
   // Utilidades, debajo de una línea (spec 010).

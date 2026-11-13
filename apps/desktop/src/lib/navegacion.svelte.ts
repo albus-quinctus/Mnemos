@@ -2,7 +2,7 @@
 import { limpiarBusqueda } from "$lib/busqueda/busqueda.svelte";
 import { limpiarSeleccion } from "$lib/seleccion/seleccion.svelte";
 
-export type Seccion = "fotos" | "favoritos" | "archivo" | "duplicados";
+export type Seccion = "fotos" | "favoritos" | "archivo" | "papelera" | "duplicados";
 
 export const navegacion = $state({ seccion: "fotos" as Seccion });
 

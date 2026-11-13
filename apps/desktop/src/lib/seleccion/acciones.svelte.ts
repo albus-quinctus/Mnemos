@@ -143,6 +143,32 @@ export function enviarSeleccionAPapelera() {
   });
 }
 
+/** Saca la selección de la Papelera, con «Deshacer». */
+export function restaurarSeleccion() {
+  return ejecutar(async () => {
+    const cambiadas = await restaurar([...seleccion.ids]);
+    terminar(fotosTexto(cambiadas.length, "restaurada"), () => enviarAPapelera(cambiadas));
+  });
+}
+
+/** Restaurar desde el visor de la Papelera, con «Deshacer». */
+export async function restaurarFoto(id: number): Promise<boolean> {
+  try {
+    await restaurar([id]);
+  } catch (e) {
+    mostrarAviso({ texto: mensajeDeError(e), error: true });
+    return false;
+  }
+  mostrarAviso({
+    texto: fotosTexto(1, "restaurada"),
+    deshacer: async () => {
+      await enviarAPapelera([id]);
+      avisarCambio();
+    },
+  });
+  return true;
+}
+
 // Tras una acción correcta se quita la selección y las cuadrículas recargan.
 function terminar(texto: string, revertir: () => Promise<number[]>) {
   limpiarSeleccion();
