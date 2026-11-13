@@ -623,7 +623,7 @@ pub fn run() {
             papelera::restaurar,
             papelera::eliminar_para_siempre,
             papelera::vaciar_papelera,
-            papelera::vaciado_automatico
+            papelera::vaciado_automatico,
             etiquetas::etiquetas,
             etiquetas::crear_etiqueta,
             etiquetas::renombrar_etiqueta,
