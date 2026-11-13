@@ -167,9 +167,9 @@ Salvaguardas que la acompañan:
 - [ ] Ninguna acción que no sea eliminar desde la Papelera borra un archivo:
   importar, indexar, editar, copiar, exportar, archivar, favoritos (prueba
   automática ampliando `originales_intactos.rs`).
-- [ ] Solo `trash.rs` contiene código que borra originales (prueba que
-  recorre el código fuente).
-- [ ] Eliminar para siempre borra exactamente esos archivos y filas y nada
+- [x] Solo `trash.rs` contiene código que borra originales (prueba que
+  recorre el código fuente: `tests/solo_la_papelera_borra.rs`).
+- [x] Eliminar para siempre borra exactamente esos archivos y filas y nada
   más; un archivo cambiado fuera de la app no se borra (prueba automática).
 - [ ] El vaciado automático borra solo lo que lleva 30 días o más, y no hace
   nada con el reloj adelantado más de 60 días (prueba automática con reloj
@@ -203,7 +203,7 @@ Salvaguardas que la acompañan:
 3. [x] Núcleo: `send_to_trash` y `restore_from_trash` sobre un `Scope`, en una
    transacción, y la vista Papelera ordenada por fecha de envío (con su
    cursor y su selección), con pruebas y medida con 10 000 fotos.
-4. [ ] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación
+4. [x] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación
    de tamaño y fecha, recetas y miniaturas sin otra foto con la huella), con
    pruebas y la prueba que recorre el código fuente.
 5. [ ] Núcleo: vaciado a los 30 días con reloj inyectable y salvaguarda del
