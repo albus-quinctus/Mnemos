@@ -176,8 +176,10 @@ Salvaguardas que la acompañan:
   simulado).
 - [ ] Las fotos en la Papelera no salen en Fotos, Favoritos, Archivo,
   búsqueda, barra de meses ni Duplicados (prueba automática).
-- [ ] Restaurar devuelve favorito, archivo y edición (prueba automática).
-- [ ] Enviar o restaurar 10 000 fotos tarda menos de 1 s.
+- [ ] Restaurar devuelve favorito, archivo y edición (prueba automática;
+  favorito y archivo ya probados en `trash.rs`).
+- [x] Enviar o restaurar 10 000 fotos tarda menos de 1 s (30 ms,
+  `docs/rendimiento.md`).
 - [x] Capturas de la Papelera, la barra de selección y el diálogo aprobadas
   por Paulo antes de cerrar la interfaz.
 - [ ] Los originales no se modifican salvo al eliminar para siempre (prueba
@@ -198,7 +200,7 @@ Salvaguardas que la acompañan:
 2. [x] Migración `0014_papelera.sql` (`trashed_at`, índices y tabla
    `library_meta` para la última apertura); filtros en las vistas, la
    búsqueda, la barra de meses, la selección y los duplicados, con pruebas.
-3. [ ] Núcleo: `send_to_trash` y `restore` sobre un `Scope`, en una
+3. [x] Núcleo: `send_to_trash` y `restore_from_trash` sobre un `Scope`, en una
    transacción, y la vista Papelera ordenada por fecha de envío (con su
    cursor y su selección), con pruebas y medida con 10 000 fotos.
 4. [ ] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación

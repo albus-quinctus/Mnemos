@@ -25,7 +25,7 @@ mod taken;
 mod takeout;
 pub mod thumbnails;
 pub mod timeline;
-mod trash;
+pub mod trash;
 
 pub use albums::{Album, MAX_ALBUM_NAME};
 pub use day_titles::{DayTitle, MAX_DAY_TITLE};
