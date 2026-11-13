@@ -1,13 +1,9 @@
-<script lang="ts" module>
-  // Última carpeta a la que se exportó en esta sesión: el selector la propone.
-  let ultimaCarpeta: string | undefined;
-</script>
-
 <script lang="ts">
   // Visor a pantalla completa, estilo Cuarto oscuro (decisión 003). Muestra al
   // instante la miniatura ampliada y la cambia por la foto completa en cuanto
   // carga. La anterior y la siguiente se precargan en memoria.
   import { open } from "@tauri-apps/plugin-dialog";
+  import { destino } from "$lib/exportacion/exportacion.svelte";
   import { onDestroy } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import {
@@ -365,10 +361,10 @@
       directory: true,
       multiple: false,
       title: "Elige dónde guardar la foto",
-      defaultPath: ultimaCarpeta,
+      defaultPath: destino.ultima,
     });
     if (typeof carpeta !== "string") return;
-    ultimaCarpeta = carpeta;
+    destino.ultima = carpeta;
     exportando = true;
     try {
       avisar(`Guardada en ${await exportar(id, carpeta, tamano)}`, false);

@@ -44,7 +44,7 @@ export function fotos(
 // Vistas, selección, favoritos, archivo y títulos de día (spec 006). Reflejan
 // `mnemos_core::{View, Scope, DayTitle}`.
 // En la Papelera (spec 015), `date` de cada foto es la fecha en que se envió.
-export type Vista = "fotos" | "favoritos" | "archivo" | "papelera";
+export type Vista = "fotos" | "favoritos" | "archivo" | "papelera" | { etiqueta: number };
 
 // Dónde se selecciona: una vista o los resultados de una búsqueda.
 export type Ambito = { vista: Vista } | { busqueda: string };
@@ -217,6 +217,36 @@ export function exportar(
   return invoke("exportar", { id, carpeta, tamano });
 }
 
+// Exportar varias fotos (spec 017). Empieza en segundo plano y avisa con el
+// evento `exportacion`; solo puede haber una a la vez.
+export interface Saltada {
+  nombre: string;
+  motivo: string;
+}
+
+export interface EventoExportacion {
+  estado: "en_curso" | "terminada" | "cancelada" | "detenida";
+  total: number;
+  hechas: number;
+  guardadas: number;
+  carpeta: string;
+  ruta: string | null; // archivo creado, solo cuando el lote es de una foto
+  saltadas: Saltada[];
+  mensaje: string | null;
+}
+
+export function exportarVarias(
+  ids: number[],
+  carpeta: string,
+  tamano: TamanoExportacion,
+): Promise<void> {
+  return invoke("exportar_varias", { ids, carpeta, tamano });
+}
+
+export function cancelarExportacion(): Promise<void> {
+  return invoke("cancelar_exportacion");
+}
+
 // Editor no destructivo (spec 009). La geometría es la de la receta
 // (`mnemos_imaging::recipe::Geometry`): giro en grados en sentido horario
 // sobre la foto ya girada según el EXIF, volteo después del giro y recorte en
@@ -371,6 +401,82 @@ export interface EventoPapelera {
   fallidas: { ruta: string; motivo: string }[]; // siguen en la Papelera
   caducadas: number; // con `reloj_adelantado`
   mensaje: string | null; // con `fallido`
+}
+
+// Ajustes (spec 013): tema de la interfaz. La página lo aplica con
+// `data-tema`; el núcleo ajusta la ventana y lo guarda para el próximo arranque.
+export type Tema = "sistema" | "claro" | "oscuro";
+
+export function ponerTema(tema: Tema): Promise<void> {
+  return invoke("poner_tema", { tema });
+}
+
+/** Alterna la pantalla completa de la ventana y devuelve el estado nuevo. */
+export function alternarPantallaCompleta(): Promise<boolean> {
+  return invoke("alternar_pantalla_completa");
+}
+
+export function estaEnPantallaCompleta(): Promise<boolean> {
+  return invoke("pantalla_completa");
+}
+
+// Etiquetas (spec 016). Solo cambian la base de datos.
+
+export interface Etiqueta {
+  id: number;
+  name: string;
+  photos: number;
+  /** Id de la foto más reciente, para la portada. */
+  cover: number | null;
+  cover_edit_version: number | null;
+}
+
+export interface UsoEtiqueta {
+  tag: number;
+  /** Cuántas fotos de la selección la tienen. */
+  photos: number;
+}
+
+/** Al renombrar: hecho, o ya existe otra con ese nombre (para ofrecer unir). */
+export type Renombrado = { hecho: Etiqueta } | { existe: Etiqueta };
+
+export function etiquetas(): Promise<Etiqueta[]> {
+  return invoke("etiquetas");
+}
+
+export function crearEtiqueta(nombre: string): Promise<Etiqueta> {
+  return invoke("crear_etiqueta", { nombre });
+}
+
+export function renombrarEtiqueta(id: number, nombre: string): Promise<Renombrado> {
+  return invoke("renombrar_etiqueta", { id, nombre });
+}
+
+export function unirEtiquetas(desde: number, en: number): Promise<Etiqueta> {
+  return invoke("unir_etiquetas", { desde, en });
+}
+
+/** Devuelve las fotos que tenía, para «Deshacer». */
+export function borrarEtiqueta(id: number): Promise<number[]> {
+  return invoke("borrar_etiqueta", { id });
+}
+
+/** Devuelve las fotos que no la tenían, para «Deshacer». */
+export function ponerEtiqueta(ids: number[], etiqueta: number): Promise<number[]> {
+  return invoke("poner_etiqueta", { ids, etiqueta });
+}
+
+/** Devuelve las fotos que la tenían, para «Deshacer». */
+export function quitarEtiqueta(ids: number[], etiqueta: number): Promise<number[]> {
+  return invoke("quitar_etiqueta", { ids, etiqueta });
+}
+
+export function etiquetasDeFoto(id: number): Promise<Etiqueta[]> {
+  return invoke("etiquetas_de_foto", { id });
+}
+
+export function usoEtiquetas(ids: number[]): Promise<UsoEtiqueta[]> {
+  return invoke("uso_etiquetas", { ids });
 }
 
 // Las otras fotos con la misma huella (spec 018). Comparten la receta de
