@@ -21,8 +21,8 @@ const MIGRATIONS: &[&str] = &[
     // Se llama 0009 porque se reservó ese número para la spec 009, pero se
     // fusionó después de la 0011 y por eso va al final.
     include_str!("migrations/0009_edicion.sql"),
-    // Papelera (spec 015). Las migraciones 0012 y 0013 (álbumes y etiquetas)
-    // van en el orden en que se fusionen, siempre al final de la lista.
+    include_str!("migrations/0013_etiquetas.sql"),
+    // Papelera (spec 015). La 0012 (álbumes) irá detrás cuando se fusione.
     include_str!("migrations/0014_papelera.sql"),
 ];
 
@@ -266,6 +266,60 @@ mod tests {
         );
         conn.execute("UPDATE photos SET edit_version = 3", [])
             .unwrap();
+    }
+
+    #[test]
+    fn la_migracion_de_etiquetas_rehace_su_columna_en_la_busqueda() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        let antes = MIGRATIONS
+            .iter()
+            .position(|m| m.contains("Etiquetas (spec 016)"))
+            .unwrap();
+        {
+            // Biblioteca justo antes de la migración, con una etiqueta que
+            // el índice de búsqueda no conoce y otra fila con texto de más.
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..antes].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute_batch(
+                "PRAGMA foreign_keys = ON;
+                 INSERT INTO photos (id, rel_path, size_bytes, modified_at, imported_at)
+                     VALUES (1, 'a.jpg', 1, 1, 1), (2, 'b.jpg', 1, 1, 1), (3, 'c.jpg', 1, 1, 1);
+                 INSERT INTO photo_search (rowid, rel_path, tags)
+                     VALUES (1, 'a.jpg', ''), (2, 'b.jpg', 'vieja'), (3, 'c.jpg', '');
+                 INSERT INTO tags (id, name) VALUES (1, 'Playa'), (2, 'Málaga');
+                 INSERT INTO photo_tags (photo_id, tag_id) VALUES (1, 1), (1, 2);",
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+        let tags = |id: i64| -> String {
+            conn.query_row(
+                "SELECT tags FROM photo_search WHERE rowid = ?1",
+                [id],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        let uno = tags(1);
+        assert!(uno.contains("Playa") && uno.contains("Málaga"), "{uno}");
+        assert_eq!(tags(2), "");
+        assert_eq!(tags(3), "");
+        let indice: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name = 'photo_tags_tag'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(indice, 1);
     }
 
     #[test]

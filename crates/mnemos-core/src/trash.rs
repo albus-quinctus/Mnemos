@@ -235,6 +235,23 @@ mod tests {
     }
 
     #[test]
+    fn las_etiquetas_no_cuentan_la_papelera() {
+        let (_dir, mut lib) = library();
+        let tag = lib.create_tag("verano").unwrap();
+        // La 6 y la 1 están fuera de la Papelera; la 2 y la 3, dentro.
+        for id in [1, 2, 3, 6] {
+            lib.conn
+                .execute(
+                    "INSERT INTO photo_tags (photo_id, tag_id) VALUES (?1, ?2)",
+                    [id, tag.id],
+                )
+                .unwrap();
+        }
+        let tag = lib.tag(tag.id).unwrap();
+        assert_eq!((tag.photos, tag.cover), (2, Some(6)));
+    }
+
+    #[test]
     fn las_vistas_usan_sus_indices_parciales() {
         let (_dir, lib) = library();
         for (view, index) in [
