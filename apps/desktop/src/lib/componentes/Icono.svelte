@@ -24,6 +24,8 @@
     archivo: "M3 5h18v4H3zM5 9v10h14V9M10 13h4",
     desarchivar: "M3 5h18v4H3zM5 9v10h14V9M12 17v-5m0 0-2.5 2.5M12 12l2.5 2.5",
     marca: "m7 12.5 3.2 3.2L17 9",
+    menos: "M7 12h10",
+    "etiqueta-menos": "M3 12V4h8l10 10-8 8L3 12Zm5-4.5h.01M10 13l5 5",
     editar: "M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4",
     girar: "M4 9a8 8 0 1 1 1.6 7.4M4 4v5h5",
     restaurar: "M4 9a8 8 0 1 1 1.6 7.4M4 4v5h5",

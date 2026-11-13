@@ -59,3 +59,35 @@ export function existeNombre<T extends { name: string }>(lista: T[], nombre: str
   const buscado = nombre.trim().toLocaleLowerCase("es");
   return lista.some((e) => e.name.toLocaleLowerCase("es") === buscado);
 }
+
+export type Casilla = "si" | "algo" | "no";
+
+/** Marcada si todas las seleccionadas la tienen, guion si algunas. */
+export function casilla(conEtiqueta: number, seleccionadas: number): Casilla {
+  if (conEtiqueta <= 0) return "no";
+  return conEtiqueta >= seleccionadas ? "si" : "algo";
+}
+
+/** Un cambio hecho desde el desplegable «Etiquetar», para el aviso y «Deshacer». */
+export interface CambioEtiqueta {
+  nombre: string;
+  puesta: boolean;
+  /** Las fotos que cambiaron de verdad. */
+  fotos: number[];
+}
+
+const fotos = (n: number) => (n === 1 ? "1 foto" : `${numero(n)} fotos`);
+
+/** Texto del aviso al cerrar el desplegable, o `null` si nada cambió. */
+export function resumenCambios(cambios: CambioEtiqueta[]): string | null {
+  const reales = cambios.filter((c) => c.fotos.length > 0);
+  if (reales.length === 0) return null;
+  if (reales.length === 1) {
+    const c = reales[0];
+    return c.puesta
+      ? `Etiqueta «${c.nombre}» añadida a ${fotos(c.fotos.length)}`
+      : `Etiqueta «${c.nombre}» quitada de ${fotos(c.fotos.length)}`;
+  }
+  const todas = new Set(reales.flatMap((c) => c.fotos));
+  return `Etiquetas cambiadas en ${fotos(todas.size)}`;
+}

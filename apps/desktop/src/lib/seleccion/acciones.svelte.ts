@@ -91,11 +91,11 @@ export function albumAbierto(): number | null {
 }
 
 // «1 foto archivada», «3 fotos archivadas».
-function fotosTexto(n: number, participio: string): string {
+export function fotosTexto(n: number, participio: string): string {
   return n === 1 ? `1 foto ${participio}` : `${n.toLocaleString("es")} fotos ${participio}s`;
 }
 
-async function ejecutar(accion: () => Promise<void>) {
+export async function ejecutar(accion: () => Promise<void>) {
   if (avisos.ocupado) return;
   avisos.ocupado = true;
   try {
@@ -232,7 +232,7 @@ export async function restaurarFoto(id: number): Promise<boolean> {
 }
 
 // Tras una acción correcta se quita la selección y las cuadrículas recargan.
-function terminar(texto: string, revertir: () => Promise<number[]>) {
+export function terminar(texto: string, revertir: () => Promise<number[]>) {
   limpiarSeleccion();
   avisarCambio();
   mostrarAviso({

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  casilla,
   existeNombre,
   filtrarEtiquetas,
   nombreValido,
   ordenarEtiquetas,
+  resumenCambios,
   textoEtiquetas,
   textoFotos,
 } from "./etiquetas";
@@ -55,5 +57,31 @@ describe("etiquetas", () => {
     expect(existeNombre(lista, " playa ")).toBe(true);
     expect(existeNombre(lista, "ÁVILA")).toBe(true);
     expect(existeNombre(lista, "Avila")).toBe(false);
+  });
+});
+
+describe("etiquetar una selección", () => {
+  it("elige la casilla según cuántas la tienen", () => {
+    expect(casilla(0, 7)).toBe("no");
+    expect(casilla(3, 7)).toBe("algo");
+    expect(casilla(7, 7)).toBe("si");
+    expect(casilla(1, 1)).toBe("si");
+  });
+
+  it("resume lo que se ha cambiado", () => {
+    expect(resumenCambios([])).toBeNull();
+    expect(resumenCambios([{ nombre: "Playa", puesta: true, fotos: [] }])).toBeNull();
+    expect(resumenCambios([{ nombre: "Playa", puesta: true, fotos: [1, 2] }])).toBe(
+      "Etiqueta «Playa» añadida a 2 fotos",
+    );
+    expect(resumenCambios([{ nombre: "Playa", puesta: false, fotos: [1] }])).toBe(
+      "Etiqueta «Playa» quitada de 1 foto",
+    );
+    expect(
+      resumenCambios([
+        { nombre: "Playa", puesta: true, fotos: [1, 2] },
+        { nombre: "Abuela", puesta: true, fotos: [2, 3] },
+      ]),
+    ).toBe("Etiquetas cambiadas en 3 fotos");
   });
 });

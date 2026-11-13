@@ -155,7 +155,7 @@ existen desde la migración 0001 y siguen vacías.
    barra de selección y sección del visor) para que Paulo las apruebe.
 6. [x] Pantalla Etiquetas y fotos de una etiqueta; activar la entrada del menú
    lateral.
-7. [ ] Botón Etiquetar en la barra de selección, con su desplegable,
+7. [x] Botón Etiquetar en la barra de selección, con su desplegable,
    «Quitar de la etiqueta» y el aviso con «Deshacer».
 8. [ ] Sección Etiquetas en el panel Detalles del visor y tecla `T`.
 9. [ ] Prueba de que ninguna acción de etiquetas cambia los originales,
