@@ -108,15 +108,17 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
   metadatos (`takeout_at`). Una foto nueva del Takeout sí crea su álbum.
 
 ## Criterios de aceptación
-- [ ] La entrada «Álbumes» del menú lateral abre la pantalla con los álbumes del
+- [x] La entrada «Álbumes» del menú lateral abre la pantalla con los álbumes del
       Takeout, su portada y su número de fotos.
-- [ ] Crear, renombrar y eliminar un álbum; eliminarlo no borra fotos.
-- [ ] Añadir fotos desde la barra de selección (también con «Seleccionar todo»)
+- [x] Crear, renombrar y eliminar un álbum; eliminarlo no borra fotos.
+- [x] Añadir fotos desde la barra de selección (también con «Seleccionar todo»)
       y quitarlas dentro del álbum, con «Deshacer».
-- [ ] Las archivadas salen en sus álbumes con la caja.
-- [ ] El esquema sube a v12 y una biblioteca v11 se migra sin perder álbumes.
-- [ ] Los originales no se modifican (prueba automática en
+- [x] Las archivadas salen en sus álbumes con la caja.
+- [x] El esquema sube a v12 y una biblioteca v11 se migra sin perder álbumes.
+- [x] Los originales no se modifican (prueba automática en
       `crates/mnemos-core/tests/originales_intactos.rs`).
+
+Falta probarlo en la app real con la biblioteca del disco (Paulo).
 
 ## Fuera de alcance
 - Elegir la portada a mano y ordenar las fotos del álbum a mano o de la más
@@ -154,4 +156,4 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 7. [x] Barra de selección: «Añadir a álbum» con su lista y «Quitar del álbum»
        con «Deshacer»; pruebas. `MenuAnadirAlbum.svelte`; si la barra no cabe,
        los botones se quedan en icono con su nombre al pasar el ratón.
-8. [ ] Prueba de originales intactos con álbumes y `docs/progreso.md`.
+8. [x] Prueba de originales intactos con álbumes y `docs/progreso.md`.

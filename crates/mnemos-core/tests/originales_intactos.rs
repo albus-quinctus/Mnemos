@@ -6,6 +6,9 @@
 //! Spec 015, tarea 11: enviar a la Papelera y restaurar tampoco los tocan, y
 //! eliminar para siempre borra solo los originales de las fotos de la
 //! Papelera, nunca otro archivo.
+//!
+//! Spec 014, tarea 8: crear, renombrar, llenar, vaciar y eliminar álbumes
+//! solo cambia la base de datos; los nombres nunca llegan al disco.
 
 #![cfg(test)]
 
@@ -162,6 +165,28 @@ fn ninguna_accion_toca_los_originales() {
         .as_secs() as i64;
     lib.empty_expired_trash(ahora, false, |_, _| {}).unwrap();
     comprobar("eliminar o vaciar fuera de la Papelera");
+
+    // Álbumes: crear (con un nombre que sería mala carpeta), añadir, quitar,
+    // renombrar y eliminar. Una foto archivada sigue en su álbum.
+    let album = lib.create_album("Viaje / «Picos» 🏔️").unwrap();
+    assert_eq!(lib.add_to_album(album, &ids).unwrap(), ids);
+    comprobar("añadir a un álbum");
+    lib.set_archived(&ids[..1], true).unwrap();
+    let dentro = lib.view_page(View::Album(album), None, 100).unwrap().photos;
+    assert_eq!(dentro.len(), ids.len());
+    lib.set_archived(&ids[..1], false).unwrap();
+    lib.remove_from_album(album, &ids[..1]).unwrap();
+    comprobar("quitar de un álbum");
+    lib.rename_album(album, "..").unwrap();
+    comprobar("renombrar un álbum");
+    lib.delete_album(album).unwrap();
+    assert!(lib.albums().unwrap().is_empty());
+    assert_eq!(
+        lib.view_page(View::Photos, None, 100).unwrap().photos.len(),
+        ids.len(),
+        "eliminar un álbum no quita fotos de la biblioteca"
+    );
+    comprobar("eliminar un álbum");
 
     // Ver las vistas.
     for vista in [View::Photos, View::Favorites, View::Archive, View::Trash] {
