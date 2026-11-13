@@ -344,3 +344,9 @@ export function alternarPantallaCompleta(): Promise<boolean> {
 export function estaEnPantallaCompleta(): Promise<boolean> {
   return invoke("pantalla_completa");
 }
+
+// Las otras fotos con la misma huella (spec 018). Comparten la receta de
+// edición: el editor avisa antes de guardar como original.
+export function copiasIdenticas(id: number): Promise<CopiaDuplicada[]> {
+  return invoke("copias_identicas", { id });
+}

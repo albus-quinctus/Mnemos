@@ -2,7 +2,13 @@
   // Modo edición del visor (spec 009): recorte, giro y volteo sobre la foto
   // sin editar. Nada se guarda hasta pulsar «Guardar»: la receta va a
   // `.mnemos/ediciones/` y el original nunca se toca.
-  import { guardarCopia, guardarEdicion, type Geometria } from "$lib/biblioteca";
+  import {
+    copiasIdenticas,
+    guardarCopia,
+    guardarEdicion,
+    type CopiaDuplicada,
+    type Geometria,
+  } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
   import { originalUrl } from "$lib/media";
   import {
@@ -27,6 +33,7 @@
     type Lado,
     type Proporcion,
   } from "./editor";
+  import { botonAplicar, rutasAviso, tituloAviso } from "./compartida";
 
   let {
     id,
@@ -54,6 +61,22 @@
   let guardando = $state(false);
   let error = $state("");
   let cargada = $state(false);
+  // Copias idénticas (spec 018): comparten la receta, así que «Guardar como
+  // original» avisa antes. Si la consulta falla, se guarda sin aviso.
+  let copias = $state<CopiaDuplicada[]>([]);
+  let avisoCompartida = $state(false);
+  const aviso = $derived(rutasAviso(copias));
+  $effect(() => {
+    let vigente = true;
+    copiasIdenticas(id)
+      .then((c) => {
+        if (vigente) copias = c;
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  });
 
   const cambios = $derived(hayCambios(e));
   const identidad = $derived(esIdentidad(e));
@@ -161,9 +184,14 @@
     else onCerrar(null);
   }
 
-  async function guardar(como: "original" | "copia") {
+  async function guardar(como: "original" | "copia", aunqueCompartida = false) {
     menuGuardar = false;
     if (guardando) return;
+    if (como === "original" && copias.length > 0 && !aunqueCompartida) {
+      avisoCompartida = true;
+      return;
+    }
+    avisoCompartida = false;
     guardando = true;
     error = "";
     const g = geometria($state.snapshot(e) as EstadoEditor);
@@ -185,8 +213,8 @@
 
   function alPulsar(ev: KeyboardEvent) {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
-    if (confirmar) {
-      if (ev.key === "Escape") confirmar = false;
+    if (confirmar || avisoCompartida) {
+      if (ev.key === "Escape") confirmar = avisoCompartida = false;
       else return;
     } else if (ev.key === "Escape") {
       if (menuGuardar) menuGuardar = false;
@@ -309,6 +337,46 @@
 
     {#if error}
       <p class="aviso" role="alert">{error}</p>
+    {/if}
+
+    {#if avisoCompartida}
+      <div class="fondo">
+        <div
+          class="dialogo ancho"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="compartida-titulo"
+          aria-describedby="compartida-texto"
+        >
+          <h2 id="compartida-titulo">{tituloAviso(copias.length)}</h2>
+          <p id="compartida-texto">
+            Las copias idénticas comparten la edición. Si la guardas como original, también se verá en:
+          </p>
+          <ul class="rutas">
+            {#each aviso.rutas as r, i (i)}
+              <li>
+                <Icono nombre="duplicados" tamano={14} />
+                <span class="ruta">{r.texto}</span>
+                {#if r.desaparecida}<small>(no está en el disco)</small>{/if}
+              </li>
+            {/each}
+            {#if aviso.resto > 0}
+              <li class="resto">y {aviso.resto} más</li>
+            {/if}
+          </ul>
+          <div class="botones">
+            <button type="button" class="pildora" onclick={() => (avisoCompartida = false)}>
+              Seguir editando
+            </button>
+            <button type="button" class="pildora" disabled={!puedeCopia} onclick={() => guardar("copia")}>
+              Guardar como copia aparte
+            </button>
+            <button type="button" class="pildora principal" onclick={() => guardar("original", true)}>
+              {botonAplicar(copias.length)}
+            </button>
+          </div>
+        </div>
+      </div>
     {/if}
 
     {#if confirmar}
@@ -689,7 +757,44 @@
     font-size: 0.9rem;
   }
 
+  .dialogo.ancho {
+    width: min(600px, calc(100% - 32px));
+  }
+
+  .rutas {
+    display: grid;
+    gap: 6px;
+    margin: -8px 0 18px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.05);
+    list-style: none;
+    font-size: 0.86rem;
+  }
+
+  .rutas li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .rutas .ruta {
+    overflow: hidden;
+    font-family: var(--fuente-mono);
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rutas small,
+  .rutas .resto {
+    flex: none;
+    color: var(--visor-texto-suave);
+  }
+
   .botones {
+    flex-wrap: wrap;
     display: flex;
     justify-content: flex-end;
     gap: 8px;

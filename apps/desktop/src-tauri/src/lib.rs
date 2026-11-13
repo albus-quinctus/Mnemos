@@ -1,6 +1,8 @@
 mod acceso_directo;
 mod configuracion;
 mod duplicados;
+#[cfg(target_os = "linux")]
+mod entorno_linux;
 mod media;
 mod organizacion;
 mod portatil;
@@ -547,6 +549,9 @@ fn crear_ventana(app: &AppHandle, raiz: Option<&Path>) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Antes que nada: puede volver a ejecutar la app con otro entorno.
+    #[cfg(target_os = "linux")]
+    entorno_linux::preparar();
     let raiz = portatil::raiz();
     tauri::Builder::default()
         .setup(|app| {
@@ -593,6 +598,7 @@ pub fn run() {
             acceso_directo::quitar_acceso_directo,
             duplicados::duplicados_resumen,
             duplicados::duplicados_grupos,
+            duplicados::copias_identicas,
             organizacion::vista_meses,
             organizacion::vista_fotos,
             organizacion::marcar_favoritos,
