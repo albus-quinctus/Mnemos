@@ -328,6 +328,14 @@ export function duplicadosGrupos(
   return invoke("duplicados_grupos", { despues, limite });
 }
 
+// Ajustes (spec 013): tema de la interfaz. La página lo aplica con
+// `data-tema`; el núcleo ajusta la ventana y lo guarda para el próximo arranque.
+export type Tema = "sistema" | "claro" | "oscuro";
+
+export function ponerTema(tema: Tema): Promise<void> {
+  return invoke("poner_tema", { tema });
+}
+
 // Etiquetas (spec 016). Solo cambian la base de datos.
 
 export interface Etiqueta {

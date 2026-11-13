@@ -85,9 +85,9 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
       equipo» y abre la ventana de Ajustes; `Esc` la cierra.
 - [ ] Elegir Claro u Oscuro cambia toda la galería al momento, también si el
       sistema está en el modo contrario (prueba de componentes).
-- [ ] El tema se recuerda entre arranques y un `configuracion.json` sin `tema`
+- [x] El tema se recuerda entre arranques y un `configuracion.json` sin `tema`
       se lee como «Sistema» (pruebas en Rust).
-- [ ] Guardar el tema conserva la última biblioteca y al revés (prueba en Rust).
+- [x] Guardar el tema conserva la última biblioteca y al revés (prueba en Rust).
 - [ ] `F11` entra y sale de pantalla completa en la galería, el visor y el
       editor; el interruptor de Ajustes muestra el estado real (prueba de la
       interfaz con Tauri simulado; prueba manual en Sway).
@@ -103,10 +103,11 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
   presentación o pase de diapositivas).
 
 ## Tareas (≤1 h cada una)
-1. [ ] `tema` en `Configuracion` (`serde(default)`, valor desconocido →
+1. [x] `tema` en `Configuracion` (`serde(default)`, valor desconocido →
        `sistema`), `recordar` sin borrar otros campos, comando `poner_tema`
        (la página lee el tema de `data-tema`, así que no hace falta otro);
-       inyección en la ventana y `set_theme`; pruebas en Rust.
+       inyección en la ventana y `set_theme`; pruebas en Rust
+       (`configuracion.rs`, `Configuracion::cambiar`).
 2. [ ] Comandos `alternar_pantalla_completa` y `pantalla_completa`; atajo `F11`
        (y `Ctrl` + `Cmd` + `F` en macOS) en `+layout.svelte`; envoltorios en
        `biblioteca.ts`; pruebas.
