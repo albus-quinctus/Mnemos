@@ -4,6 +4,7 @@ mod duplicados;
 #[cfg(target_os = "linux")]
 mod entorno_linux;
 mod etiquetas;
+mod exportacion;
 mod media;
 mod organizacion;
 mod portatil;
@@ -565,6 +566,7 @@ pub fn run() {
         .manage(OpenLibrary::default())
         .manage(Thumbnails::default())
         .manage(Importacion::default())
+        .manage(exportacion::Exportacion::default())
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("mnemos", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -591,6 +593,8 @@ pub fn run() {
             priorizar_miniaturas,
             importar,
             cancelar_importacion,
+            exportacion::exportar_varias,
+            exportacion::cancelar_exportacion,
             poner_tema,
             alternar_pantalla_completa,
             pantalla_completa,

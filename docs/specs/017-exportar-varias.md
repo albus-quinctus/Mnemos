@@ -92,6 +92,6 @@ el mismo núcleo.
 ## Tareas (≤1 h cada una)
 1. [x] Spec y capturas del diseño (aprobadas por Paulo el 12 nov; `capturas/017-*.png` en los archivos del proyecto).
 2. [x] `mnemos-core`: `export_many` en un módulo aparte, con progreso, cancelación y la regla de saltar o parar. Pruebas. Llama a la exportación de una foto de la spec 008, que ya saca la versión editada. En `crates/mnemos-core/src/export_many.rs`, con `Library::export_items` para los ids en el orden de la cuadrícula.
-3. [ ] App: comandos `exportar_varias` y `cancelar_exportacion` con el evento `exportacion` (en curso, terminada, cancelada, detenida), en un hilo aparte como la importación.
+3. [x] App: comandos `exportar_varias` y `cancelar_exportacion` con el evento `exportacion` (en curso, terminada, cancelada, detenida), en un hilo aparte como la importación. Hecha en `apps/desktop/src-tauri/src/exportacion.rs` (progreso como mucho cada 100 ms; una sola exportación de varias a la vez).
 4. [ ] Barra de selección: botón y menú, selector de carpeta, progreso con «Cancelar», resumen y «Ver». Pruebas de la interfaz.
 5. [ ] Probarlo en la app real con el HDD (Paulo).
