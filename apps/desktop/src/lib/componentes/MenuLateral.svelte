@@ -1,7 +1,7 @@
 <script lang="ts">
   import { irA, navegacion, type Seccion } from "$lib/navegacion.svelte";
   import AccesoDirecto from "$lib/acceso-directo/AccesoDirecto.svelte";
-  import { abrirAjustes, ajustes } from "$lib/ajustes/ajustes.svelte";
+  import { abrirAjustes, ajustes } from "$lib/ajustes/estado.svelte";
   import Icono, { type NombreIcono } from "./Icono.svelte";
 
   type Entrada = { nombre: string; icono: NombreIcono; seccion?: Seccion };

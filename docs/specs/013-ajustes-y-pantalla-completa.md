@@ -118,7 +118,7 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
        `lib/ajustes/tema.svelte.ts`; pruebas (incluida una que comprueba
        que los dos bloques oscuros de `tokens.css` son iguales).
 5. [x] Entrada «Ajustes» en `MenuLateral.svelte` y ventana de Ajustes
-       (`lib/ajustes/Ajustes.svelte`, estado en `ajustes.svelte.ts`); pruebas.
+       (`lib/ajustes/Ajustes.svelte`, estado en `estado.svelte.ts`); pruebas.
        `Esc` cierra solo Ajustes, sin quitar la selección ni la búsqueda.
 6. [ ] Prueba en la app real (Linux con Sway; Windows si se puede) y
        `docs/progreso.md`.

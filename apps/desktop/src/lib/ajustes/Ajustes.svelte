@@ -7,7 +7,7 @@
     cambiarPantallaCompleta,
     cambiarTema,
     cerrarAjustes,
-  } from "./ajustes.svelte";
+  } from "./estado.svelte";
   import { version } from "../../../package.json";
 
   const temas: { valor: Tema; nombre: string }[] = [

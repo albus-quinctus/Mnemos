@@ -31,7 +31,7 @@ import {
   cambiarPantallaCompleta,
   cambiarTema,
   cerrarAjustes,
-} from "./ajustes.svelte";
+} from "./estado.svelte";
 
 beforeEach(() => {
   completa = false;

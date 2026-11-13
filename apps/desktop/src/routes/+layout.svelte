@@ -5,7 +5,7 @@
   import { escucharImportacion } from "$lib/importacion/importacion.svelte";
   import ProgresoImportacion from "$lib/importacion/ProgresoImportacion.svelte";
   import Ajustes from "$lib/ajustes/Ajustes.svelte";
-  import { ajustes } from "$lib/ajustes/ajustes.svelte";
+  import { ajustes } from "$lib/ajustes/estado.svelte";
   import { esTeclaPantallaCompleta, pantallaCompleta } from "$lib/ajustes/pantalla";
   import Aviso from "$lib/seleccion/Aviso.svelte";
   import BarraSeleccion from "$lib/seleccion/BarraSeleccion.svelte";
