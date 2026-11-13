@@ -27,7 +27,12 @@
   import { lineaCompartida } from "$lib/editor/compartida";
   import Editor from "$lib/editor/Editor.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
-  import { archivarFoto, marcarFavorita } from "$lib/seleccion/acciones.svelte";
+  import {
+    archivarFoto,
+    enviarFotoAPapelera,
+    esTeclaPapelera,
+    marcarFavorita,
+  } from "$lib/seleccion/acciones.svelte";
   import { CacheImagenes, vecinas } from "./cache";
   import { fechas } from "./fechas.svelte";
   import {
@@ -54,6 +59,7 @@
     onPedirMas,
     enArchivo = false,
     onArchivada,
+    onEnviadaPapelera,
   }: {
     fotos: FotoCuadricula[];
     indice: number;
@@ -66,6 +72,9 @@
     // Tras archivar o desarchivar: la cuadrícula decide si la foto deja de
     // estar en la vista y el visor pasa a la siguiente.
     onArchivada?: (indice: number, archivada: boolean) => void;
+    // Tras enviarla a la Papelera (spec 015): la cuadrícula la quita y el
+    // visor pasa a la siguiente. Sin él, no se ofrece el botón.
+    onEnviadaPapelera?: (indice: number) => void;
   } = $props();
 
   type Completa = {
@@ -166,6 +175,16 @@
     if (await archivarFoto(foto.id, archivada)) {
       datosCambiados = true;
       onArchivada?.(indice, archivada);
+    }
+    marcando = false;
+  }
+
+  async function aPapelera() {
+    if (!foto || marcando || !onEnviadaPapelera) return;
+    marcando = true;
+    if (await enviarFotoAPapelera(foto.id)) {
+      datosCambiados = true;
+      onEnviadaPapelera(indice);
     }
     marcando = false;
   }
@@ -449,6 +468,7 @@
     else if ((e.key === "e" || e.key === "E") && !e.shiftKey) abrirEditor();
     else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
+    else if (esTeclaPapelera(e) && onEnviadaPapelera) aPapelera();
     else if (e.key === "ArrowRight") ir(1);
     else if (e.key === "ArrowLeft") ir(-1);
     else return;
@@ -551,6 +571,18 @@
     >
       <Icono nombre={enArchivo ? "desarchivar" : "archivo"} />
     </button>
+    {#if onEnviadaPapelera}
+      <button
+        type="button"
+        class="boton"
+        aria-label="Enviar a la papelera"
+        title="Enviar a la papelera (Supr)"
+        disabled={marcando}
+        onclick={aPapelera}
+      >
+        <Icono nombre="papelera" />
+      </button>
+    {/if}
     <button
       type="button"
       class="boton info"

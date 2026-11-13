@@ -29,6 +29,8 @@
   import {
     alternarArchivo,
     alternarFavoritos,
+    enviarSeleccionAPapelera,
+    esTeclaPapelera,
     registrarFotos,
   } from "$lib/seleccion/acciones.svelte";
   import { fechas } from "$lib/visor/fechas.svelte";
@@ -125,10 +127,12 @@
       e.preventDefault();
       return;
     }
-    // Con selección, F marca favoritos y Mayús + A archiva, como en el visor.
+    // Con selección, F marca favoritos, Mayús + A archiva y Supr envía a la
+    // Papelera, como en el visor.
     if (!haySeleccion() || e.ctrlKey || e.metaKey || e.altKey) return;
     if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavoritos();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivo();
+    else if (esTeclaPapelera(e) && vista !== "papelera") enviarSeleccionAPapelera();
     else return;
     e.preventDefault();
   }
@@ -139,6 +143,14 @@
   function alArchivarEnVisor(indice: number, archivada: boolean) {
     if (texto) return;
     if (!(vista === "fotos" && archivada) && !(vista === "archivo" && !archivada)) return;
+    fotos = fotos.toSpliced(indice, 1);
+    if (fotos.length === 0) abierta = null;
+    else if (indice >= fotos.length) abierta = fotos.length - 1;
+  }
+
+  // Enviada a la Papelera desde el visor: deja de estar en cualquier vista y
+  // en la búsqueda, y el visor pasa a la siguiente (o a la anterior).
+  function quitarDelVisor(indice: number) {
     fotos = fotos.toSpliced(indice, 1);
     if (fotos.length === 0) abierta = null;
     else if (indice >= fotos.length) abierta = fotos.length - 1;
@@ -494,6 +506,7 @@
     onPedirMas={cargarPagina}
     enArchivo={!texto && vista === "archivo"}
     onArchivada={alArchivarEnVisor}
+    onEnviadaPapelera={quitarDelVisor}
   />
 {/if}
 

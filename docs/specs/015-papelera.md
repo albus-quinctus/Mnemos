@@ -214,7 +214,7 @@ Salvaguardas que la acompañan:
    progreso, y envoltorios en `biblioteca.ts`.
 8. [x] Capturas del diseño para Paulo (aprobadas el 2026-11-12;
    `capturas/015-*.png`).
-9. [ ] Interfaz: botón y tecla `Supr` en la barra de selección y en el visor,
+9. [x] Interfaz: botón y tecla `Supr` en la barra de selección y en el visor,
    con aviso y «Deshacer».
 10. [ ] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
     vacía), barra con Restaurar y Eliminar para siempre, visor de la Papelera
