@@ -38,6 +38,6 @@ pub use library::{Library, LibraryInfo, MediaEdit, PhotoDetails, PhotoMedia};
 pub use paths::RelPath;
 pub use search::{DateFilter, SearchQuery};
 pub use selection::Scope;
-pub use tags::{MAX_TAG_NAME, Tag};
+pub use tags::{MAX_TAG_NAME, Tag, TagUsage};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
 pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage, View};

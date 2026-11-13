@@ -144,11 +144,11 @@ existen desde la migración 0001 y siguen vacías.
    reconstrucción de `photo_search.tags`) y núcleo: crear, renombrar, unir,
    borrar y listar con recuento y foto de portada. Cada cambio rehace
    `photo_search.tags` de las fotos afectadas. Con pruebas.
-2. [ ] Núcleo: poner y quitar una etiqueta a varias fotos (devuelve las que
+2. [x] Núcleo: poner y quitar una etiqueta a varias fotos (devuelve las que
    cambian, para «Deshacer»), etiquetas de una foto y estado de cada etiqueta
    en una selección (todas, algunas, ninguna). La copia hereda las etiquetas.
    Medición con 10 000 fotos.
-3. [ ] Núcleo: fotos de una etiqueta (meses, páginas y `Scope` para la
+3. [x] Núcleo: fotos de una etiqueta (meses, páginas y `Scope` para la
    selección) y la búsqueda por etiqueta. Comando `mnemos etiquetas` en la CLI.
 4. [ ] Comandos de Tauri y sus envoltorios en `biblioteca.ts`.
 5. [ ] Capturas del diseño (pantalla, fotos de una etiqueta, desplegable de la
