@@ -335,3 +335,9 @@ export type Tema = "sistema" | "claro" | "oscuro";
 export function ponerTema(tema: Tema): Promise<void> {
   return invoke("poner_tema", { tema });
 }
+
+// Las otras fotos con la misma huella (spec 018). Comparten la receta de
+// edición: el editor avisa antes de guardar como original.
+export function copiasIdenticas(id: number): Promise<CopiaDuplicada[]> {
+  return invoke("copias_identicas", { id });
+}
