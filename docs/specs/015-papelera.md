@@ -208,7 +208,7 @@ Salvaguardas que la acompañan:
    pruebas y la prueba que recorre el código fuente.
 5. [x] Núcleo: vaciado a los 30 días con reloj inyectable y salvaguarda del
    reloj adelantado; informe de importación con «ya estaban en la papelera».
-6. [ ] CLI `mnemos papelera` y `mnemos papelera vaciar`.
+6. [x] CLI `mnemos papelera` y `mnemos papelera vaciar`.
 7. [ ] Comandos de Tauri (`enviar_a_papelera`, `restaurar`,
    `eliminar_para_siempre`, `vaciar_papelera`, vaciado al abrir) con
    progreso, y envoltorios en `biblioteca.ts`.

@@ -41,3 +41,4 @@ pub use selection::Scope;
 pub use tags::{MAX_TAG_NAME, Tag};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
 pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage, View};
+pub use trash::{AutoEmpty, DeleteFailure, DeleteReport, TRASH_DAYS, TrashEntry};
