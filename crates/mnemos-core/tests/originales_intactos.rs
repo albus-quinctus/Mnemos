@@ -2,6 +2,10 @@
 //! tocan los originales. Cada acción se comprueba contra la huella BLAKE3, el
 //! tamaño y la fecha de modificación de todos los archivos de la biblioteca
 //! fuera de `.mnemos/`.
+//!
+//! Spec 015, tarea 11: enviar a la Papelera y restaurar tampoco los tocan, y
+//! eliminar para siempre borra solo los originales de las fotos de la
+//! Papelera, nunca otro archivo.
 
 #![cfg(test)]
 
@@ -11,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use mnemos_core::{Library, Scope, SearchQuery, TimelineCursor, View};
+use mnemos_imaging::recipe::Geometry;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures");
 
@@ -125,15 +130,89 @@ fn ninguna_accion_toca_los_originales() {
     lib.set_day_title("2024-10-12", "").unwrap();
     comprobar("títulos de día");
 
+    // Papelera: una foto editada, favorita y archivada vuelve igual.
+    let giro = Geometry {
+        rotate: 90,
+        ..Geometry::default()
+    };
+    assert_eq!(lib.save_edit(ids[0], giro).unwrap(), 1);
+    lib.set_favorite(&ids[..1], true).unwrap();
+    lib.set_archived(&ids[..1], true).unwrap();
+    lib.send_to_trash(&ids[..1]).unwrap();
+    lib.restore_from_trash(&ids[..1]).unwrap();
+    assert_eq!(lib.edit_summary(ids[0]).unwrap().current, Some(1));
+    let archivada = lib.view_page(View::Archive, None, 100).unwrap().photos;
+    assert!(archivada.iter().any(|f| f.id == ids[0] && f.favorite));
+    lib.set_archived(&ids[..1], false).unwrap();
+    lib.set_favorite(&ids[..1], false).unwrap();
+    comprobar("restaurar una foto editada");
+
+    // Papelera: enviar, ver y restaurar. Eliminar para siempre fotos que no
+    // están en la Papelera, o vaciar sin nada caducado, no borra nada.
+    let cambiadas = lib.send_to_trash(&ids).unwrap();
+    assert_eq!(cambiadas.len(), ids.len());
+    comprobar("enviar a la Papelera");
+    lib.restore_from_trash(&cambiadas).unwrap();
+    comprobar("restaurar");
+    let informe = lib.delete_permanently(&ids, |_, _| {}).unwrap();
+    assert!(informe.deleted.is_empty() && informe.failed.is_empty());
+    let ahora = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    lib.empty_expired_trash(ahora, false, |_, _| {}).unwrap();
+    comprobar("eliminar o vaciar fuera de la Papelera");
+
     // Ver las vistas.
-    for vista in [View::Photos, View::Favorites, View::Archive] {
+    for vista in [View::Photos, View::Favorites, View::Archive, View::Trash] {
         lib.view_months(vista).unwrap();
         lib.view_page(vista, None, 100).unwrap();
     }
-    comprobar("ver Fotos, Favoritos y Archivo");
+    comprobar("ver Fotos, Favoritos, Archivo y Papelera");
 
     // Al cerrar y volver a abrir, todo sigue igual.
     drop(lib);
     Library::open(raiz.path()).unwrap();
     comprobar("cerrar y abrir");
+}
+
+#[test]
+fn eliminar_para_siempre_solo_borra_lo_de_la_papelera() {
+    let (_origen, raiz, mut lib, fotos) = biblioteca();
+    let ids: Vec<i64> = fotos.iter().map(|f| f.0).collect();
+    let antes = estado(raiz.path());
+
+    // Una foto a la Papelera; se pide eliminar todas.
+    lib.send_to_trash(&ids[..1]).unwrap();
+    let en_papelera = lib.trash_entries().unwrap();
+    assert_eq!(en_papelera.len(), 1);
+    let borrada = PathBuf::from(&en_papelera[0].rel_path);
+    let informe = lib.delete_permanently(&ids, |_, _| {}).unwrap();
+    assert_eq!(informe.deleted, vec![ids[0]]);
+    assert!(informe.failed.is_empty());
+
+    let mut esperado = antes.clone();
+    assert!(esperado.remove(&borrada).is_some(), "no era un original");
+    assert_eq!(estado(raiz.path()), esperado, "se ha borrado otro archivo");
+
+    // Vaciado automático 31 días después: solo lo que está en la Papelera.
+    lib.send_to_trash(&ids[1..2]).unwrap();
+    let otra = PathBuf::from(&lib.trash_entries().unwrap()[0].rel_path);
+    let dentro_de_31_dias = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+        + 31 * 24 * 3600;
+    lib.empty_expired_trash(dentro_de_31_dias, true, |_, _| {})
+        .unwrap();
+    esperado.remove(&otra);
+    assert_eq!(
+        estado(raiz.path()),
+        esperado,
+        "el vaciado ha borrado otro archivo"
+    );
+    assert_eq!(
+        lib.view_page(View::Photos, None, 100).unwrap().photos.len(),
+        ids.len() - 2
+    );
 }
