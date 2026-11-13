@@ -171,7 +171,7 @@ Salvaguardas que la acompañan:
   recorre el código fuente: `tests/solo_la_papelera_borra.rs`).
 - [x] Eliminar para siempre borra exactamente esos archivos y filas y nada
   más; un archivo cambiado fuera de la app no se borra (prueba automática).
-- [ ] El vaciado automático borra solo lo que lleva 30 días o más, y no hace
+- [x] El vaciado automático borra solo lo que lleva 30 días o más, y no hace
   nada con el reloj adelantado más de 60 días (prueba automática con reloj
   simulado).
 - [ ] Las fotos en la Papelera no salen en Fotos, Favoritos, Archivo,
@@ -206,7 +206,7 @@ Salvaguardas que la acompañan:
 4. [x] Núcleo: `trash::delete_original` y `delete_permanently` (comprobación
    de tamaño y fecha, recetas y miniaturas sin otra foto con la huella), con
    pruebas y la prueba que recorre el código fuente.
-5. [ ] Núcleo: vaciado a los 30 días con reloj inyectable y salvaguarda del
+5. [x] Núcleo: vaciado a los 30 días con reloj inyectable y salvaguarda del
    reloj adelantado; informe de importación con «ya estaban en la papelera».
 6. [ ] CLI `mnemos papelera` y `mnemos papelera vaciar`.
 7. [ ] Comandos de Tauri (`enviar_a_papelera`, `restaurar`,

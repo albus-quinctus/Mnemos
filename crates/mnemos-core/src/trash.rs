@@ -32,6 +32,27 @@ use crate::thumbnails::thumbnail_rel_path;
 /// Días que pasa una foto en la Papelera antes de eliminarse para siempre.
 pub const TRASH_DAYS: i64 = 30;
 
+/// Si la fecha del equipo va más de estos días por delante de la última vez
+/// que se abrió la biblioteca, el vaciado automático pregunta antes.
+pub const CLOCK_AHEAD_DAYS: i64 = 60;
+
+const DAY: i64 = 86_400;
+
+/// Clave de `library_meta` con la última apertura (segundos Unix, UTC).
+const LAST_OPEN: &str = "ultima_apertura";
+
+/// Resultado del vaciado automático de la Papelera.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "tipo", rename_all = "snake_case")]
+pub enum AutoEmpty {
+    /// Se eliminaron (o se intentaron eliminar) las fotos caducadas.
+    Emptied(DeleteReport),
+    /// La fecha del equipo parece adelantada: no se ha borrado nada. Hay
+    /// que preguntar y, si el usuario acepta, volver a llamar con
+    /// `trust_clock`.
+    ClockAhead { expired: u64, last_open: i64 },
+}
+
 /// Resultado de eliminar fotos para siempre.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct DeleteReport {
@@ -128,6 +149,80 @@ impl Library {
         }
         progress(total, total);
         Ok(report)
+    }
+
+    /// Vaciado automático (spec 015): elimina para siempre las fotos que
+    /// llevan [`TRASH_DAYS`] días o más en la Papelera a fecha de `now`
+    /// (segundos Unix) y guarda `now` como última apertura.
+    ///
+    /// Si `now` va más de [`CLOCK_AHEAD_DAYS`] días por delante de la última
+    /// apertura y hay algo que eliminar, no borra nada ni guarda la fecha:
+    /// devuelve [`AutoEmpty::ClockAhead`] para que la app pregunte. Con
+    /// `trust_clock` (el usuario ha dicho que sí) se salta esa comprobación.
+    pub fn empty_expired_trash(
+        &mut self,
+        now: i64,
+        trust_clock: bool,
+        progress: impl FnMut(usize, usize),
+    ) -> Result<AutoEmpty> {
+        let expired = self.expired_trash(now)?;
+        let last_open = self.last_open()?;
+        if let Some(last_open) = last_open
+            && !trust_clock
+            && !expired.is_empty()
+            && now - last_open > CLOCK_AHEAD_DAYS * DAY
+        {
+            return Ok(AutoEmpty::ClockAhead {
+                expired: expired.len() as u64,
+                last_open,
+            });
+        }
+        let report = if expired.is_empty() {
+            DeleteReport::default()
+        } else {
+            self.delete_permanently(&expired, progress)?
+        };
+        // La última apertura nunca va hacia atrás: un equipo con la fecha
+        // retrasada no debe desactivar la comprobación para los demás.
+        if last_open.is_none_or(|last| now > last) {
+            self.conn.execute(
+                "INSERT INTO library_meta (key, value) VALUES (?1, ?2)
+                 ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                (LAST_OPEN, now.to_string()),
+            )?;
+        }
+        Ok(AutoEmpty::Emptied(report))
+    }
+
+    /// Fotos que llevan [`TRASH_DAYS`] días o más en la Papelera a fecha de
+    /// `now`, de la más antigua a la más reciente.
+    pub fn expired_trash(&self, now: i64) -> Result<Vec<i64>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id FROM photos WHERE trashed_at IS NOT NULL AND trashed_at <= ?1
+             ORDER BY trashed_at, id",
+        )?;
+        let ids = stmt
+            .query_map([now - TRASH_DAYS * DAY], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(ids)
+    }
+
+    /// Todas las fotos de la Papelera («Vaciar papelera»), de la más antigua
+    /// a la más reciente.
+    pub fn trash_ids(&self) -> Result<Vec<i64>> {
+        self.expired_trash(i64::MAX / 2)
+    }
+
+    fn last_open(&self) -> Result<Option<i64>> {
+        let value: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT value FROM library_meta WHERE key = ?1",
+                [LAST_OPEN],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(value.and_then(|v| v.parse().ok()))
     }
 
     /// Error claro si la carpeta de originales no está: sin ella, todas las
@@ -737,5 +832,169 @@ mod borrado {
             .delete_permanently(&ids, |done, total| steps.push((done, total)))
             .unwrap();
         assert_eq!(steps, [(0, 2), (1, 2), (2, 2)]);
+    }
+}
+
+#[cfg(test)]
+mod vaciado {
+    use std::fs;
+    use std::path::PathBuf;
+
+    use super::*;
+    use crate::index::tests::{set_mtime, write_png};
+
+    const HOY: i64 = 1_800_000_000;
+
+    /// Cuatro fotos: «vieja.png» enviada hace 31 días, «justa.png» hace
+    /// exactamente 30, «reciente.png» hace 29 y «fuera.png» sin enviar.
+    fn setup() -> (tempfile::TempDir, Library) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lib = Library::create(dir.path()).unwrap();
+        let originals = dir.path().join(ORIGINALS_DIR);
+        for name in ["vieja.png", "justa.png", "reciente.png", "fuera.png"] {
+            write_png(&originals.join(name), 10, 10, name.as_bytes());
+            set_mtime(&originals.join(name), 1_700_000_000);
+        }
+        lib.index().unwrap();
+        for (name, days) in [("vieja", 31), ("justa", 30), ("reciente", 29)] {
+            lib.conn
+                .execute(
+                    "UPDATE photos SET trashed_at = ?2 WHERE rel_path = ?1",
+                    (format!("{ORIGINALS_DIR}/{name}.png"), HOY - days * DAY),
+                )
+                .unwrap();
+        }
+        (dir, lib)
+    }
+
+    fn file(dir: &tempfile::TempDir, name: &str) -> PathBuf {
+        dir.path().join(ORIGINALS_DIR).join(name)
+    }
+
+    fn set_last_open(lib: &Library, at: i64) {
+        lib.conn
+            .execute(
+                "INSERT OR REPLACE INTO library_meta (key, value) VALUES (?1, ?2)",
+                (LAST_OPEN, at.to_string()),
+            )
+            .unwrap();
+    }
+
+    fn emptied(result: AutoEmpty) -> DeleteReport {
+        match result {
+            AutoEmpty::Emptied(report) => report,
+            other => panic!("se esperaba vaciado: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn elimina_solo_lo_que_lleva_30_dias_o_mas() {
+        let (dir, mut lib) = setup();
+        set_last_open(&lib, HOY - DAY);
+        let report = emptied(lib.empty_expired_trash(HOY, false, |_, _| {}).unwrap());
+        assert_eq!(report.deleted.len(), 2);
+        assert!(!file(&dir, "vieja.png").exists());
+        assert!(!file(&dir, "justa.png").exists());
+        assert!(file(&dir, "reciente.png").exists());
+        assert!(file(&dir, "fuera.png").exists());
+        assert_eq!(lib.last_open().unwrap(), Some(HOY));
+    }
+
+    #[test]
+    fn con_el_reloj_adelantado_pregunta_y_no_borra() {
+        let (dir, mut lib) = setup();
+        set_last_open(&lib, HOY - 61 * DAY);
+        let result = lib.empty_expired_trash(HOY, false, |_, _| {}).unwrap();
+        assert_eq!(
+            result,
+            AutoEmpty::ClockAhead {
+                expired: 2,
+                last_open: HOY - 61 * DAY
+            }
+        );
+        assert!(file(&dir, "vieja.png").exists());
+        // No guarda la fecha dudosa: la próxima vez vuelve a preguntar.
+        assert_eq!(lib.last_open().unwrap(), Some(HOY - 61 * DAY));
+        assert!(matches!(
+            lib.empty_expired_trash(HOY, false, |_, _| {}).unwrap(),
+            AutoEmpty::ClockAhead { .. }
+        ));
+
+        // El usuario dice que la fecha está bien.
+        let report = emptied(lib.empty_expired_trash(HOY, true, |_, _| {}).unwrap());
+        assert_eq!(report.deleted.len(), 2);
+        assert_eq!(lib.last_open().unwrap(), Some(HOY));
+    }
+
+    #[test]
+    fn sin_nada_caducado_no_pregunta_aunque_el_reloj_salte() {
+        let (_dir, mut lib) = setup();
+        lib.conn
+            .execute("UPDATE photos SET trashed_at = NULL", [])
+            .unwrap();
+        set_last_open(&lib, HOY - 400 * DAY);
+        let report = emptied(lib.empty_expired_trash(HOY, false, |_, _| {}).unwrap());
+        assert!(report.deleted.is_empty());
+        assert_eq!(lib.last_open().unwrap(), Some(HOY));
+    }
+
+    #[test]
+    fn la_primera_apertura_vacia_sin_preguntar() {
+        let (_dir, mut lib) = setup();
+        assert_eq!(lib.last_open().unwrap(), None);
+        let report = emptied(lib.empty_expired_trash(HOY, false, |_, _| {}).unwrap());
+        assert_eq!(report.deleted.len(), 2);
+    }
+
+    #[test]
+    fn un_reloj_retrasado_no_borra_ni_hace_retroceder_la_fecha() {
+        let (dir, mut lib) = setup();
+        set_last_open(&lib, HOY);
+        let report = emptied(
+            lib.empty_expired_trash(HOY - 40 * DAY, false, |_, _| {})
+                .unwrap(),
+        );
+        assert!(report.deleted.is_empty());
+        assert!(file(&dir, "vieja.png").exists());
+        assert_eq!(lib.last_open().unwrap(), Some(HOY));
+    }
+
+    #[test]
+    fn vaciar_la_papelera_lista_todas_de_la_mas_antigua_a_la_mas_reciente() {
+        let (_dir, lib) = setup();
+        let names: Vec<String> = lib
+            .trash_ids()
+            .unwrap()
+            .into_iter()
+            .map(|id| {
+                lib.conn
+                    .query_row("SELECT rel_path FROM photos WHERE id = ?1", [id], |r| {
+                        r.get(0)
+                    })
+                    .unwrap()
+            })
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "Originales/vieja.png",
+                "Originales/justa.png",
+                "Originales/reciente.png"
+            ]
+        );
+    }
+
+    #[test]
+    fn importar_una_foto_de_la_papelera_no_la_trae_otra_vez() {
+        let (dir, mut lib) = setup();
+        let origen = tempfile::tempdir().unwrap();
+        fs::copy(file(&dir, "vieja.png"), origen.path().join("vieja.png")).unwrap();
+        fs::copy(file(&dir, "fuera.png"), origen.path().join("fuera.png")).unwrap();
+        write_png(&origen.path().join("nueva.png"), 10, 10, b"nueva");
+        let report = lib.import_from(origen.path()).unwrap();
+        assert_eq!(
+            (report.copied, report.duplicates, report.in_trash),
+            (1, 1, 1)
+        );
     }
 }

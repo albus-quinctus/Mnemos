@@ -70,6 +70,9 @@ fn print_index(r: &IndexReport) -> bool {
 fn print_import(r: &ImportReport) -> bool {
     println!("Copiadas:   {}", r.copied);
     println!("Duplicadas: {}", r.duplicates);
+    if r.in_trash > 0 {
+        println!("Ya estaban en la papelera: {}", r.in_trash);
+    }
     print_errors(&r.errors)
 }
 
