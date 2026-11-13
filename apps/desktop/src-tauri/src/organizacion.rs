@@ -1,4 +1,5 @@
-//! Comandos de la spec 006: vistas Fotos, Favoritos y Archivo, selección
+//! Comandos de la spec 006: vistas Fotos, Favoritos, Archivo (y Papelera, spec
+//! 015), selección
 //! múltiple, favoritos, archivo y títulos de día. Solo cambian la base de
 //! datos; ninguno toca los archivos.
 
