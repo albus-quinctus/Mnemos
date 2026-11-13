@@ -10,7 +10,6 @@
 </script>
 
 {#if acceso.disponible}
-  <hr />
   <div class="acceso">
     {#if acceso.estado === "si"}
       <div class="fila">
@@ -36,13 +35,6 @@
 {/if}
 
 <style>
-  hr {
-    width: calc(100% - 1.5rem);
-    margin: 0.25rem auto;
-    border: 0;
-    border-top: 1px solid var(--borde);
-  }
-
   .acceso {
     display: flex;
     flex-direction: column;

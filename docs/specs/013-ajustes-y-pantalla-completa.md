@@ -82,9 +82,9 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
   alterna igual y no escribe nada en el campo.
 
 ## Criterios de aceptación
-- [ ] La entrada «Ajustes» aparece en el menú lateral encima de «Añadir a este
+- [x] La entrada «Ajustes» aparece en el menú lateral encima de «Añadir a este
       equipo» y abre la ventana de Ajustes; `Esc` la cierra.
-- [ ] Elegir Claro u Oscuro cambia toda la galería al momento, también si el
+- [x] Elegir Claro u Oscuro cambia toda la galería al momento, también si el
       sistema está en el modo contrario (prueba de componentes).
 - [x] El tema se recuerda entre arranques y un `configuracion.json` sin `tema`
       se lee como «Sistema» (pruebas en Rust).
@@ -117,7 +117,8 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
 4. [x] Tokens con `data-tema` en `tokens.css` y estado del tema en
        `lib/ajustes/tema.svelte.ts`; pruebas (incluida una que comprueba
        que los dos bloques oscuros de `tokens.css` son iguales).
-5. [ ] Entrada «Ajustes» en `MenuLateral.svelte` y ventana de Ajustes
-       (`lib/ajustes/Ajustes.svelte`); pruebas.
+5. [x] Entrada «Ajustes» en `MenuLateral.svelte` y ventana de Ajustes
+       (`lib/ajustes/Ajustes.svelte`, estado en `ajustes.svelte.ts`); pruebas.
+       `Esc` cierra solo Ajustes, sin quitar la selección ni la búsqueda.
 6. [ ] Prueba en la app real (Linux con Sway; Windows si se puede) y
        `docs/progreso.md`.
