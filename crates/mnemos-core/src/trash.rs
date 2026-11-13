@@ -70,6 +70,17 @@ pub struct DeleteFailure {
     pub reason: String,
 }
 
+/// Una foto de la Papelera, para listarla.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TrashEntry {
+    pub id: i64,
+    pub rel_path: String,
+    /// Cuándo se envió (segundos Unix, UTC).
+    pub trashed_at: i64,
+    /// Día en que se eliminará, en hora local: `"2026-12-12"`.
+    pub deletes_on: String,
+}
+
 /// Lo que la base de datos sabe del archivo de una foto de la Papelera.
 struct Trashed {
     id: i64,
@@ -205,6 +216,28 @@ impl Library {
             .query_map([now - TRASH_DAYS * DAY], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
         Ok(ids)
+    }
+
+    /// Lo que hay en la Papelera, de lo enviado más tarde a lo más antiguo,
+    /// con el día en que se eliminará cada foto.
+    pub fn trash_entries(&self) -> Result<Vec<TrashEntry>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, rel_path, trashed_at,
+                    strftime('%Y-%m-%d', trashed_at + ?1, 'unixepoch', 'localtime')
+             FROM photos WHERE trashed_at IS NOT NULL
+             ORDER BY trashed_at DESC, id DESC",
+        )?;
+        let entries = stmt
+            .query_map([TRASH_DAYS * DAY], |r| {
+                Ok(TrashEntry {
+                    id: r.get(0)?,
+                    rel_path: r.get(1)?,
+                    trashed_at: r.get(2)?,
+                    deletes_on: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(entries)
     }
 
     /// Todas las fotos de la Papelera («Vaciar papelera»), de la más antigua
@@ -957,6 +990,30 @@ mod vaciado {
         assert!(report.deleted.is_empty());
         assert!(file(&dir, "vieja.png").exists());
         assert_eq!(lib.last_open().unwrap(), Some(HOY));
+    }
+
+    #[test]
+    fn lista_la_papelera_con_el_dia_en_que_se_elimina_cada_foto() {
+        let (_dir, lib) = setup();
+        let entries = lib.trash_entries().unwrap();
+        let names: Vec<&str> = entries.iter().map(|e| e.rel_path.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "Originales/reciente.png",
+                "Originales/justa.png",
+                "Originales/vieja.png"
+            ]
+        );
+        let expected: String = lib
+            .conn
+            .query_row(
+                "SELECT strftime('%Y-%m-%d', ?1, 'unixepoch', 'localtime')",
+                [HOY + DAY],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(entries[0].deletes_on, expected);
     }
 
     #[test]
