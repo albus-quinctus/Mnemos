@@ -19,7 +19,9 @@ pub use raw::raw_preview;
 pub use thumbnail::{
     DISPLAY_MAX_SIDE, DISPLAY_QUALITY, display_image, display_image_edited, display_size, web_mime,
 };
-pub use thumbnail::{EXPORT_MAX_SIDE, EXPORT_QUALITY, export_image, export_size};
+pub use thumbnail::{
+    EXPORT_MAX_SIDE, EXPORT_QUALITY, export_image, export_image_edited, export_size,
+};
 pub use thumbnail::{
     THUMBNAIL_HEIGHT, THUMBNAIL_MAX_WIDTH, THUMBNAIL_QUALITY, Thumbnail, ThumbnailError, thumbnail,
     thumbnail_edited, thumbnail_size,
