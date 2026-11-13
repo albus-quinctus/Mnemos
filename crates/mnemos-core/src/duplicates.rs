@@ -73,7 +73,7 @@ impl Library {
         Ok(self.conn.query_row(
             "SELECT count(*), coalesce(sum(n - 1), 0), coalesce(sum((n - 1) * size), 0)
              FROM (SELECT count(*) AS n, min(size_bytes) AS size
-                   FROM photos WHERE content_hash IS NOT NULL
+                   FROM photos WHERE content_hash IS NOT NULL AND trashed_at IS NULL
                    GROUP BY content_hash HAVING n > 1)",
             [],
             |r| {
@@ -110,7 +110,7 @@ impl Library {
         let hash_bound = if after.is_some() { hash } else { "\u{10FFFF}" };
         let mut stmt = self.conn.prepare(&format!(
             "SELECT content_hash, max({DATE}) AS d
-             FROM photos WHERE content_hash IS NOT NULL
+             FROM photos WHERE content_hash IS NOT NULL AND trashed_at IS NULL
              GROUP BY content_hash
              HAVING count(*) > 1 AND (d, content_hash) < (?1, ?2)
              ORDER BY d DESC, content_hash DESC
@@ -127,7 +127,7 @@ impl Library {
 
         let mut copies_stmt = self.conn.prepare(&format!(
             "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL
-             FROM photos WHERE content_hash = ?1
+             FROM photos WHERE content_hash = ?1 AND trashed_at IS NULL
              ORDER BY imported_at, id"
         ))?;
         let mut groups = Vec::with_capacity(heads.len());

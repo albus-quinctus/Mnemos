@@ -30,7 +30,8 @@ pub(crate) struct Filter {
 /// el mismo orden y el mismo cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum View {
-    /// La biblioteca sin las fotos archivadas.
+    /// La biblioteca sin las fotos archivadas. Ninguna vista incluye las
+    /// fotos de la Papelera (spec 015).
     #[default]
     #[serde(rename = "fotos")]
     Photos,
@@ -47,16 +48,18 @@ pub enum View {
 
 impl View {
     /// Condición de la vista. Las de la spec 006 son SQL fijo, sin
-    /// parámetros, y repiten la de su índice parcial (migración 0007) para que
-    /// SQLite lo use. La de una etiqueta usa el índice `photo_tags_tag`.
+    /// parámetros, y repiten la de su índice parcial (migración 0014) para que
+    /// SQLite lo use. La de una etiqueta usa el índice `photo_tags_tag`. Ninguna
+    /// enseña las fotos de la papelera.
     pub(crate) fn filter(self) -> Filter {
         let sql = match self {
-            View::Photos => " AND archived_at IS NULL",
-            View::Favorites => " AND favorite = 1",
-            View::Archive => " AND archived_at IS NOT NULL",
+            View::Photos => " AND archived_at IS NULL AND trashed_at IS NULL",
+            View::Favorites => " AND favorite = 1 AND trashed_at IS NULL",
+            View::Archive => " AND archived_at IS NOT NULL AND trashed_at IS NULL",
             View::Tag(tag) => {
                 return Filter {
-                    sql: " AND id IN (SELECT photo_id FROM photo_tags WHERE tag_id = ?)".to_owned(),
+                    sql: " AND trashed_at IS NULL AND id IN (SELECT photo_id FROM photo_tags WHERE tag_id = ?)"
+                        .to_owned(),
                     params: vec![Value::from(tag)],
                 };
             }
