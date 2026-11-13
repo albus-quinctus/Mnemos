@@ -162,9 +162,9 @@ Salvaguardas que la acompañan:
   solo maneja ids y el núcleo usa rutas relativas.
 
 ## Criterios de aceptación
-- [ ] Enviar a la Papelera y restaurar no cambian huella, tamaño ni fecha del
+- [x] Enviar a la Papelera y restaurar no cambian huella, tamaño ni fecha del
   original (prueba automática).
-- [ ] Ninguna acción que no sea eliminar desde la Papelera borra un archivo:
+- [x] Ninguna acción que no sea eliminar desde la Papelera borra un archivo:
   importar, indexar, editar, copiar, exportar, archivar, favoritos (prueba
   automática ampliando `originales_intactos.rs`).
 - [x] Solo `trash.rs` contiene código que borra originales (prueba que
@@ -174,15 +174,15 @@ Salvaguardas que la acompañan:
 - [x] El vaciado automático borra solo lo que lleva 30 días o más, y no hace
   nada con el reloj adelantado más de 60 días (prueba automática con reloj
   simulado).
-- [ ] Las fotos en la Papelera no salen en Fotos, Favoritos, Archivo,
+- [x] Las fotos en la Papelera no salen en Fotos, Favoritos, Archivo,
   búsqueda, barra de meses ni Duplicados (prueba automática).
-- [ ] Restaurar devuelve favorito, archivo y edición (prueba automática;
-  favorito y archivo ya probados en `trash.rs`).
+- [x] Restaurar devuelve favorito, archivo y edición (pruebas en `trash.rs` y
+  `tests/originales_intactos.rs`).
 - [x] Enviar o restaurar 10 000 fotos tarda menos de 1 s (30 ms,
   `docs/rendimiento.md`).
 - [x] Capturas de la Papelera, la barra de selección y el diálogo aprobadas
   por Paulo antes de cerrar la interfaz.
-- [ ] Los originales no se modifican salvo al eliminar para siempre (prueba
+- [x] Los originales no se modifican salvo al eliminar para siempre (prueba
   automática).
 
 ## Fuera de alcance
@@ -219,5 +219,5 @@ Salvaguardas que la acompañan:
 10. [x] Interfaz: vista Papelera (franja, cabeceras con los días que quedan,
     vacía), barra con Restaurar y Eliminar para siempre, visor de la Papelera
     y diálogo de confirmación.
-11. [ ] Prueba de punta a punta ampliando `originales_intactos.rs` y
+11. [x] Prueba de punta a punta ampliando `originales_intactos.rs` y
     `docs/arquitectura.md`; actualizar `docs/progreso.md`.
