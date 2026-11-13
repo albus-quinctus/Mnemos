@@ -12,6 +12,7 @@
   import { SvelteMap } from "svelte/reactivity";
   import {
     camara as pedirCamara,
+    copiasIdenticas,
     detalles as pedirDetalles,
     ediciones as pedirEdiciones,
     elegirVersion,
@@ -27,6 +28,7 @@
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
   import { avisarCambio } from "$lib/cambios.svelte";
+  import { lineaCompartida } from "$lib/editor/compartida";
   import Editor from "$lib/editor/Editor.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
   import {
@@ -206,6 +208,8 @@
   let info = $state<Detalles | null>(null);
   let camaraInfo = $state<Camara | null>(null);
   let edicionesInfo = $state<Ediciones | null>(null);
+  // Copias idénticas (spec 018): comparten las ediciones.
+  let copiasInfo = $state(0);
   // Sube al guardar una fecha, para volver a pedir los detalles.
   let recarga = $state(0);
   const captura = $derived(info ? fechaCaptura(info.taken_at, info.taken_source) : null);
@@ -225,6 +229,13 @@
       })
       .catch(() => {
         if (vigente) info = null;
+      });
+    copiasIdenticas(id)
+      .then((c) => {
+        if (vigente) copiasInfo = c.length;
+      })
+      .catch(() => {
+        if (vigente) copiasInfo = 0;
       });
     pedirEdiciones(id)
       .then((e) => {
@@ -707,7 +718,11 @@
         </dl>
         {#if edicionesInfo && (edicionesInfo.versions.length > 0 || edicionesInfo.damaged)}
           {@const ed = edicionesInfo}
+          {@const compartida = lineaCompartida(copiasInfo)}
           <h3>Ediciones</h3>
+          {#if compartida}
+            <p class="nota compartida"><Icono nombre="duplicados" tamano={13} />{compartida}</p>
+          {/if}
           {#if ed.damaged}
             <p class="nota">La receta de esta foto no se puede leer: se ve sin editar. ({ed.damaged})</p>
           {:else}
@@ -916,6 +931,13 @@
   }
 
   /* Sección Ediciones (spec 009). */
+  .compartida {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: -2px;
+  }
+
   .versiones {
     display: grid;
     gap: 2px;
