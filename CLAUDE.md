@@ -12,7 +12,7 @@ Gestor de fotos portátil, local y de código abierto. Funciona desde un disco e
 - Dependencias: `cargo deny check`, `pnpm audit`
 
 ## Reglas que no se rompen
-1. **Nunca modificar, mover ni borrar un original** de la biblioteca. Las ediciones son recetas JSON en `.mnemos/ediciones/`.
+1. **Nunca modificar, mover ni borrar un original** de la biblioteca. Las ediciones son recetas JSON en `.mnemos/ediciones/`. **Única excepción:** eliminar para siempre desde la Papelera (spec 015), a mano con confirmación o al cumplirse los 30 días. Ningún otro código borra originales.
 2. **Solo rutas relativas** a la raíz de la biblioteca. Nada de rutas absolutas en la base de datos.
 3. Las pruebas usan `tests/fixtures/`, nunca una biblioteca real.
 4. Sin servicios en la nube, cuentas ni telemetría.
