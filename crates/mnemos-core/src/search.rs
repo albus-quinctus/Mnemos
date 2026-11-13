@@ -148,7 +148,7 @@ impl Library {
         // La búsqueda incluye las archivadas, pero no la Papelera (spec 015).
         let mut filter = Filter {
             sql: " AND trashed_at IS NULL".to_owned(),
-            params: Vec::new(),
+            ..Filter::default()
         };
         if let Some(expr) = query.fts_match() {
             filter

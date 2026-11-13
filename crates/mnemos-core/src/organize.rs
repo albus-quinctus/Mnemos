@@ -48,7 +48,12 @@ impl Library {
     /// Ejecuta `sql` (con `?1` = id y, si hay `value`, `?2`) para cada id dentro de
     /// una transacción. Una fila por sentencia evita el límite de parámetros
     /// de SQLite con selecciones de decenas de miles de fotos.
-    fn update_each(&mut self, ids: &[i64], sql: &str, value: Option<i64>) -> Result<Vec<i64>> {
+    pub(crate) fn update_each(
+        &mut self,
+        ids: &[i64],
+        sql: &str,
+        value: Option<i64>,
+    ) -> Result<Vec<i64>> {
         let tx = self.conn.transaction()?;
         let mut changed = Vec::new();
         {

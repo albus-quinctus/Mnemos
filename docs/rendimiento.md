@@ -49,6 +49,16 @@ Spec 006, tareas 2 a 4. Mismo equipo. El objetivo es menos de 1 s.
 
 Con las 10 000 en Favoritos y archivadas (el peor caso para esas vistas), los meses y la primera página de 500 de Favoritos tardan 13 ms y los de Archivo 12 ms. La vista Fotos sigue en 7 ms para los meses y 1,5 ms la página más lenta. Para la selección (tarea 4), «seleccionar todo» tarda 0,8 ms y el rango de la primera foto a la última, 1,6 ms.
 
+### Papelera en el núcleo, 10 000 fotos (2026-11-13)
+Spec 015, tarea 3. Contenedor de desarrollo, en modo release. El objetivo es menos de 1 s.
+
+| Acción sobre las 10 000 fotos | Tiempo |
+|---|---|
+| Enviar a la Papelera | 30 ms |
+| Restaurar | 30 ms |
+
+Con las 10 000 en la Papelera (su peor caso), los meses y la primera página de la vista Papelera tardan 4,7 ms.
+
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
 |---|---|---|

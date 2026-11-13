@@ -4,6 +4,42 @@
 //! el archivo sigue en su sitio. Las vistas, la búsqueda y los duplicados
 //! dejan fuera esas fotos. Borrar el archivo es la única excepción a la regla
 //! 1 de `CLAUDE.md` y vivirá solo en este módulo.
+//!
+//! Enviar y restaurar funcionan como archivar (spec 006): una transacción
+//! para toda la selección y, de vuelta, los ids que cambiaron de verdad para
+//! poder deshacer.
+
+use std::time::SystemTime;
+
+use crate::error::Result;
+use crate::files::unix_secs;
+use crate::library::Library;
+
+/// Días que pasa una foto en la Papelera antes de eliminarse para siempre.
+pub const TRASH_DAYS: i64 = 30;
+
+impl Library {
+    /// Envía a la Papelera las fotos `ids`. No toca los archivos: solo guarda
+    /// la fecha de envío. Una foto que ya estaba conserva su fecha. Los ids
+    /// que no existen se ignoran.
+    pub fn send_to_trash(&mut self, ids: &[i64]) -> Result<Vec<i64>> {
+        self.update_each(
+            ids,
+            "UPDATE photos SET trashed_at = ?2 WHERE id = ?1 AND trashed_at IS NULL",
+            Some(unix_secs(SystemTime::now())),
+        )
+    }
+
+    /// Saca de la Papelera las fotos `ids`. Vuelven con su favorito, su
+    /// archivo y su edición, que no se tocaron al enviarlas.
+    pub fn restore_from_trash(&mut self, ids: &[i64]) -> Result<Vec<i64>> {
+        self.update_each(
+            ids,
+            "UPDATE photos SET trashed_at = NULL WHERE id = ?1 AND trashed_at IS NOT NULL",
+            None,
+        )
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -120,19 +156,100 @@ mod tests {
     }
 
     #[test]
+    fn enviar_y_restaurar_devuelven_solo_lo_que_cambia() {
+        let (_dir, mut lib) = library();
+        // La 2 ya estaba en la Papelera y la 99 no existe.
+        assert_eq!(lib.send_to_trash(&[1, 2, 99, 1]).unwrap(), [1]);
+        assert_eq!(page_ids(&lib, View::Photos), [6]);
+        // Deshacer: solo vuelve la 1; la 2 sigue en la Papelera.
+        assert_eq!(lib.restore_from_trash(&[1]).unwrap(), [1]);
+        assert_eq!(page_ids(&lib, View::Photos), [6, 1]);
+        assert_eq!(lib.restore_from_trash(&[1, 6]).unwrap(), Vec::<i64>::new());
+    }
+
+    #[test]
+    fn enviar_conserva_la_fecha_de_envio_de_las_que_ya_estaban() {
+        let (_dir, mut lib) = library();
+        lib.send_to_trash(&[2, 6]).unwrap();
+        let fecha = |id: i64| -> i64 {
+            lib.conn
+                .query_row("SELECT trashed_at FROM photos WHERE id = ?1", [id], |r| {
+                    r.get(0)
+                })
+                .unwrap()
+        };
+        assert_eq!(fecha(2), 100);
+        assert!(fecha(6) > 1_700_000_000);
+    }
+
+    #[test]
+    fn restaurar_devuelve_favorito_y_archivo() {
+        let (_dir, mut lib) = library();
+        lib.restore_from_trash(&[3, 4, 5]).unwrap();
+        assert_eq!(page_ids(&lib, View::Favorites), [5, 3]);
+        assert_eq!(page_ids(&lib, View::Archive), [5, 4]);
+        assert_eq!(page_ids(&lib, View::Photos), [6, 3, 1]);
+    }
+
+    #[test]
+    fn la_papelera_va_por_fecha_de_envio() {
+        let (_dir, lib) = library();
+        // Cada foto se envía en un momento distinto, en otro orden que el de
+        // su fecha de captura.
+        for (id, at) in [(2, 300), (3, 100), (4, 400), (5, 200)] {
+            lib.conn
+                .execute("UPDATE photos SET trashed_at = ?2 WHERE id = ?1", [id, at])
+                .unwrap();
+        }
+        let page = lib.view_page(View::Trash, None, 100).unwrap();
+        let got: Vec<(i64, i64)> = page.photos.iter().map(|p| (p.id, p.date)).collect();
+        assert_eq!(got, [(4, 400), (2, 300), (5, 200), (3, 100)]);
+        assert_eq!(months_total(&lib, View::Trash), 4);
+
+        // Paginación por cursor con la fecha de envío.
+        let first = lib.view_page(View::Trash, None, 2).unwrap();
+        let ids: Vec<i64> = first.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [4, 2]);
+        let rest = lib.view_page(View::Trash, first.next, 2).unwrap();
+        let ids: Vec<i64> = rest.photos.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [5, 3]);
+        assert!(rest.next.is_none());
+
+        // La selección sigue el mismo orden.
+        let trash = Scope::View(View::Trash);
+        assert_eq!(lib.select_all(trash).unwrap(), [4, 2, 5, 3]);
+        let a = crate::timeline::TimelineCursor { date: 300, id: 2 };
+        let b = crate::timeline::TimelineCursor { date: 100, id: 3 };
+        assert_eq!(lib.select_range(trash, b, a).unwrap(), [2, 5, 3]);
+        // Las cuatro se enviaron el 1-1-1970 en UTC; en hora local puede ser
+        // el 31-12-1969, así que se pregunta por el día que da SQLite.
+        let day: String = lib
+            .conn
+            .query_row(
+                "SELECT strftime('%Y-%m-%d', 300, 'unixepoch', 'localtime')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(lib.select_day(trash, &day).unwrap(), [4, 2, 5, 3]);
+    }
+
+    #[test]
     fn las_vistas_usan_sus_indices_parciales() {
         let (_dir, lib) = library();
         for (view, index) in [
             (View::Photos, "photos_timeline_fotos"),
             (View::Favorites, "photos_timeline_favoritos"),
             (View::Archive, "photos_timeline_archivo"),
+            (View::Trash, "photos_papelera"),
         ] {
             let plan: String = lib
                 .conn
                 .prepare(&format!(
                     "EXPLAIN QUERY PLAN SELECT id FROM photos WHERE 1 {}
-                     ORDER BY coalesce(taken_at, modified_at) DESC, id DESC",
-                    view.filter().sql
+                     ORDER BY {} DESC, id DESC",
+                    view.filter().sql,
+                    view.filter().order
                 ))
                 .unwrap()
                 .query_map([], |r| r.get::<_, String>(3))
