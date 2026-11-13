@@ -8,6 +8,7 @@ export type EventoImportacion = {
   procesadas: number;
   copiadas: number;
   duplicadas: number;
+  en_papelera: number; // ya estaban, pero en la Papelera (spec 015)
   errores: number;
   mensaje: string | null;
 };
@@ -45,6 +46,7 @@ export async function importarCarpeta(): Promise<void> {
     procesadas: 0,
     copiadas: 0,
     duplicadas: 0,
+    en_papelera: 0,
     errores: 0,
     mensaje: null,
   };

@@ -3,6 +3,7 @@ mod configuracion;
 mod duplicados;
 mod media;
 mod organizacion;
+mod papelera;
 mod portatil;
 
 use std::path::{Path, PathBuf};
@@ -350,6 +351,8 @@ struct EventoImportacion {
     procesadas: u64,
     copiadas: u64,
     duplicadas: u64,
+    /// Ya estaban en la biblioteca, pero en la Papelera (spec 015).
+    en_papelera: u64,
     errores: usize,
     mensaje: Option<String>,
 }
@@ -362,6 +365,7 @@ impl EventoImportacion {
             procesadas: progreso.procesadas,
             copiadas: parcial.copied,
             duplicadas: parcial.duplicates,
+            en_papelera: parcial.in_trash,
             errores: parcial.errors.len(),
             mensaje: None,
         }
@@ -376,6 +380,7 @@ impl EventoImportacion {
             },
             copiadas: informe.copied,
             duplicadas: informe.duplicates,
+            en_papelera: informe.in_trash,
             errores: informe.errors.len(),
             ..Self::default()
         }
@@ -517,6 +522,7 @@ pub fn run() {
         .manage(OpenLibrary::default())
         .manage(Thumbnails::default())
         .manage(Importacion::default())
+        .manage(papelera::Borrado::default())
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("mnemos", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -556,7 +562,12 @@ pub fn run() {
             organizacion::seleccionar_dia,
             organizacion::seleccionar_rango,
             organizacion::titulos_dia,
-            organizacion::poner_titulo_dia
+            organizacion::poner_titulo_dia,
+            papelera::enviar_a_papelera,
+            papelera::restaurar,
+            papelera::eliminar_para_siempre,
+            papelera::vaciar_papelera,
+            papelera::vaciado_automatico
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");

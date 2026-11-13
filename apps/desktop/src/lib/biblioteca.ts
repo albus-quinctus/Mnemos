@@ -43,7 +43,8 @@ export function fotos(
 
 // Vistas, selección, favoritos, archivo y títulos de día (spec 006). Reflejan
 // `mnemos_core::{View, Scope, DayTitle}`.
-export type Vista = "fotos" | "favoritos" | "archivo";
+// En la Papelera (spec 015), `date` de cada foto es la fecha en que se envió.
+export type Vista = "fotos" | "favoritos" | "archivo" | "papelera";
 
 // Dónde se selecciona: una vista o los resultados de una búsqueda.
 export type Ambito = { vista: Vista } | { busqueda: string };
@@ -326,4 +327,48 @@ export function duplicadosGrupos(
   limite: number,
 ): Promise<PaginaDuplicados> {
   return invoke("duplicados_grupos", { despues, limite });
+}
+
+// Papelera (spec 015). Refleja `mnemos_core::trash` y los comandos de
+// `src-tauri/src/papelera.rs`.
+
+// Días que pasa una foto en la Papelera antes de eliminarse para siempre.
+export const DIAS_PAPELERA = 30;
+
+// Enviar y restaurar no tocan los archivos y devuelven los ids que han
+// cambiado de verdad, para «Deshacer».
+export function enviarAPapelera(ids: number[]): Promise<number[]> {
+  return invoke("enviar_a_papelera", { ids });
+}
+
+export function restaurar(ids: number[]): Promise<number[]> {
+  return invoke("restaurar", { ids });
+}
+
+// Borran originales: la interfaz pide confirmación antes. Vuelven enseguida;
+// el avance y el resultado llegan como eventos `papelera`.
+export function eliminarParaSiempre(ids: number[]): Promise<void> {
+  return invoke("eliminar_para_siempre", { ids });
+}
+
+export function vaciarPapelera(): Promise<void> {
+  return invoke("vaciar_papelera");
+}
+
+// Elimina lo que lleva 30 días. Se pide al abrir la biblioteca y cada hora.
+// Con el reloj adelantado avisa con `reloj_adelantado` y no borra; si el
+// usuario confirma, se vuelve a pedir con `confiarReloj`.
+export function vaciadoAutomatico(confiarReloj = false): Promise<void> {
+  return invoke("vaciado_automatico", { confiarReloj });
+}
+
+export interface EventoPapelera {
+  estado: "en_curso" | "terminado" | "reloj_adelantado" | "fallido";
+  motivo: "seleccion" | "vaciar" | "automatico";
+  hechas: number;
+  total: number;
+  eliminadas: number[]; // ids que ya no existen
+  fallidas: { ruta: string; motivo: string }[]; // siguen en la Papelera
+  caducadas: number; // con `reloj_adelantado`
+  mensaje: string | null; // con `fallido`
 }
