@@ -216,6 +216,36 @@ export function exportar(
   return invoke("exportar", { id, carpeta, tamano });
 }
 
+// Exportar varias fotos (spec 017). Empieza en segundo plano y avisa con el
+// evento `exportacion`; solo puede haber una a la vez.
+export interface Saltada {
+  nombre: string;
+  motivo: string;
+}
+
+export interface EventoExportacion {
+  estado: "en_curso" | "terminada" | "cancelada" | "detenida";
+  total: number;
+  hechas: number;
+  guardadas: number;
+  carpeta: string;
+  ruta: string | null; // archivo creado, solo cuando el lote es de una foto
+  saltadas: Saltada[];
+  mensaje: string | null;
+}
+
+export function exportarVarias(
+  ids: number[],
+  carpeta: string,
+  tamano: TamanoExportacion,
+): Promise<void> {
+  return invoke("exportar_varias", { ids, carpeta, tamano });
+}
+
+export function cancelarExportacion(): Promise<void> {
+  return invoke("cancelar_exportacion");
+}
+
 // Editor no destructivo (spec 009). La geometría es la de la receta
 // (`mnemos_imaging::recipe::Geometry`): giro en grados en sentido horario
 // sobre la foto ya girada según el EXIF, volteo después del giro y recorte en
