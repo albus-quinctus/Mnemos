@@ -2,6 +2,8 @@
 //!
 //! Lee el original y escribe una copia nueva en el destino: nunca toca el
 //! original ni la base de datos, y nunca sobrescribe un archivo del destino.
+//! Si la foto tiene una versión editada a la vista (spec 009), se exporta esa:
+//! la receta se aplica al exportar, sobre el original leído.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -9,15 +11,19 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::copies::copy_name;
 use crate::error::{Error, Result};
 use crate::files::hash_file;
 use crate::library::{Library, PhotoMedia};
 
-/// Tamaño de la foto exportada.
+/// Tamaño de la foto exportada. Con una edición a la vista, los dos tamaños
+/// salen con la edición aplicada.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportSize {
-    /// Copia exacta del archivo, con sus metadatos.
+    /// Copia exacta del archivo, con sus metadatos. Si la foto está
+    /// editada, la foto editada a tamaño completo (JPEG 95 o PNG, como
+    /// «Guardar como copia») con el EXIF del original.
     Original,
     /// JPEG con el lado mayor de [`mnemos_imaging::EXPORT_MAX_SIDE`] como
     /// mucho, ya girado y sin metadatos.
@@ -54,6 +60,9 @@ pub fn export(
     if !src.is_file() {
         return Err(Error::OriginalMissing(media.rel_path.to_string()));
     }
+    if let Some(edit) = &media.edit {
+        return export_edited(media, &src, &edit.geometry, dest_dir, size, name);
+    }
     match size {
         ExportSize::Original => {
             // Se lee una sola vez: la huella sale de lo mismo que se escribe.
@@ -73,16 +82,60 @@ pub fn export(
                 Err(mnemos_imaging::ThumbnailError::Io(e)) => return Err(e.into()),
                 Err(_) => return Err(Error::CannotReduce(media.rel_path.to_string())),
             };
-            let stem = Path::new(name)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .filter(|s| !s.is_empty())
-                .unwrap_or(name);
-            write_new(dest_dir, &format!("{stem}.jpg"), |out| {
+            write_new(dest_dir, &format!("{}.jpg", stem_of(name)), |out| {
                 out.write_all(&img.jpeg)
             })
         }
     }
+}
+
+/// Exporta la foto con la geometría de su edición aplicada. El original solo
+/// se lee.
+fn export_edited(
+    media: &PhotoMedia,
+    src: &Path,
+    geometry: &mnemos_imaging::recipe::Geometry,
+    dest_dir: &Path,
+    size: ExportSize,
+    name: &str,
+) -> Result<PathBuf> {
+    let rel = media.rel_path.to_string();
+    let cannot_render = |err: mnemos_imaging::ThumbnailError| match err {
+        mnemos_imaging::ThumbnailError::Io(e) => Error::Io(e),
+        other => Error::CannotRender {
+            path: rel.clone(),
+            message: other.to_string(),
+        },
+    };
+    match size {
+        ExportSize::Original => {
+            let copy = mnemos_imaging::edited_copy(src, media.orientation, geometry)
+                .map_err(cannot_render)?;
+            let (stem, ext) = copy_name(src, copy.format)?;
+            let modified = fs::metadata(src)?.modified()?;
+            write_new(dest_dir, &format!("{stem}.{ext}"), |out| {
+                out.write_all(&copy.bytes)?;
+                out.set_modified(modified)?;
+                Ok(())
+            })
+        }
+        ExportSize::Reduced => {
+            let img = mnemos_imaging::export_image_edited(src, media.orientation, geometry)
+                .map_err(cannot_render)?;
+            write_new(dest_dir, &format!("{}.jpg", stem_of(name)), |out| {
+                out.write_all(&img.jpeg)
+            })
+        }
+    }
+}
+
+/// Nombre sin la extensión, o el nombre entero si quedaría vacío.
+fn stem_of(name: &str) -> &str {
+    Path::new(name)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(name)
 }
 
 /// Comprueba que lo escrito en `dest` tiene la huella del original; si no,
@@ -147,6 +200,7 @@ fn write_new(
 mod tests {
     use super::*;
     use crate::library::ORIGINALS_DIR;
+    use mnemos_imaging::recipe::{Crop, Geometry};
 
     struct Setup {
         _dir: tempfile::TempDir,
@@ -336,6 +390,107 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, Error::PhotoNotFound(999)), "{err}");
         assert_eq!(fs::read_dir(&s.dest).unwrap().count(), 0);
+    }
+
+    fn geometry(rotate: u16, crop: Option<(f64, f64, f64, f64)>) -> Geometry {
+        Geometry {
+            rotate,
+            flip_horizontal: false,
+            crop: crop.map(|(x, y, width, height)| Crop {
+                x,
+                y,
+                width,
+                height,
+            }),
+        }
+    }
+
+    #[test]
+    fn el_original_editado_sale_con_la_edicion_a_tamano_completo() {
+        let mut s = setup("Picos.jpg", jpeg(400, 200));
+        // Girada 90° (200 × 400) y con la mitad izquierda: 100 × 400.
+        s.lib
+            .save_edit(s.id, geometry(90, Some((0.0, 0.0, 0.5, 1.0))))
+            .unwrap();
+        let antes = snapshot(&s);
+        let out = s
+            .lib
+            .export_photo(s.id, &s.dest, ExportSize::Original)
+            .unwrap();
+        assert_eq!(out, s.dest.join("Picos.jpg"));
+        let bytes = fs::read(&out).unwrap();
+        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg).unwrap();
+        assert_eq!((img.width(), img.height()), (100, 400));
+        let original = s.lib.root().join("Originales/Picos.jpg");
+        assert_ne!(bytes, fs::read(&original).unwrap());
+        assert_eq!(
+            fs::metadata(&out).unwrap().modified().unwrap(),
+            fs::metadata(&original).unwrap().modified().unwrap()
+        );
+        assert_eq!(snapshot(&s), antes);
+    }
+
+    #[test]
+    fn la_reducida_editada_mide_el_lado_mayor_sobre_la_editada() {
+        let mut s = setup("panoramica.png", |path| {
+            image::RgbImage::from_pixel(3000, 1000, image::Rgb([10, 200, 10]))
+                .save_with_format(path, image::ImageFormat::Png)
+                .unwrap();
+        });
+        // Girada 90° (1000 × 3000) y sin el 10 % de abajo: 1000 × 2700, que
+        // se reduce a 759 × 2048.
+        s.lib
+            .save_edit(s.id, geometry(90, Some((0.0, 0.0, 1.0, 0.9))))
+            .unwrap();
+        let antes = snapshot(&s);
+        let out = s
+            .lib
+            .export_photo(s.id, &s.dest, ExportSize::Reduced)
+            .unwrap();
+        assert_eq!(out, s.dest.join("panoramica.jpg"));
+        let bytes = fs::read(&out).unwrap();
+        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg).unwrap();
+        assert_eq!((img.width(), img.height()), (759, 2048));
+        assert!(
+            exif::Reader::new()
+                .read_from_container(&mut io::Cursor::new(&bytes))
+                .is_err(),
+            "la reducida no debe llevar EXIF"
+        );
+        assert_eq!(snapshot(&s), antes);
+    }
+
+    #[test]
+    fn un_png_editado_sale_en_png() {
+        let mut s = setup("captura.png", |path| {
+            image::RgbaImage::from_pixel(80, 40, image::Rgba([0, 0, 255, 128]))
+                .save_with_format(path, image::ImageFormat::Png)
+                .unwrap();
+        });
+        s.lib.save_edit(s.id, geometry(180, None)).unwrap();
+        let out = s
+            .lib
+            .export_photo(s.id, &s.dest, ExportSize::Original)
+            .unwrap();
+        assert_eq!(out, s.dest.join("captura.png"));
+        let img = image::open(&out).unwrap();
+        assert_eq!((img.width(), img.height()), (80, 40));
+        assert!(img.color().has_alpha());
+    }
+
+    #[test]
+    fn al_volver_al_original_se_exporta_el_archivo_tal_cual() {
+        let mut s = setup("a.jpg", jpeg(64, 48));
+        s.lib.save_edit(s.id, geometry(90, None)).unwrap();
+        s.lib.set_edit_version(s.id, None).unwrap();
+        let out = s
+            .lib
+            .export_photo(s.id, &s.dest, ExportSize::Original)
+            .unwrap();
+        assert_eq!(
+            fs::read(out).unwrap(),
+            fs::read(s.lib.root().join("Originales/a.jpg")).unwrap()
+        );
     }
 
     #[test]
