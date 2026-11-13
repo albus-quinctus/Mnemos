@@ -88,9 +88,11 @@ impl View {
             }
             View::Album(album) => {
                 return Filter {
-                    sql: " AND id IN (SELECT photo_id FROM album_photos WHERE album_id = ?)"
+                    sql: " AND trashed_at IS NULL \
+                          AND id IN (SELECT photo_id FROM album_photos WHERE album_id = ?)"
                         .to_owned(),
                     params: vec![Value::from(album)],
+                    order: DATE,
                 };
             }
         };

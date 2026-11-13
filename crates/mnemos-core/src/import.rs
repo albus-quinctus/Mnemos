@@ -181,7 +181,7 @@ fn import_file(
         improve_taken(&tx, &hash, &taken)?;
         let fresh = seen.takeout_applied.contains(&hash);
         if takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref(), fresh)? {
-            seen.takeout_applied.insert(hash);
+            seen.takeout_applied.insert(hash.clone());
         }
         tx.commit()?;
         if !seen.imported.contains(&hash) && only_in_trash(conn, &hash)? {

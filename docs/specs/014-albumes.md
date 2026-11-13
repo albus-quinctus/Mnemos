@@ -96,6 +96,8 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 - Una foto desaparecida (spec 002) sigue en sus álbumes con el marcador «Sin
   vista previa».
 - Si la foto de portada se quita, la portada pasa a la siguiente más reciente.
+- Las fotos de la Papelera (spec 015) siguen en sus álbumes pero no se ven ni
+  cuentan; si se restauran, vuelven a aparecer.
 - Nombres con emojis, tildes, comillas o barras: solo se guardan en la base de
   datos, nunca se usan como nombre de carpeta o archivo.
 - Añadir 10 000 fotos a la vez: una sola sentencia `INSERT … SELECT`, en menos
