@@ -43,6 +43,9 @@ pub enum View {
     /// Las fotos de una etiqueta, archivadas o no (spec 016).
     #[serde(rename = "etiqueta")]
     Tag(i64),
+    /// Las fotos de un álbum, archivadas o no (spec 014).
+    #[serde(rename = "album")]
+    Album(i64),
 }
 
 impl View {
@@ -58,6 +61,13 @@ impl View {
                 return Filter {
                     sql: " AND id IN (SELECT photo_id FROM photo_tags WHERE tag_id = ?)".to_owned(),
                     params: vec![Value::from(tag)],
+                };
+            }
+            View::Album(album) => {
+                return Filter {
+                    sql: " AND id IN (SELECT photo_id FROM album_photos WHERE album_id = ?)"
+                        .to_owned(),
+                    params: vec![Value::from(album)],
                 };
             }
         };

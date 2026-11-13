@@ -78,6 +78,7 @@ impl Library {
         let total = archivos.len() as u64;
         let mut imported = HashSet::new();
         let mut sidecars = Sidecars::default();
+        let mut takeout_applied = HashSet::new();
         for (i, archivo) in archivos.iter().enumerate() {
             if cancelar.load(Ordering::Relaxed) {
                 report.cancelled = true;
@@ -86,6 +87,7 @@ impl Library {
             let seen = Seen {
                 imported: &mut imported,
                 sidecars: &mut sidecars,
+                takeout_applied: &mut takeout_applied,
             };
             match import_file(&self.conn, &self.root, &tmp, archivo, seen) {
                 Ok(Outcome::Copied) => report.copied += 1,
@@ -135,6 +137,9 @@ struct Seen<'a> {
     /// Huellas copiadas en esta importación.
     imported: &'a mut HashSet<String>,
     sidecars: &'a mut Sidecars,
+    /// Huellas a las que se aplicó el `.json` de Takeout en esta
+    /// importación: sus otras copias (la del álbum) aún pueden añadir álbum.
+    takeout_applied: &'a mut HashSet<String>,
 }
 
 fn import_file(
@@ -159,7 +164,10 @@ fn import_file(
         // Takeout que no había cuando se importó, o la copia de un álbum.
         let tx = conn.unchecked_transaction()?;
         improve_taken(&tx, &hash, &taken)?;
-        takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref())?;
+        let fresh = seen.takeout_applied.contains(&hash);
+        if takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref(), fresh)? {
+            seen.takeout_applied.insert(hash);
+        }
         tx.commit()?;
         return Ok(Outcome::Duplicate);
     }
@@ -201,7 +209,9 @@ fn import_file(
         taken,
     };
     insert_photo(&tx, &rel, &photo)?;
-    takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref())?;
+    if takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref(), false)? {
+        seen.takeout_applied.insert(hash.clone());
+    }
     tx.commit()?;
     seen.imported.insert(hash);
     Ok(Outcome::Copied)
@@ -777,6 +787,70 @@ mod tests {
             )
             .unwrap();
         assert_eq!((albumes, entradas), (1, 1));
+    }
+
+    #[test]
+    fn reimportar_no_resucita_albumes_eliminados_ni_fotos_quitadas() {
+        let (dir, mut lib, _) = setup();
+        let takeout = dir.path().join("Takeout");
+        let anio = takeout.join("Fotos de 2023");
+        let picos = takeout.join("Picos");
+        // Como en Takeout: cada foto en la carpeta del año y en la del álbum,
+        // las dos con su .json.
+        for carpeta in [&anio, &picos] {
+            for (nombre, bytes) in [("a.png", b"a"), ("b.png", b"b")] {
+                write_png(&carpeta.join(nombre), 1, 1, bytes);
+                fs::write(
+                    carpeta.join(format!("{nombre}.supplemental-metadata.json")),
+                    JSON_COMPLETO,
+                )
+                .unwrap();
+            }
+        }
+        fs::write(picos.join("metadata.json"), ALBUM_PICOS).unwrap();
+        lib.import_from(&takeout).unwrap();
+        let entradas = |lib: &Library| -> (i64, i64) {
+            lib.connection()
+                .query_row(
+                    "SELECT (SELECT count(*) FROM albums), (SELECT count(*) FROM album_photos)",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .unwrap()
+        };
+        assert_eq!(entradas(&lib), (1, 2));
+
+        // Quitar una foto del álbum: reimportar no la devuelve.
+        let album: i64 = lib
+            .connection()
+            .query_row("SELECT id FROM albums", [], |r| r.get(0))
+            .unwrap();
+        let a: i64 = lib
+            .connection()
+            .query_row(
+                "SELECT id FROM photos WHERE rel_path LIKE '%a.png'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        lib.remove_from_album(album, &[a]).unwrap();
+        lib.import_from(&takeout).unwrap();
+        assert_eq!(entradas(&lib), (1, 1));
+
+        // Eliminar el álbum: reimportar no lo resucita.
+        lib.delete_album(album).unwrap();
+        lib.import_from(&takeout).unwrap();
+        assert_eq!(entradas(&lib), (0, 0));
+
+        // Una foto nueva del álbum sí lo crea otra vez.
+        write_png(&picos.join("c.png"), 1, 1, b"c");
+        fs::write(
+            picos.join("c.png.supplemental-metadata.json"),
+            JSON_COMPLETO,
+        )
+        .unwrap();
+        lib.import_from(&takeout).unwrap();
+        assert_eq!(entradas(&lib), (1, 1));
     }
 
     #[test]

@@ -129,9 +129,13 @@ eliminar un álbum nunca toca los archivos (regla 1 de CLAUDE.md).
 1. [x] Migración 0012 y núcleo: listar (portada, número, rango de fechas),
        crear, renombrar y eliminar álbumes; pruebas. `crates/mnemos-core/src/albums.rs`
        (`albums`, `album`, `create_album`, `rename_album`, `delete_album`).
-2. [ ] `View::Album` en meses, páginas y `Scope`; `add_to_album` y
+2. [x] `View::Album` en meses, páginas y `Scope`; `add_to_album` y
        `remove_from_album`; álbum del Takeout una sola vez por foto; pruebas,
-       también con 10 000 fotos.
+       también con 10 000 fotos. Añadir y quitar reciben ids, como Etiquetas
+       (la interfaz los saca de `select_all` con el `Scope`). El álbum del
+       Takeout se añade si su `.json` se aplica en esta importación (la foto
+       suele venir en la carpeta del año y en la del álbum); sin `.json`, como
+       antes.
 3. [ ] Comandos de Tauri y envoltorios en `biblioteca.ts`.
 4. [x] Capturas del diseño (pantalla Álbumes, dentro de un álbum, «Añadir a
        álbum» y eliminar), en claro y oscuro, aprobadas por Paulo el 12 nov
