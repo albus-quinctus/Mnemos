@@ -336,6 +336,15 @@ export function ponerTema(tema: Tema): Promise<void> {
   return invoke("poner_tema", { tema });
 }
 
+/** Alterna la pantalla completa de la ventana y devuelve el estado nuevo. */
+export function alternarPantallaCompleta(): Promise<boolean> {
+  return invoke("alternar_pantalla_completa");
+}
+
+export function estaEnPantallaCompleta(): Promise<boolean> {
+  return invoke("pantalla_completa");
+}
+
 // Etiquetas (spec 016). Solo cambian la base de datos.
 
 export interface Etiqueta {

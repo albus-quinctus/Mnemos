@@ -58,7 +58,8 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
 - `F11` alterna la pantalla completa de la ventana en cualquier pantalla:
   galería, búsqueda, visor y editor. No se pierde nada de lo que estaba abierto.
 - Se hace desde Rust (`set_fullscreen`) con un comando
-  `alternar_pantalla_completa` que devuelve el estado nuevo; no hace falta
+  `alternar_pantalla_completa` que devuelve el estado pedido (en Wayland el
+  compositor la concede un instante después; `pantalla_completa` da el real); no hace falta
   ampliar los permisos de la ventana.
 - `Esc` **no** sale de pantalla completa: ya cierra el visor, la búsqueda y la
   selección. Para salir, `F11` otra vez o el interruptor de Ajustes.
@@ -108,9 +109,9 @@ visor de imágenes. Lo pidió Paulo el 2026-11-12.
        (la página lee el tema de `data-tema`, así que no hace falta otro);
        inyección en la ventana y `set_theme`; pruebas en Rust
        (`configuracion.rs`, `Configuracion::cambiar`).
-2. [ ] Comandos `alternar_pantalla_completa` y `pantalla_completa`; atajo `F11`
+2. [x] Comandos `alternar_pantalla_completa` y `pantalla_completa`; atajo `F11`
        (y `Ctrl` + `Cmd` + `F` en macOS) en `+layout.svelte`; envoltorios en
-       `biblioteca.ts`; pruebas.
+       `biblioteca.ts`; pruebas (`lib/ajustes/pantalla.ts`).
 3. [ ] Capturas del diseño de la entrada y de la ventana de Ajustes (claro y
        oscuro), para que Paulo las apruebe (`capturas/013-*.png`).
 4. [ ] Tokens con `data-tema` en `tokens.css` y estado del tema en

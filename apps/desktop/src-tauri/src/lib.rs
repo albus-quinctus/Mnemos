@@ -134,6 +134,25 @@ fn cambiar_config(
         .map_err(|e| format!("no se pudo guardar la configuración: {e}"))
 }
 
+/// Alterna la pantalla completa de la ventana (spec 013, tecla F11) y
+/// devuelve el estado pedido. En Wayland el compositor la concede después, así
+/// que `is_fullscreen` justo ahora aún daría el anterior; el interruptor de
+/// Ajustes vuelve a preguntar con `pantalla_completa` al abrirse.
+#[tauri::command]
+fn alternar_pantalla_completa(window: tauri::WebviewWindow) -> Result<bool, String> {
+    let ahora = window.is_fullscreen().map_err(|e| e.to_string())?;
+    window
+        .set_fullscreen(!ahora)
+        .map_err(|e| format!("no se pudo cambiar la pantalla completa: {e}"))?;
+    Ok(!ahora)
+}
+
+/// ¿Está la ventana en pantalla completa? Para el interruptor de Ajustes.
+#[tauri::command]
+fn pantalla_completa(window: tauri::WebviewWindow) -> Result<bool, String> {
+    window.is_fullscreen().map_err(|e| e.to_string())
+}
+
 /// Cambia el tema de la interfaz (spec 013): ajusta el tema nativo de la
 /// ventana y lo guarda para el próximo arranque. La página ya lo ha aplicado.
 #[tauri::command]
@@ -573,6 +592,8 @@ pub fn run() {
             importar,
             cancelar_importacion,
             poner_tema,
+            alternar_pantalla_completa,
+            pantalla_completa,
             acceso_directo::acceso_directo_estado,
             acceso_directo::crear_acceso_directo,
             acceso_directo::quitar_acceso_directo,
