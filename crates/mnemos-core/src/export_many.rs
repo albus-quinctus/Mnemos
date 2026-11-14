@@ -149,6 +149,7 @@ fn skip_reason(root: &Path, err: &Error) -> Option<String> {
             "El archivo no está en el disco".into()
         }
         Error::CannotReduce(_) => "Solo se puede exportar en tamaño original".into(),
+        Error::VideoNotReducible(_) => "Los vídeos solo se exportan en tamaño original".into(),
         Error::CannotRender { message, .. } => {
             format!("No se puede aplicar la edición: {message}")
         }

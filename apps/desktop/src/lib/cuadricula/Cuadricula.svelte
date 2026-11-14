@@ -1,6 +1,7 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
   import { onMount, tick } from "svelte";
+  import { duracion } from "$lib/visor/formato";
   import {
     buscarFotos,
     buscarMeses,
@@ -465,7 +466,7 @@
             >
               {#if foto.thumbnail_failed || fallidas.has(foto.id)}
                 <div class="sin-vista">
-                  <span>Sin vista previa</span>
+                  <span>{foto.media_kind === "video" ? "Vídeo sin vista previa" : "Sin vista previa"}</span>
                   <span class="nombre">{foto.name}</span>
                 </div>
               {:else}
@@ -479,6 +480,14 @@
                     onload={() => alCargar(foto.id)}
                   />
                 {/key}
+              {/if}
+              {#if foto.media_kind === "video"}
+                <span class="insignia duracion" title="Vídeo">
+                  <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                    <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+                  </svg>
+                  {#if foto.duration_ms}{duracion(foto.duration_ms)}{/if}
+                </span>
               {/if}
               {#if foto.favorite}
                 <span class="insignia favorita" title="En Favoritos">
@@ -494,6 +503,7 @@
                 <span
                   class="insignia archivada"
                   class:junto={foto.edit_version !== null}
+                  class:tras-duracion={foto.media_kind === "video"}
                   title="Archivada"
                 >
                   <Icono nombre="archivo" tamano={16} />
@@ -739,6 +749,21 @@
     pointer-events: none;
   }
 
+  /* Duración de un vídeo (spec 019): sobre una pastilla para que se lea en
+     miniaturas claras. Los vídeos no se editan, así que no choca con el lápiz. */
+  .duracion {
+    right: 8px;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px 2px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+  }
+
   .favorita {
     left: 8px;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
@@ -749,6 +774,10 @@
   .editada {
     right: 8px;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  }
+
+  .archivada.tras-duracion {
+    right: 84px;
   }
 
   .archivada.junto {

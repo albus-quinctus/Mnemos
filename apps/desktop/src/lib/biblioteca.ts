@@ -18,6 +18,8 @@ export interface FotoCuadricula {
   favorite: boolean; // en Favoritos: estrella (spec 006)
   archived: boolean; // archivada: caja en la búsqueda (spec 006)
   edit_version: number | null; // versión editada que se ve (spec 009); con ella, width y height son los de la editada
+  media_kind: "foto" | "video"; // spec 019
+  duration_ms: number | null; // duración de un vídeo, si se conoce
 }
 
 export interface Cursor {
@@ -152,6 +154,8 @@ export interface Detalles {
   taken_auto_at: number | null; // con fecha a mano, la automática (spec 011)
   taken_auto_source: string | null;
   format: string; // "JPEG", "PNG", "DNG"…
+  media_kind: "foto" | "video"; // spec 019
+  duration_ms: number | null;
 }
 
 export function detalles(id: number): Promise<Detalles | null> {
@@ -173,6 +177,29 @@ export interface Camara {
 
 export function camara(id: number): Promise<Camara | null> {
   return invoke("camara", { id });
+}
+
+// Datos del contenedor de un vídeo (`mnemos_imaging::VideoInfo`, spec 019).
+export interface DatosVideo {
+  duration_ms: number | null;
+  width: number | null; // ya girado
+  height: number | null;
+  rotation: number;
+  fps: number | null;
+  video_codec: string | null;
+  audio_codec: string | null;
+  make: string | null;
+  model: string | null;
+  gps: [number, number] | null;
+}
+
+export function datosVideo(id: number): Promise<DatosVideo | null> {
+  return invoke("datos_video", { id });
+}
+
+/** Abre el vídeo con el programa del sistema (el original, sin copiarlo). */
+export function abrirConOtraAplicacion(id: number): Promise<void> {
+  return invoke("abrir_con_otra_aplicacion", { id });
 }
 
 // Fecha de captura a mano: `fecha` es la hora local "AAAA-MM-DD hh:mm[:ss]".
@@ -336,6 +363,8 @@ export interface CopiaDuplicada {
   favorite: boolean;
   archived: boolean;
   exists: boolean; // false: foto desaparecida del disco
+  media_kind: "foto" | "video"; // spec 019
+  duration_ms: number | null;
 }
 
 export interface GrupoDuplicado {

@@ -32,6 +32,8 @@ describe("duplicados", () => {
       favorite: false,
       archived: false,
       exists: true,
+      media_kind: "foto" as const,
+      duration_ms: null,
     };
     expect(fechaCopia(copia, new Date(2026, 10, 5))).toBe("Sáb, 17 ago 2024");
   });
@@ -49,6 +51,8 @@ describe("duplicados", () => {
           favorite: true,
           archived: false,
           exists: false,
+          media_kind: "video",
+          duration_ms: 42000,
         },
       ],
     };
@@ -64,6 +68,8 @@ describe("duplicados", () => {
         favorite: true,
         archived: false,
         edit_version: null,
+        media_kind: "video",
+        duration_ms: 42000,
       },
     ]);
   });

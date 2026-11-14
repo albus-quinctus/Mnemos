@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  duracion,
   apertura,
   cambiosVersion,
   camposFecha,
@@ -90,5 +91,14 @@ describe("versiones de una edición", () => {
     expect(cuandoVersion(s(new Date(2026, 10, 12, 18, 20)), ahora)).toBe("hoy, 18:20");
     expect(cuandoVersion(s(new Date(2026, 10, 11, 21, 5)), ahora)).toBe("ayer, 21:05");
     expect(cuandoVersion(s(new Date(2026, 9, 3, 9, 0)), ahora)).toContain("2026");
+  });
+});
+
+describe("duracion", () => {
+  it("minutos y segundos, y horas si las hay", () => {
+    expect(duracion(42_000)).toBe("0:42");
+    expect(duracion(125_000)).toBe("2:05");
+    expect(duracion(3_910_000)).toBe("1:05:10");
+    expect(duracion(400)).toBe("0:00");
   });
 });

@@ -73,6 +73,10 @@ pub struct PhotoDetails {
     pub taken_auto_source: Option<String>,
     /// Formato según la extensión, en mayúsculas: "JPEG", "PNG", "DNG"…
     pub format: String,
+    /// `"foto"` o `"video"` (spec 019).
+    pub media_kind: String,
+    /// Duración de un vídeo en milisegundos, si se conoce.
+    pub duration_ms: Option<u64>,
 }
 
 impl Library {
@@ -166,7 +170,8 @@ impl Library {
             .conn
             .query_row(
                 "SELECT rel_path, width, height, size_bytes, modified_at, coalesce(orientation, 1),
-                        taken_at, taken_source, taken_auto_at, taken_auto_source
+                        taken_at, taken_source, taken_auto_at, taken_auto_source, media_kind,
+                        duration_ms
                  FROM photos WHERE id = ?1",
                 [id],
                 |r| {
@@ -181,6 +186,8 @@ impl Library {
                         r.get::<_, Option<String>>(7)?,
                         r.get::<_, Option<i64>>(8)?,
                         r.get::<_, Option<String>>(9)?,
+                        r.get::<_, String>(10)?,
+                        r.get::<_, Option<u64>>(11)?,
                     ))
                 },
             )
@@ -197,6 +204,8 @@ impl Library {
                 taken_source,
                 taken_auto_at,
                 taken_auto_source,
+                media_kind,
+                duration_ms,
             )| {
                 let (width, height) = if mnemos_imaging::swaps_dimensions(orientation) {
                     (h, w)
@@ -214,6 +223,8 @@ impl Library {
                     taken_source,
                     taken_auto_at,
                     taken_auto_source,
+                    media_kind,
+                    duration_ms,
                 }
             },
         ))
@@ -356,6 +367,8 @@ mod tests {
                 taken_auto_at: None,
                 taken_auto_source: None,
                 format: "JPEG".to_owned(),
+                media_kind: "foto".to_owned(),
+                duration_ms: None,
             }
         );
         assert_eq!(lib.photo_details(id + 1).unwrap(), None);

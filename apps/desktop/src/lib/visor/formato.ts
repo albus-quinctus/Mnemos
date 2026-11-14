@@ -36,11 +36,21 @@ export function fecha(segundos: number): string {
 
 const ORIGENES: Record<string, string> = {
   exif: "Según la cámara (EXIF)",
+  video: "Según el vídeo",
   nombre: "Según el nombre del archivo",
   takeout: "Según Google Fotos",
   nombre_dia: "Según el nombre del archivo, solo el día",
   manual: "Puesta a mano",
 };
+
+/** 42 000 → "0:42"; 3 910 000 → "1:05:10" (spec 019). */
+export function duracion(ms: number): string {
+  const s = Math.round(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
 
 /** Fecha de captura y de dónde sale, o "Sin fecha de captura". */
 export function fechaCaptura(

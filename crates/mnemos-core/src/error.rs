@@ -54,6 +54,9 @@ pub enum Error {
     #[error("{0} solo se puede exportar en tamaño original")]
     CannotReduce(String),
 
+    #[error("{0} es un vídeo: los vídeos solo se exportan en tamaño original")]
+    VideoNotReducible(String),
+
     #[error("la biblioteca usa el esquema {found}, más nuevo que el soportado ({supported})")]
     SchemaTooNew { found: u32, supported: u32 },
 

@@ -41,6 +41,9 @@ pub struct DuplicateCopy {
     pub archived: bool,
     /// `false` si el archivo ya no está en el disco (foto desaparecida).
     pub exists: bool,
+    /// `"foto"` o `"video"` (spec 019).
+    pub media_kind: String,
+    pub duration_ms: Option<u64>,
 }
 
 /// Fotos con la misma huella, por orden de llegada a la biblioteca. Ese orden
@@ -126,7 +129,8 @@ impl Library {
         heads.truncate(limit as usize);
 
         let mut copies_stmt = self.conn.prepare(&format!(
-            "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL
+            "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL,
+                    media_kind, duration_ms
              FROM photos WHERE content_hash = ?1 AND trashed_at IS NULL
              ORDER BY imported_at, id"
         ))?;
@@ -142,6 +146,8 @@ impl Library {
                         favorite: r.get(4)?,
                         archived: r.get(5)?,
                         exists: false,
+                        media_kind: r.get(6)?,
+                        duration_ms: r.get(7)?,
                     })
                 })?
                 .collect::<rusqlite::Result<Vec<_>>>()?
@@ -184,7 +190,8 @@ impl Library {
             return Ok(Vec::new());
         };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL
+            "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL,
+                    media_kind, duration_ms
              FROM photos WHERE content_hash = ?1 AND id <> ?2
              ORDER BY imported_at, id"
         ))?;
@@ -198,6 +205,8 @@ impl Library {
                     favorite: r.get(4)?,
                     archived: r.get(5)?,
                     exists: false,
+                    media_kind: r.get(6)?,
+                    duration_ms: r.get(7)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?
