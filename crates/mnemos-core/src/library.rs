@@ -294,7 +294,7 @@ fn format_name(rel_path: &str) -> String {
         .map(|(_, ext)| ext.to_ascii_lowercase())
         .unwrap_or_default();
     match ext.as_str() {
-        "jpg" | "jpeg" | "jpe" => "JPEG".to_owned(),
+        "jpg" | "jpeg" | "jpe" | "jfif" | "jfi" | "jif" => "JPEG".to_owned(),
         "tif" | "tiff" => "TIFF".to_owned(),
         _ => ext.to_ascii_uppercase(),
     }
@@ -480,6 +480,7 @@ mod tests {
     #[test]
     fn nombre_del_formato() {
         assert_eq!(format_name("a.jpeg"), "JPEG");
+        assert_eq!(format_name("descarga.JFIF"), "JPEG");
         assert_eq!(format_name("a.tif"), "TIFF");
         assert_eq!(format_name("Originales/b.dng"), "DNG");
         assert_eq!(format_name("sin_extension"), "");

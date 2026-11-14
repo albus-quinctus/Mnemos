@@ -441,6 +441,7 @@ mod tests {
             ("d.gif", ImageFormat::Gif),
             ("e.bmp", ImageFormat::Bmp),
             ("f.tiff", ImageFormat::Tiff),
+            ("g.jfif", ImageFormat::Jpeg),
         ] {
             let path = dir.join(name);
             write_image(&path, 800, 600, format);

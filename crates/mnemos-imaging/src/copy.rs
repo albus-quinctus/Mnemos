@@ -36,7 +36,12 @@ impl CopyFormat {
     pub fn matches_extension(self, ext: &str) -> bool {
         let ext = ext.to_ascii_lowercase();
         match self {
-            CopyFormat::Jpeg => matches!(ext.as_str(), "jpg" | "jpeg"),
+            CopyFormat::Jpeg => {
+                matches!(
+                    ext.as_str(),
+                    "jpg" | "jpeg" | "jpe" | "jfif" | "jfi" | "jif"
+                )
+            }
             CopyFormat::Png => ext == "png",
         }
     }
@@ -356,6 +361,7 @@ mod tests {
     fn las_extensiones_de_cada_formato() {
         assert!(CopyFormat::Jpeg.matches_extension("JPG"));
         assert!(CopyFormat::Jpeg.matches_extension("jpeg"));
+        assert!(CopyFormat::Jpeg.matches_extension("JFIF"));
         assert!(!CopyFormat::Jpeg.matches_extension("cr2"));
         assert!(CopyFormat::Png.matches_extension("PNG"));
         assert_eq!(CopyFormat::Jpeg.extension(), "jpg");

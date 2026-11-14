@@ -35,9 +35,12 @@ use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
 
 /// Extensiones de imagen que MNEMOS reconoce, en minúsculas.
+///
+/// `jpe`, `jfif`, `jfi` y `jif` son otras extensiones de JPEG: algunos
+/// navegadores y Windows guardan así las fotos descargadas.
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "heic", "heif", "avif", "dng",
-    "cr2", "cr3", "nef", "nrw", "arw", "raf", "orf", "rw2", "pef", "srw",
+    "jpg", "jpeg", "jpe", "jfif", "jfi", "jif", "png", "webp", "gif", "bmp", "tif", "tiff", "heic",
+    "heif", "avif", "dng", "cr2", "cr3", "nef", "nrw", "arw", "raf", "orf", "rw2", "pef", "srw",
 ];
 
 /// Extensiones de los formatos RAW, en minúsculas. Son un subconjunto de
@@ -124,6 +127,14 @@ mod tests {
     fn reconoce_imagenes_sin_importar_mayusculas() {
         assert!(is_supported_image(Path::new("viaje/IMG_0001.JPG")));
         assert!(is_supported_image(Path::new("foto.heic")));
+    }
+
+    #[test]
+    fn reconoce_las_otras_extensiones_de_jpeg() {
+        for name in ["descarga.jfif", "b.JFIF", "c.jpe", "d.jfi", "e.JIF"] {
+            assert!(is_supported_image(Path::new(name)), "{name}");
+            assert!(!is_raw(Path::new(name)), "{name}");
+        }
     }
 
     #[test]
