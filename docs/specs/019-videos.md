@@ -1,6 +1,6 @@
 # 019 · Vídeos
 
-- Estado: aprobada
+- Estado: en curso
 - Fase: F2
 
 ## Qué y por qué
@@ -114,9 +114,10 @@ para H.264 ni HEVC. Tres caminos:
 - **Miniaturas:** mismas carpeta y tamaño que las fotos
   (`.mnemos/miniaturas/v1/<ab>/<huella>.jpg`). La cola del núcleo se salta los
   vídeos; la interfaz pide los que no tienen miniatura y las va haciendo de una
-  en una mientras la biblioteca está abierta, sin frenar la cuadrícula. Un
-  fallo se apunta en `thumbnail_failures` (spec 002) y el vídeo usa la
-  genérica; reindexar lo vuelve a intentar.
+  en una mientras la biblioteca está abierta, sin frenar la cuadrícula. Si
+  falla, el vídeo usa la genérica. El fallo no se anota en la base de datos: se vuelve a intentar en
+  la siguiente sesión, que puede ser en otro equipo con otros códecs (cambiado
+  al implementarlo; antes decía `thumbnail_failures`).
 
 ## Casos límite
 - Disco desconectado a mitad de reproducción: el visor enseña «El archivo no
@@ -135,15 +136,15 @@ para H.264 ni HEVC. Tres caminos:
   Linux, también en la ruta `mnemos://localhost/video/<id>`.
 
 ## Criterios de aceptación
-- [ ] Importar una carpeta con fotos y vídeos copia los dos, verificados, en `Originales/AAAA/MM/` y el resumen los cuenta aparte (prueba automática).
-- [ ] La fecha de un vídeo sale del contenedor, del nombre o del `.json` de Takeout en ese orden, y un vídeo archivado en el Takeout entra archivado (prueba automática).
-- [ ] La migración 0015 deja las filas que ya había como fotos (prueba automática).
-- [ ] `mnemos://localhost/video/<id>` responde a `Range` con 206 y el trozo pedido sin leer el archivo entero (prueba automática).
-- [ ] En la cuadrícula el vídeo sale en su día, con su proporción girada y la duración.
-- [ ] En el visor se reproduce, se para al cambiar de elemento y responde a `Espacio`, `M` y `Mayús` + flechas; si no se puede reproducir sale el aviso con «Abrir con otra aplicación».
-- [ ] Exportar en tamaño original copia el vídeo verificado; en tamaño reducido se salta con su motivo (prueba automática).
+- [x] Importar una carpeta con fotos y vídeos copia los dos, verificados, en `Originales/AAAA/MM/` y el resumen los cuenta aparte (prueba automática).
+- [x] La fecha de un vídeo sale del contenedor, del nombre o del `.json` de Takeout en ese orden, y un vídeo archivado en el Takeout entra archivado (prueba automática).
+- [x] La migración 0015 deja las filas que ya había como fotos (prueba automática).
+- [x] `mnemos://localhost/video/<id>` responde a `Range` con 206 y el trozo pedido sin leer el archivo entero (prueba automática).
+- [x] En la cuadrícula el vídeo sale en su día, con su proporción girada y la duración.
+- [x] En el visor se reproduce, se para al cambiar de elemento y responde a `Espacio`, `M` y `Mayús` + flechas; si no se puede reproducir sale el aviso con «Abrir con otra aplicación».
+- [x] Exportar en tamaño original copia el vídeo verificado; en tamaño reducido se salta con su motivo (prueba automática).
 - [x] Capturas de la cuadrícula, el visor, el aviso y Detalles aprobadas por Paulo.
-- [ ] Los originales no se modifican (prueba automática en `tests/originales_intactos.rs`).
+- [x] Los originales no se modifican (prueba automática en `tests/originales_intactos.rs`).
 - [ ] Probado en la app real con los vídeos del Takeout en Linux (Paulo); Google y MNEMOS cuentan los mismos archivados.
 
 ## Fuera de alcance
@@ -159,14 +160,14 @@ para H.264 ni HEVC. Tres caminos:
 ## Tareas (≤1 h cada una)
 1. [x] Spec y decisión A/B/C (Paulo eligió C el 14 nov).
 2. [x] Capturas del diseño: cuadrícula con duración, visor reproduciendo, aviso de no reproducible y Detalles, en claro y oscuro (aprobadas por Paulo el 14 nov; `capturas/019-*.png` en los archivos del proyecto).
-3. [ ] `mnemos-imaging`: lector de contenedores ISO (duración, tamaño, giro, fecha, fps, códecs, cámara) con pruebas sobre vídeos mínimos generados en `tests/fixtures/`.
-4. [ ] Migración 0015 y extensiones de vídeo en el indexado y la importación; fecha de captura con el contenedor; `.json` de Takeout para vídeos; resumen con fotos y vídeos aparte. Pruebas.
-5. [ ] Ruta `mnemos://localhost/video/<id>` con `Range`, cabecera CORS y CSP con `media-src`. Pruebas.
-6. [ ] Miniaturas de vídeo: la cola del núcleo se los salta, comandos para pedir los pendientes y guardar la miniatura que manda la interfaz, y fallos en `thumbnail_failures`. Pruebas.
-7. [ ] Interfaz: generador de miniaturas en segundo plano (`<video>` + `<canvas>`) y miniatura genérica.
-8. [ ] Cuadrícula: duración con el icono de reproducir; `GridPhoto` lleva `media_kind` y `duration_ms`.
-9. [ ] Visor: reproductor, teclas, parar al cambiar, aviso de no reproducible con «Abrir con otra aplicación», sin «Editar».
-10. [ ] Detalles de un vídeo y exportación (sin tamaño reducido en el visor; motivo propio en el lote).
-11. [ ] AppImage con `bundleMediaFramework` y prueba en el CI de que lleva el descodificador H.264 de GStreamer.
-12. [ ] `tests/originales_intactos.rs` con vídeos, sección «Vídeos» en `docs/arquitectura.md` y `docs/progreso.md`.
+3. [x] `mnemos-imaging`: lector de contenedores ISO (duración, tamaño, giro, fecha, fps, códecs, cámara) con pruebas sobre vídeos mínimos generados en `tests/fixtures/`.
+4. [x] Migración 0015 y extensiones de vídeo en el indexado y la importación; fecha de captura con el contenedor; `.json` de Takeout para vídeos; resumen con fotos y vídeos aparte. Pruebas.
+5. [x] Ruta `mnemos://localhost/video/<id>` con `Range`, cabecera CORS y CSP con `media-src`. Pruebas.
+6. [x] Miniaturas de vídeo: la cola del núcleo se los salta, comandos para pedir los pendientes y guardar la miniatura que manda la interfaz y avisar de los fallos (sin anotarlos). Pruebas.
+7. [x] Interfaz: generador de miniaturas en segundo plano (`<video>` + `<canvas>`) y miniatura genérica.
+8. [x] Cuadrícula: duración con el icono de reproducir; `GridPhoto` lleva `media_kind` y `duration_ms`.
+9. [x] Visor: reproductor, teclas, parar al cambiar, aviso de no reproducible con «Abrir con otra aplicación», sin «Editar».
+10. [x] Detalles de un vídeo y exportación (sin tamaño reducido en el visor; motivo propio en el lote).
+11. [x] AppImage con `bundleMediaFramework` y prueba en el CI de que lleva el descodificador H.264 de GStreamer.
+12. [x] `tests/originales_intactos.rs` con vídeos, sección «Vídeos» en `docs/arquitectura.md` y `docs/progreso.md`.
 13. [ ] Probarlo en la app real con el Takeout del HDD (Paulo).
