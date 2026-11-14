@@ -76,6 +76,20 @@ pub fn dimensions(path: &Path) -> Option<(u32, u32)> {
     ))
 }
 
+/// Ancho y alto de un JPEG en memoria, o `None` si los bytes no son un JPEG.
+/// Sirve para comprobar las miniaturas de vídeo que manda la interfaz (spec
+/// 019).
+pub fn jpeg_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    if !bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return None;
+    }
+    let size = imagesize::blob_size(bytes).ok()?;
+    Some((
+        u32::try_from(size.width).ok()?,
+        u32::try_from(size.height).ok()?,
+    ))
+}
+
 /// Orientación EXIF (1 a 8) de la imagen principal.
 ///
 /// Devuelve `None` si el archivo no tiene EXIF, no trae la etiqueta o su

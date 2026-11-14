@@ -16,6 +16,11 @@ export function fotoUrl(id: number, version?: number): string {
   return conVersion(convertFileSrc(`foto/${id}`, "mnemos"), version);
 }
 
+/** El vídeo tal cual, por trozos (spec 019). */
+export function videoUrl(id: number): string {
+  return convertFileSrc(`video/${id}`, "mnemos");
+}
+
 /** La foto sin la edición, sobre la que trabaja el editor. */
 export function originalUrl(id: number): string {
   return convertFileSrc(`original/${id}`, "mnemos");

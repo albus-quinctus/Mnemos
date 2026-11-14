@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use mnemos_core::thumbnails::DEFAULT_WORKERS;
+use mnemos_core::thumbnails::{DEFAULT_WORKERS, ThumbnailEvent};
 use mnemos_core::{
     EditSummary, ExportSize, ImportReport, Library, LibraryInfo, Month, PhotoDetails, Progreso,
     SearchQuery, ThumbnailQueue, TimelineCursor, TimelinePage,
@@ -197,6 +197,61 @@ fn priorizar_miniaturas(ids: Vec<i64>, miniaturas: State<'_, Thumbnails>) {
     if let Some(queue) = lock(&miniaturas.0).as_ref() {
         queue.prioritize(&ids);
     }
+}
+
+/// Vídeos sin miniatura (spec 019). Los genera la interfaz, que es la que
+/// sabe descodificar vídeo.
+#[tauri::command]
+fn miniaturas_video_pendientes(
+    limite: u32,
+    estado: State<'_, OpenLibrary>,
+) -> Result<Vec<i64>, String> {
+    with_library(&estado, |lib| lib.pending_video_thumbnails(limite))
+}
+
+/// Guarda la miniatura JPEG que la interfaz ha sacado de un vídeo. El JPEG
+/// llega como cuerpo binario y el id en la cabecera `id`. Avisa a la
+/// cuadrícula con el mismo evento que la cola de miniaturas.
+#[tauri::command]
+fn guardar_miniatura_video(
+    app: AppHandle,
+    request: tauri::ipc::Request<'_>,
+    estado: State<'_, OpenLibrary>,
+) -> Result<(), String> {
+    let id: i64 = request
+        .headers()
+        .get("id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse().ok())
+        .ok_or("falta el id del vídeo")?;
+    let tauri::ipc::InvokeBody::Raw(jpeg) = request.body() else {
+        return Err("la miniatura debe llegar en binario".into());
+    };
+    let copias = with_library(&estado, |lib| lib.save_video_thumbnail(id, jpeg))?
+        .ok_or("no es un vídeo de la biblioteca")?;
+    let _ = app.emit("miniaturas", ThumbnailEvent::Ready { photo_ids: copias });
+    Ok(())
+}
+
+/// La interfaz no ha podido sacar la miniatura de un vídeo (códec que este
+/// equipo no entiende, archivo dañado…). Solo avisa a la cuadrícula: no se
+/// anota, y se vuelve a intentar en la siguiente sesión.
+#[tauri::command]
+fn miniatura_video_fallida(
+    app: AppHandle,
+    id: i64,
+    motivo: String,
+    estado: State<'_, OpenLibrary>,
+) -> Result<(), String> {
+    let copias = with_library(&estado, |lib| lib.video_copies(id))?;
+    let _ = app.emit(
+        "miniaturas",
+        ThumbnailEvent::Failed {
+            photo_ids: copias,
+            message: motivo,
+        },
+    );
+    Ok(())
 }
 
 /// Ejecuta `f` con la biblioteca abierta, o falla si no hay ninguna.
@@ -610,6 +665,9 @@ pub fn run() {
             guardar_copia,
             elegir_version,
             priorizar_miniaturas,
+            miniaturas_video_pendientes,
+            guardar_miniatura_video,
+            miniatura_video_fallida,
             importar,
             cancelar_importacion,
             exportacion::exportar_varias,
