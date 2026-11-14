@@ -65,8 +65,8 @@ const PERMITIDAS: &[(&str, &str, &str)] = &[
     ),
     (
         "thumbnails.rs",
-        "fs::rename(&part, &dest)",
-        "miniatura temporal (caché)",
+        "fs::rename(&part, dest)",
+        "miniatura temporal (caché), también la de un vídeo",
     ),
     (
         "thumbnails.rs",
