@@ -16,6 +16,7 @@
   import { importacion } from "$lib/importacion/importacion.svelte";
   import { cambios } from "$lib/cambios.svelte";
   import { vaciarCaducadas } from "$lib/papelera/papelera.svelte";
+  import { miniaturasVideoAlAbrir } from "$lib/miniaturas-video/generador";
 
   type LibraryInfo = {
     root: string;
@@ -43,6 +44,8 @@
       info = await invoke<LibraryInfo>(comando, { ruta });
       // Lo que lleva 30 días en la Papelera se elimina al abrir y cada hora.
       vaciarCaducadas();
+      // Las miniaturas de vídeo las saca la interfaz (spec 019).
+      miniaturasVideoAlAbrir();
     } catch (e) {
       error = String(e);
     } finally {

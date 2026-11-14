@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { miniaturasVideoTrasImportar } from "$lib/miniaturas-video/generador";
 
 export type EventoImportacion = {
   estado: "en_curso" | "terminada" | "cancelada" | "fallida";
@@ -30,6 +31,7 @@ export function escucharImportacion(): void {
   listen<EventoImportacion>("importacion", (e) => {
     importacion.actual = e.payload;
     if (e.payload.estado !== "en_curso" && e.payload.copiadas > 0) importacion.version++;
+    if (e.payload.estado !== "en_curso" && e.payload.videos > 0) miniaturasVideoTrasImportar();
   }).catch(() => (escuchando = false));
 }
 

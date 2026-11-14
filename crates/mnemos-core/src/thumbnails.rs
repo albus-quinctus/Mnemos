@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 use mnemos_imaging::recipe::Geometry;
@@ -215,24 +215,107 @@ pub fn make_thumbnail(root: &Path, job: &ThumbnailJob) -> io::Result<Outcome> {
         Err(err) => return Ok(Outcome::Failed(err.to_string())),
     };
 
+    write_thumbnail(root, &dest, &job.content_hash, &thumb.jpeg)?;
+    Ok(Outcome::Written)
+}
+
+/// Escribe una miniatura en `.mnemos/tmp/` y la mueve a `dest`, para que un
+/// corte nunca deje una a medias.
+fn write_thumbnail(root: &Path, dest: &Path, content_hash: &str, jpeg: &[u8]) -> io::Result<()> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let tmp_dir = root.join(DATA_DIR).join(TMP_DIR);
     fs::create_dir_all(&tmp_dir)?;
     let part = tmp_dir.join(format!(
         "{}-{}-{}.jpg.part",
-        job.content_hash,
+        content_hash,
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
-    let written = fs::write(&part, &thumb.jpeg)
+    let written = fs::write(&part, jpeg)
         .and_then(|()| fs::File::open(&part)?.sync_all())
         .and_then(|()| fs::create_dir_all(dest.parent().unwrap_or(root)))
-        .and_then(|()| fs::rename(&part, &dest));
+        .and_then(|()| fs::rename(&part, dest));
     if let Err(err) = written {
         let _ = fs::remove_file(&part);
         return Err(err);
     }
-    Ok(Outcome::Written)
+    Ok(())
+}
+
+/// Mayor miniatura de vídeo que se acepta, en bytes.
+const MAX_VIDEO_THUMBNAIL: usize = 2 << 20;
+
+impl Library {
+    /// Vídeos sin miniatura en disco, uno por huella y de los más recientes a
+    /// los más antiguos (spec 019). Las genera la interfaz, que es la que sabe
+    /// descodificar vídeo; un vídeo que falla no se anota: se reintenta en la
+    /// siguiente sesión, quizá en un equipo con otros códecs.
+    pub fn pending_video_thumbnails(&self, limit: u32) -> Result<Vec<i64>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content_hash FROM photos
+             WHERE media_kind = 'video' AND content_hash IS NOT NULL
+             ORDER BY coalesce(taken_at, modified_at) DESC, id DESC",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+        let mut seen = HashSet::new();
+        let mut ids = Vec::new();
+        for row in rows {
+            let (id, hash) = row?;
+            if ids.len() >= limit as usize {
+                break;
+            }
+            if seen.insert(hash.clone()) && !self.root.join(thumbnail_rel_path(&hash)).is_file() {
+                ids.push(id);
+            }
+        }
+        Ok(ids)
+    }
+
+    /// Guarda la miniatura que la interfaz ha sacado del vídeo `id` y devuelve
+    /// los ids de todas las copias que la comparten. Devuelve `None` si `id`
+    /// no es un vídeo de la biblioteca; falla si los bytes no son un JPEG del
+    /// tamaño de una miniatura.
+    pub fn save_video_thumbnail(&self, id: i64, jpeg: &[u8]) -> Result<Option<Vec<i64>>> {
+        let hash: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT content_hash FROM photos WHERE id = ?1 AND media_kind = 'video'",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten();
+        let Some(hash) = hash else { return Ok(None) };
+        let valid = jpeg.len() <= MAX_VIDEO_THUMBNAIL
+            && mnemos_imaging::jpeg_size(jpeg).is_some_and(|(w, h)| {
+                (1..=mnemos_imaging::THUMBNAIL_MAX_WIDTH).contains(&w)
+                    && (1..=mnemos_imaging::THUMBNAIL_HEIGHT).contains(&h)
+            });
+        if !valid {
+            return Err(crate::error::Error::InvalidThumbnail);
+        }
+        let dest = self.root.join(thumbnail_rel_path(&hash));
+        write_thumbnail(&self.root, &dest, &hash, jpeg)?;
+        Ok(Some(photos_with_hash(&self.conn, &hash)?))
+    }
+
+    /// Ids de las copias del vídeo `id` (él incluido), para avisar de que su
+    /// miniatura no se pudo sacar. No anota nada en la base de datos.
+    pub fn video_copies(&self, id: i64) -> Result<Vec<i64>> {
+        let hash: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT content_hash FROM photos WHERE id = ?1 AND media_kind = 'video'",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(match hash {
+            Some(hash) => photos_with_hash(&self.conn, &hash)?,
+            None => Vec::new(),
+        })
+    }
 }
 
 fn record_failure(conn: &Connection, content_hash: &str, message: &str) -> rusqlite::Result<()> {
@@ -610,5 +693,90 @@ mod tests {
             matches!(events.as_slice(), [ThumbnailEvent::Stopped { .. }]),
             "{events:?}"
         );
+    }
+
+    fn biblioteca_con_videos() -> (tempfile::TempDir, Library, Vec<i64>) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lib = Library::create(dir.path()).unwrap();
+        let video = include_bytes!("../../../tests/fixtures/video-girado.mp4");
+        fs::create_dir_all(dir.path().join("Originales/b")).unwrap();
+        fs::write(dir.path().join("Originales/a.mp4"), video).unwrap();
+        // Otra copia del mismo vídeo y uno distinto.
+        fs::write(dir.path().join("Originales/b/a.mp4"), video).unwrap();
+        fs::write(dir.path().join("Originales/c.mov"), b"otro video").unwrap();
+        lib.index().unwrap();
+        let ids = lib
+            .connection()
+            .prepare("SELECT id FROM photos ORDER BY rel_path")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        (dir, lib, ids)
+    }
+
+    fn jpeg(width: u32, height: u32) -> Vec<u8> {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(width, height, image::Rgb([200, 100, 50]))
+            .write_to(&mut out, image::ImageFormat::Jpeg)
+            .unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn los_videos_sin_miniatura_se_piden_una_vez_por_huella() {
+        let (_dir, lib, ids) = biblioteca_con_videos();
+        let pendientes = lib.pending_video_thumbnails(10).unwrap();
+        assert_eq!(pendientes.len(), 2, "las dos copias comparten miniatura");
+        assert!(pendientes.contains(&ids[2]));
+        assert_eq!(lib.pending_video_thumbnails(1).unwrap().len(), 1);
+        // Nunca entran en la cola del núcleo.
+        assert!(lib.pending_thumbnails().unwrap().is_empty());
+    }
+
+    #[test]
+    fn guarda_la_miniatura_del_video_para_todas_sus_copias() {
+        let (dir, lib, ids) = biblioteca_con_videos();
+        let thumb = jpeg(203, 360);
+        let mut copias = lib.save_video_thumbnail(ids[0], &thumb).unwrap().unwrap();
+        copias.sort_unstable();
+        let mut esperadas = vec![ids[0], ids[1]];
+        esperadas.sort_unstable();
+        assert_eq!(copias, esperadas);
+        let hash: String = lib
+            .connection()
+            .query_row(
+                "SELECT content_hash FROM photos WHERE id = ?1",
+                [ids[0]],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            fs::read(dir.path().join(thumbnail_rel_path(&hash))).unwrap(),
+            thumb
+        );
+        assert_eq!(lib.pending_video_thumbnails(10).unwrap(), vec![ids[2]]);
+        // No deja nada a medias en tmp.
+        let tmp = dir.path().join(".mnemos/tmp");
+        assert_eq!(fs::read_dir(tmp).map(|d| d.count()).unwrap_or(0), 0);
+    }
+
+    #[test]
+    fn rechaza_miniaturas_de_video_que_no_lo_son() {
+        let (dir, lib, ids) = biblioteca_con_videos();
+        assert!(lib.save_video_thumbnail(ids[0], b"no es un jpeg").is_err());
+        assert!(lib.save_video_thumbnail(ids[0], &jpeg(64, 2000)).is_err());
+        let png = {
+            let mut out = std::io::Cursor::new(Vec::new());
+            image::RgbImage::new(10, 10)
+                .write_to(&mut out, image::ImageFormat::Png)
+                .unwrap();
+            out.into_inner()
+        };
+        assert!(lib.save_video_thumbnail(ids[0], &png).is_err());
+        // Un id que no existe o que no es un vídeo no escribe nada.
+        assert_eq!(lib.save_video_thumbnail(9999, &jpeg(10, 10)).unwrap(), None);
+        assert!(!dir.path().join(THUMBNAILS_DIR).exists());
     }
 }

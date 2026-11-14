@@ -42,6 +42,9 @@ pub enum Error {
     #[error("no hay ninguna foto con el id {0}")]
     PhotoNotFound(i64),
 
+    #[error("la miniatura del vídeo no es un JPEG del tamaño de una miniatura")]
+    InvalidThumbnail,
+
     #[error("el archivo {0} no está en el disco")]
     OriginalMissing(String),
 
