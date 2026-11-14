@@ -2,6 +2,12 @@
   // Sustituye a la barra superior mientras hay selección (spec 006).
   import Icono from "$lib/componentes/Icono.svelte";
   import MenuAnadirAlbum from "$lib/albumes/MenuAnadirAlbum.svelte";
+  import MenuEtiquetar from "$lib/etiquetas/MenuEtiquetar.svelte";
+  import {
+    etiquetaAbierta,
+    nombreEtiquetaAbierta,
+    quitarSeleccionDeEtiqueta,
+  } from "$lib/etiquetas/acciones.svelte";
   import { limpiarSeleccion, seleccion } from "./seleccion.svelte";
   import {
     albumAbierto,
@@ -24,6 +30,7 @@
   const desarchivar = $derived(enArchivo());
   const papelera = $derived(enPapelera());
   const enAlbum = $derived(albumAbierto() !== null);
+  const enEtiqueta = $derived(etiquetaAbierta() !== null);
 
   // Exportar (spec 017): el mismo menú que el visor.
   let menuExportar = $state(false);
@@ -48,7 +55,7 @@
 
 <svelte:window onpointerdown={alPulsarFuera} onkeydowncapture={alPulsarTecla} />
 
-<header class:en-album={enAlbum}>
+<header class:en-album={enAlbum || enEtiqueta}>
   <button
     type="button"
     class="boton solo"
@@ -83,8 +90,21 @@
       <span>Eliminar para siempre</span>
     </button>
   {:else}
-    <!-- Álbumes (spec 014). -->
+    <!-- Álbumes (spec 014) y etiquetas (spec 016). -->
     <MenuAnadirAlbum />
+    <MenuEtiquetar />
+    {#if enEtiqueta}
+      <button
+        type="button"
+        class="boton"
+        title={`Quitar de «${nombreEtiquetaAbierta()}»`}
+        disabled={avisos.ocupado}
+        onclick={quitarSeleccionDeEtiqueta}
+      >
+        <Icono nombre="etiqueta-menos" />
+        <span>Quitar de «{nombreEtiquetaAbierta()}»</span>
+      </button>
+    {/if}
     {#if enAlbum}
       <button
         type="button"
@@ -197,7 +217,7 @@
 
   /* El texto se oculta a la vista, no a los lectores de pantalla; el
      `title` del botón lo enseña al pasar el ratón. */
-  @container (max-width: 1000px) {
+  @container (max-width: 1120px) {
     header :global(.boton > span) {
       position: absolute;
       width: 1px;
@@ -212,8 +232,8 @@
     }
   }
 
-  /* Dentro de un álbum hay un botón más. */
-  @container (max-width: 1180px) {
+  /* Dentro de un álbum o de una etiqueta hay un botón más. */
+  @container (max-width: 1320px) {
     header.en-album :global(.boton > span) {
       position: absolute;
       width: 1px;

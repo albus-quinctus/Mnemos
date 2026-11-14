@@ -44,3 +44,10 @@ DISCO/
 - **Vaciado automático:** al abrir la biblioteca y cada hora se elimina lo que lleva 30 días o más. La última apertura se guarda en `library_meta` y nunca retrocede; si el reloj va más de 60 días por delante, no se borra nada hasta que el usuario lo confirme.
 - **Segundo plano:** los comandos Tauri que borran usan su propia conexión, uno a la vez, y avisan con eventos `papelera`. Interfaz en `lib/papelera/`.
 - **Pruebas:** `tests/solo_la_papelera_borra.rs` falla si otro código del núcleo borra o mueve archivos, y `tests/originales_intactos.rs` comprueba que enviar y restaurar no tocan nada y que eliminar o vaciar borra solo los originales de la Papelera.
+
+## Etiquetas (spec 016)
+- **Datos:** `tags(id, name UNIQUE COLLATE NOCASE)` y `photo_tags(photo_id, tag_id)`; la migración 0013 añade el índice por etiqueta. Las etiquetas solo viven en `.mnemos/mnemos.db`: nunca se escriben en los archivos de imagen.
+- **Búsqueda:** la columna `tags` de `photo_search` guarda los nombres de las etiquetas de cada foto. Cada cambio (poner, quitar, renombrar, unir, borrar) la rehace para las fotos afectadas dentro de la misma transacción (`refresh_search`).
+- **Núcleo:** `tags.rs`. Poner y quitar a varias fotos devuelven las que cambian, para «Deshacer». `View::Tag(id)` (`{"etiqueta": id}`) incluye las archivadas y deja fuera la Papelera. «Guardar como copia» copia las etiquetas (`copy_tags`).
+- **Interfaz:** `lib/etiquetas/`: pantalla Etiquetas, cabecera de una etiqueta, «Etiquetar» en la barra de selección y la sección del panel Detalles del visor (tecla `T`).
+- **Pruebas:** `tests/originales_intactos.rs` comprueba que ninguna acción de etiquetas toca los originales y que borrar una etiqueta no quita fotos.

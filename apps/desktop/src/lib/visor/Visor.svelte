@@ -26,6 +26,8 @@
   import { avisarCambio } from "$lib/cambios.svelte";
   import { lineaCompartida } from "$lib/editor/compartida";
   import Editor from "$lib/editor/Editor.svelte";
+  import EtiquetasFoto from "$lib/etiquetas/EtiquetasFoto.svelte";
+  import { abrirEtiqueta } from "$lib/navegacion.svelte";
   import { fotoUrl, miniaturaUrl } from "$lib/media";
   import {
     archivarFoto,
@@ -223,6 +225,18 @@
   // Panel de detalles: se abre y se cierra con la tecla i y sigue abierto al
   // pasar de foto.
   let panel = $state(false);
+  /** Tecla `T`: abre el panel si hace falta y lleva al campo de etiquetas. */
+  let pedidoEtiqueta = $state(false);
+
+  function irAEtiquetas() {
+    panel = true;
+    pedidoEtiqueta = true;
+  }
+
+  function abrirEtiquetaDesdeVisor(id: number) {
+    onCerrar();
+    abrirEtiqueta(id);
+  }
   let info = $state<Detalles | null>(null);
   let camaraInfo = $state<Camara | null>(null);
   let edicionesInfo = $state<Ediciones | null>(null);
@@ -484,6 +498,8 @@
       }
       return;
     }
+    // Mientras se escribe una etiqueta, las teclas son del campo.
+    if (e.target instanceof HTMLElement && e.target.closest(".etiquetas-foto input")) return;
     if (e.key === "Escape" && menuExportar) menuExportar = false;
     else if (e.key === "Escape") onCerrar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
@@ -491,6 +507,7 @@
       if (foto && !borrado.enCurso) onEliminar?.(foto.id);
     } else if (enPapelera && !["ArrowRight", "ArrowLeft"].includes(e.key)) return;
     else if ((e.key === "e" || e.key === "E") && !e.shiftKey) abrirEditor();
+    else if ((e.key === "t" || e.key === "T") && !e.shiftKey && foto) irAEtiquetas();
     else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
     else if (esTeclaPapelera(e) && onEnviadaPapelera) aPapelera();
@@ -763,6 +780,14 @@
           <dt>Formato</dt>
           <dd>{info.format || "Desconocido"}</dd>
         </dl>
+        {#if foto && !enPapelera}
+          <EtiquetasFoto
+            foto={foto.id}
+            pedido={pedidoEtiqueta}
+            onAtendido={() => (pedidoEtiqueta = false)}
+            onAbrir={abrirEtiquetaDesdeVisor}
+          />
+        {/if}
         {#if edicionesInfo && (edicionesInfo.versions.length > 0 || edicionesInfo.damaged)}
           {@const ed = edicionesInfo}
           {@const compartida = lineaCompartida(copiasInfo)}
