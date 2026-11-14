@@ -1,6 +1,6 @@
 # 019 · Vídeos
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F2
 
 ## Qué y por qué
@@ -142,7 +142,7 @@ para H.264 ni HEVC. Tres caminos:
 - [ ] En la cuadrícula el vídeo sale en su día, con su proporción girada y la duración.
 - [ ] En el visor se reproduce, se para al cambiar de elemento y responde a `Espacio`, `M` y `Mayús` + flechas; si no se puede reproducir sale el aviso con «Abrir con otra aplicación».
 - [ ] Exportar en tamaño original copia el vídeo verificado; en tamaño reducido se salta con su motivo (prueba automática).
-- [ ] Capturas de la cuadrícula, el visor, el aviso y Detalles aprobadas por Paulo.
+- [x] Capturas de la cuadrícula, el visor, el aviso y Detalles aprobadas por Paulo.
 - [ ] Los originales no se modifican (prueba automática en `tests/originales_intactos.rs`).
 - [ ] Probado en la app real con los vídeos del Takeout en Linux (Paulo); Google y MNEMOS cuentan los mismos archivados.
 
@@ -157,8 +157,8 @@ para H.264 ni HEVC. Tres caminos:
 - Cambiar los textos «fotos» por «elementos».
 
 ## Tareas (≤1 h cada una)
-1. [ ] Spec y decisión A/B/C (Paulo eligió C el 14 nov).
-2. [ ] Capturas del diseño: cuadrícula con duración, visor reproduciendo, aviso de no reproducible y Detalles, en claro y oscuro (Paulo las aprueba).
+1. [x] Spec y decisión A/B/C (Paulo eligió C el 14 nov).
+2. [x] Capturas del diseño: cuadrícula con duración, visor reproduciendo, aviso de no reproducible y Detalles, en claro y oscuro (aprobadas por Paulo el 14 nov; `capturas/019-*.png` en los archivos del proyecto).
 3. [ ] `mnemos-imaging`: lector de contenedores ISO (duración, tamaño, giro, fecha, fps, códecs, cámara) con pruebas sobre vídeos mínimos generados en `tests/fixtures/`.
 4. [ ] Migración 0015 y extensiones de vídeo en el indexado y la importación; fecha de captura con el contenedor; `.json` de Takeout para vídeos; resumen con fotos y vídeos aparte. Pruebas.
 5. [ ] Ruta `mnemos://localhost/video/<id>` con `Range`, cabecera CORS y CSP con `media-src`. Pruebas.
