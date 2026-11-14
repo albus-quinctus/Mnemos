@@ -32,6 +32,8 @@ Spec 015, papelera (`docs/specs/015-papelera.md`), aprobada el 12 nov: enviar a 
 
 17. AppImage en Sway: la GTK empaquetada abortaba al arrancar con el tema de cursor de GSettings vacío. Ahora la app, al arrancar desde la AppImage en Wayland fuera de GNOME, KDE y escritorios parecidos, se vuelve a ejecutar con `GSETTINGS_BACKEND=memory` (`apps/desktop/src-tauri/src/entorno_linux.rs`, sin `unsafe`). Un gancho en `apprun-hooks/` no sirve: `bundle.linux.appimage.files` no lo mete en la AppImage. El zip lleva `MNEMOS.sh`, que abre la AppImage de su carpeta. Falta probarlo con doble clic en el Sway de Paulo.
 
+18. Spec 019, vídeos (`docs/specs/019-videos.md`), en borrador: importar vídeos (MP4, MOV y otros) con su fecha y los datos del Takeout, duración en la cuadrícula y reproducción en el visor. Reserva la migración 0015. Falta que Paulo elija cómo se hacen las miniaturas (vista web o `ffmpeg` dentro) y apruebe las capturas.
+
 ## Pendientes / ideas aparcadas
 - Botón de Ajustes en el menú lateral, encima de «Añadir a este equipo», para el modo claro u oscuro y otras preferencias (pedido por Paulo el 2026-11-12).
 - Pantalla completa con F11 (pedido por Paulo el 2026-11-12).
