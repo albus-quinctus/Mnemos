@@ -344,6 +344,38 @@ mod tests {
     }
 
     #[test]
+    fn importa_los_jpeg_con_extension_jfif() {
+        let (dir, mut lib, src) = setup();
+        let foto = src.join("descarga.jfif");
+        let mut bytes = Vec::new();
+        image::RgbImage::from_pixel(64, 48, image::Rgb([200, 120, 40]))
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Jpeg,
+            )
+            .unwrap();
+        fs::write(&foto, &bytes).unwrap();
+        set_mtime(&foto, NOV_2023);
+
+        let report = lib.import_from(&src).unwrap();
+        assert_eq!(report.copied, 1);
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+
+        let dest = dir
+            .path()
+            .join("Biblioteca/Originales/2023/11/descarga.jfif");
+        assert_eq!(fs::read(&dest).unwrap(), bytes);
+        let (rel, w, h): (String, u32, u32) = lib
+            .connection()
+            .query_row("SELECT rel_path, width, height FROM photos", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(rel, "Originales/2023/11/descarga.jfif");
+        assert_eq!((w, h), (64, 48));
+    }
+
+    #[test]
     fn no_importa_duplicados() {
         let (_dir, mut lib, src) = setup();
         write_png(&src.join("a.png"), 1, 1, b"igual");
