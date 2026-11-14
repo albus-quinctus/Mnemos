@@ -505,7 +505,8 @@ fn cancelar_importacion(importacion: State<'_, Importacion>) {
     }
 }
 
-/// Atiende `mnemos://localhost/miniatura/<id>` y `mnemos://localhost/foto/<id>`.
+/// Atiende `mnemos://localhost/miniatura/<id>`, `…/foto/<id>`, `…/original/<id>`
+/// y `…/video/<id>`.
 fn serve(
     app: &AppHandle,
     request: &tauri::http::Request<Vec<u8>>,
@@ -530,6 +531,13 @@ fn serve(
         Some((_, Err(_))) => return media::status(StatusCode::INTERNAL_SERVER_ERROR),
         _ => return media::status(StatusCode::NOT_FOUND),
     };
+    if kind == media::Kind::Video {
+        let range = request
+            .headers()
+            .get(header::RANGE)
+            .and_then(|v| v.to_str().ok());
+        return media::respond_video(&media.rel_path.to_path(&root), range);
+    }
     let if_none_match = request
         .headers()
         .get(header::IF_NONE_MATCH)
