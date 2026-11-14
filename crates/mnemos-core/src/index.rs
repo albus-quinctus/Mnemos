@@ -68,7 +68,7 @@ impl Library {
                     continue;
                 }
             };
-            if !entry.file_type().is_file() || !mnemos_imaging::is_supported_image(entry.path()) {
+            if !entry.file_type().is_file() || !is_media(entry.path()) {
                 continue;
             }
             let rel = match RelPath::from_absolute(&self.root, entry.path()) {
@@ -126,9 +126,71 @@ fn known_files(conn: &Connection) -> Result<HashMap<String, Known>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-/// Orientación EXIF que se guarda: 1 (sin girar) si no se puede leer.
-pub(crate) fn read_orientation(path: &Path) -> u16 {
-    mnemos_imaging::orientation(path).unwrap_or(1)
+/// Indica si el archivo es una foto o un vídeo que MNEMOS reconoce.
+pub(crate) fn is_media(path: &Path) -> bool {
+    mnemos_imaging::is_supported_image(path) || mnemos_imaging::is_video(path)
+}
+
+/// Lo que se guarda de un archivo además de su huella y su fecha.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MediaProps {
+    /// Ancho y alto tal como están guardados, sin girar.
+    pub dims: Option<(u32, u32)>,
+    /// Orientación EXIF (1 a 8). La de un vídeo sale de su giro.
+    pub orientation: u16,
+    pub video: bool,
+    pub duration_ms: Option<u64>,
+}
+
+impl MediaProps {
+    /// Lee la cabecera del archivo: el EXIF de una foto o el contenedor de un
+    /// vídeo (spec 019).
+    pub(crate) fn of_file(path: &Path) -> Self {
+        if !mnemos_imaging::is_video(path) {
+            return MediaProps {
+                dims: mnemos_imaging::dimensions(path),
+                orientation: mnemos_imaging::orientation(path).unwrap_or(1),
+                video: false,
+                duration_ms: None,
+            };
+        }
+        let info = mnemos_imaging::video_info(path).unwrap_or_default();
+        // El giro se guarda como la orientación EXIF equivalente, así la
+        // cuadrícula pone el vídeo en vertical igual que una foto.
+        let orientation = match info.rotation {
+            90 => 6,
+            180 => 3,
+            270 => 8,
+            _ => 1,
+        };
+        let dims = info.width.zip(info.height).map(|(w, h)| {
+            if mnemos_imaging::swaps_dimensions(orientation) {
+                (h, w)
+            } else {
+                (w, h)
+            }
+        });
+        MediaProps {
+            dims,
+            orientation,
+            video: true,
+            duration_ms: info.duration_ms,
+        }
+    }
+
+    /// Una foto sin girar de este tamaño (las copias editadas, spec 009).
+    pub(crate) fn photo(width: u32, height: u32) -> Self {
+        MediaProps {
+            dims: Some((width, height)),
+            orientation: 1,
+            video: false,
+            duration_ms: None,
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        if self.video { "video" } else { "foto" }
+    }
 }
 
 fn index_file(
@@ -145,7 +207,7 @@ fn index_file(
             // Registrada antes de la migración 0002: basta con leer el EXIF.
             conn.execute(
                 "UPDATE photos SET orientation = ?2 WHERE rel_path = ?1",
-                params![rel.as_str(), read_orientation(path)],
+                params![rel.as_str(), MediaProps::of_file(path).orientation],
             )?;
         }
         if !known.has_taken {
@@ -156,23 +218,24 @@ fn index_file(
     }
 
     let hash = hash_file(path)?;
-    let dims = mnemos_imaging::dimensions(path);
-    let orientation = read_orientation(path);
+    let props = MediaProps::of_file(path);
     let taken = Taken::of_file(path);
     if known.is_some() {
         conn.execute(
             "UPDATE photos
              SET size_bytes = ?2, modified_at = ?3, content_hash = ?4, width = ?5, height = ?6,
-                 orientation = ?7
+                 orientation = ?7, media_kind = ?8, duration_ms = ?9
              WHERE rel_path = ?1",
             params![
                 rel.as_str(),
                 size,
                 modified,
                 hash,
-                dims.map(|d| d.0),
-                dims.map(|d| d.1),
-                orientation
+                props.dims.map(|d| d.0),
+                props.dims.map(|d| d.1),
+                props.orientation,
+                props.kind(),
+                props.duration_ms.and_then(|d| i64::try_from(d).ok())
             ],
         )?;
         set_taken(conn, rel.as_str(), &taken)?;
@@ -182,8 +245,7 @@ fn index_file(
             size,
             modified,
             hash: &hash,
-            dims,
-            orientation,
+            props,
             taken,
         };
         insert_photo(conn, rel, &photo)?;
@@ -196,8 +258,7 @@ pub(crate) struct NewPhoto<'a> {
     pub size: i64,
     pub modified: i64,
     pub hash: &'a str,
-    pub dims: Option<(u32, u32)>,
-    pub orientation: u16,
+    pub props: MediaProps,
     pub taken: Taken,
 }
 
@@ -207,8 +268,7 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
         size,
         modified,
         hash,
-        dims,
-        orientation,
+        props,
         ref taken,
     } = *photo;
     let (exact, local) = taken.sql_params();
@@ -216,8 +276,8 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
         &format!(
             "INSERT INTO photos
                  (rel_path, size_bytes, modified_at, content_hash, width, height, orientation,
-                  imported_at, taken_at, taken_source)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {}, ?10)",
+                  imported_at, taken_at, taken_source, media_kind, duration_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {}, ?10, ?11, ?12)",
             taken_at_sql(8, 9)
         ),
         params![
@@ -225,12 +285,14 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
             size,
             modified,
             hash,
-            dims.map(|d| d.0),
-            dims.map(|d| d.1),
-            orientation,
+            props.dims.map(|d| d.0),
+            props.dims.map(|d| d.1),
+            props.orientation,
             exact,
             local,
-            taken.source.as_str()
+            taken.source.as_str(),
+            props.kind(),
+            props.duration_ms.and_then(|d| i64::try_from(d).ok())
         ],
     )?;
     let id = conn.last_insert_rowid();

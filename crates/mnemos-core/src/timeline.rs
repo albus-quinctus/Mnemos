@@ -132,6 +132,10 @@ pub struct GridPhoto {
     /// Versión de la edición que se ve (spec 009), o `None` si se ve el
     /// original. Con edición, `width` y `height` son los de la foto editada.
     pub edit_version: Option<u32>,
+    /// `"foto"` o `"video"` (spec 019).
+    pub media_kind: String,
+    /// Duración de un vídeo en milisegundos, si se conoce.
+    pub duration_ms: Option<u64>,
 }
 
 /// Dónde sigue la página siguiente: justo después de esta foto.
@@ -208,7 +212,8 @@ impl Library {
             "SELECT id, {order}, strftime('%Y-%m', {order}, 'unixepoch', 'localtime'),
                     width, height, coalesce(orientation, 1),
                     content_hash IN (SELECT content_hash FROM thumbnail_failures),
-                    rel_path, favorite, archived_at IS NOT NULL, edit_version, content_hash
+                    rel_path, favorite, archived_at IS NOT NULL, edit_version, content_hash,
+                    media_kind, duration_ms
              FROM photos
              WHERE ({order}, id) < (?, ?) {}
              ORDER BY {order} DESC, id DESC
@@ -242,6 +247,8 @@ impl Library {
                     favorite: r.get(8)?,
                     archived: r.get(9)?,
                     edit_version,
+                    media_kind: r.get(12)?,
+                    duration_ms: r.get(13)?,
                 };
                 Ok((photo, hash.filter(|_| edit_version.is_some())))
             })?

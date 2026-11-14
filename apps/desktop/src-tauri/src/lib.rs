@@ -389,6 +389,8 @@ struct EventoImportacion {
     total: u64,
     procesadas: u64,
     copiadas: u64,
+    /// De las copiadas, cuántas son vídeos (spec 019).
+    videos: u64,
     duplicadas: u64,
     /// Ya estaban en la biblioteca, pero en la Papelera (spec 015).
     en_papelera: u64,
@@ -403,6 +405,7 @@ impl EventoImportacion {
             total: progreso.total,
             procesadas: progreso.procesadas,
             copiadas: parcial.copied,
+            videos: parcial.videos,
             duplicadas: parcial.duplicates,
             en_papelera: parcial.in_trash,
             errores: parcial.errors.len(),
@@ -418,6 +421,7 @@ impl EventoImportacion {
                 "terminada"
             },
             copiadas: informe.copied,
+            videos: informe.videos,
             duplicadas: informe.duplicates,
             en_papelera: informe.in_trash,
             errores: informe.errors.len(),

@@ -22,6 +22,9 @@ pub(crate) enum Source {
     Takeout,
     Name,
     Exif,
+    /// Fecha de grabación guardada en el contenedor de un vídeo (spec 019).
+    /// Vale lo mismo que el EXIF de una foto.
+    Video,
 }
 
 impl Source {
@@ -33,6 +36,7 @@ impl Source {
             Source::Takeout => "takeout",
             Source::Name => "nombre",
             Source::Exif => "exif",
+            Source::Video => "video",
         }
     }
 
@@ -42,13 +46,16 @@ impl Source {
     pub(crate) fn rank_sql(column: &str) -> String {
         format!(
             "CASE {column} WHEN '{MANUAL}' THEN 5
-                WHEN 'exif' THEN 4 WHEN 'nombre' THEN 3 WHEN 'takeout' THEN 2
+                WHEN 'exif' THEN 4 WHEN 'video' THEN 4 WHEN 'nombre' THEN 3 WHEN 'takeout' THEN 2
                 WHEN 'nombre_dia' THEN 1 ELSE 0 END"
         )
     }
 
     pub(crate) fn rank(self) -> i64 {
-        self as i64
+        match self {
+            Source::Video => Source::Exif as i64,
+            other => other as i64,
+        }
     }
 }
 
@@ -204,7 +211,11 @@ impl Taken {
     }
 
     fn find(path: &Path, takeout: Option<i64>) -> Self {
-        if let Some(t) = mnemos_imaging::capture_time(path) {
+        if mnemos_imaging::is_video(path) {
+            if let Some(t) = mnemos_imaging::video_info(path).and_then(|v| v.capture_time) {
+                return Self::new(When::Local(t), Source::Video);
+            }
+        } else if let Some(t) = mnemos_imaging::capture_time(path) {
             return Self::new(When::Local(t), Source::Exif);
         }
         let name = path

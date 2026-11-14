@@ -18,7 +18,7 @@ use rusqlite::{OptionalExtension, params};
 use crate::error::{Error, Result};
 use crate::files::hash_file;
 use crate::import::numbered_name;
-use crate::index::{NewPhoto, insert_photo};
+use crate::index::{MediaProps, NewPhoto, insert_photo};
 use crate::library::{DATA_DIR, Library, TMP_DIR};
 use crate::paths::RelPath;
 use crate::taken::Taken;
@@ -106,8 +106,7 @@ impl Library {
             size,
             modified,
             hash: &hash,
-            dims: Some((copy.width, copy.height)),
-            orientation: 1,
+            props: MediaProps::photo(copy.width, copy.height),
             taken: Taken::NONE,
         };
         insert_photo(&tx, &rel, &photo)?;

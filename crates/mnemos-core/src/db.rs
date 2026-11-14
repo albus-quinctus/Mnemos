@@ -26,6 +26,8 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0012_albumes.sql"),
     // Papelera (spec 015). Va después de la 0012 (álbumes), que se fusiona antes.
     include_str!("migrations/0014_papelera.sql"),
+    // Vídeos (spec 019).
+    include_str!("migrations/0015_videos.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -485,5 +487,44 @@ mod tests {
             .query_row("SELECT count(*) FROM library_meta", [], |r| r.get(0))
             .unwrap();
         assert_eq!(meta, 0);
+    }
+
+    #[test]
+    fn la_migracion_de_videos_deja_las_filas_como_fotos() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        let antes = MIGRATIONS
+            .iter()
+            .position(|m| m.contains("Vídeos (spec 019)"))
+            .unwrap();
+        {
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..antes].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at)
+                 VALUES ('a.jpg', 1, 1, 1)",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+        let fila: (String, Option<i64>) = conn
+            .query_row("SELECT media_kind, duration_ms FROM photos", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(fila, ("foto".to_owned(), None));
+        // Solo admite «foto» y «video».
+        assert!(
+            conn.execute("UPDATE photos SET media_kind = 'audio'", [])
+                .is_err()
+        );
     }
 }
