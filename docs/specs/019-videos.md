@@ -40,8 +40,8 @@ para H.264 ni HEVC. Tres caminos:
   `docs/decisiones/` después de probar con los 146 vídeos reales en Linux y en
   Windows.
 
-Esta spec describe A (camino C). Si Paulo elige B, cambian las tareas 3, 6 y 7;
-el resto vale igual.
+**Elegido por Paulo el 14 nov: C.** Esta spec describe A; B se decidirá en
+`docs/decisiones/` solo si la prueba con los vídeos reales lo pide.
 
 ## Comportamiento
 - **Formatos.** Se importan como vídeo: `mp4`, `m4v`, `mov`, `3gp`, `3g2`,
@@ -157,7 +157,7 @@ el resto vale igual.
 - Cambiar los textos «fotos» por «elementos».
 
 ## Tareas (≤1 h cada una)
-1. [ ] Spec y decisión A/B/C (Paulo).
+1. [ ] Spec y decisión A/B/C (Paulo eligió C el 14 nov).
 2. [ ] Capturas del diseño: cuadrícula con duración, visor reproduciendo, aviso de no reproducible y Detalles, en claro y oscuro (Paulo las aprueba).
 3. [ ] `mnemos-imaging`: lector de contenedores ISO (duración, tamaño, giro, fecha, fps, códecs, cámara) con pruebas sobre vídeos mínimos generados en `tests/fixtures/`.
 4. [ ] Migración 0015 y extensiones de vídeo en el indexado y la importación; fecha de captura con el contenedor; `.json` de Takeout para vídeos; resumen con fotos y vídeos aparte. Pruebas.
