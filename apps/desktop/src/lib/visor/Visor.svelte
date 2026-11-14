@@ -7,8 +7,10 @@
   import { onDestroy } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import {
+    abrirConOtraAplicacion,
     camara as pedirCamara,
     copiasIdenticas,
+    datosVideo,
     detalles as pedirDetalles,
     ediciones as pedirEdiciones,
     elegirVersion,
@@ -16,6 +18,7 @@
     ponerFecha,
     quitarFechaManual,
     type Camara,
+    type DatosVideo,
     type Detalles,
     type Ediciones,
     type FotoCuadricula,
@@ -28,7 +31,8 @@
   import Editor from "$lib/editor/Editor.svelte";
   import EtiquetasFoto from "$lib/etiquetas/EtiquetasFoto.svelte";
   import { abrirEtiqueta } from "$lib/navegacion.svelte";
-  import { fotoUrl, miniaturaUrl } from "$lib/media";
+  import { fotoUrl, miniaturaUrl, videoUrl } from "$lib/media";
+  import { accionVideo, aplicarAccion, sonido } from "./reproductor";
   import {
     archivarFoto,
     enviarFotoAPapelera,
@@ -47,6 +51,7 @@
     coordenadas,
     cuandoVersion,
     dimensiones,
+    duracion,
     exposicion,
     fecha,
     fechaCaptura,
@@ -109,6 +114,8 @@
     (id) => {
       const img = new Image();
       const completa: Completa = { img, estado: "cargando" };
+      // Un vídeo no se precarga (spec 019): el visor usa su `<video>`.
+      if (fotos.find((f) => f.id === id)?.media_kind === "video") return completa;
       img.decoding = "async";
       img.onload = () => {
         completa.estado = "lista";
@@ -141,6 +148,37 @@
   }
 
   const foto = $derived(fotos[indice]);
+  // Vídeos (spec 019).
+  const esVideo = $derived(foto?.media_kind === "video");
+  let reproductor = $state<HTMLVideoElement | null>(null);
+  let noReproducible = $state(false);
+  let abriendoFuera = $state(false);
+  $effect(() => {
+    void foto?.id;
+    noReproducible = false;
+  });
+
+  async function abrirFuera() {
+    if (!foto || abriendoFuera) return;
+    abriendoFuera = true;
+    try {
+      await abrirConOtraAplicacion(foto.id);
+    } catch (e) {
+      avisar(String(e), true);
+    } finally {
+      abriendoFuera = false;
+    }
+  }
+
+  function alCargarVideo(video: HTMLVideoElement) {
+    video.volume = sonido.volumen;
+    video.muted = sonido.silencio;
+  }
+
+  function alCambiarVolumen(video: HTMLVideoElement) {
+    sonido.volumen = video.volume;
+    sonido.silencio = video.muted;
+  }
   // Copia del estado de la imagen: si fuera el mismo objeto, Svelte no vería
   // que ha cambiado al terminar de cargar.
   const completa = $derived.by(() => {
@@ -239,6 +277,7 @@
   }
   let info = $state<Detalles | null>(null);
   let camaraInfo = $state<Camara | null>(null);
+  let videoInfo = $state<DatosVideo | null>(null);
   let edicionesInfo = $state<Ediciones | null>(null);
   // Copias idénticas (spec 018): comparten las ediciones.
   let copiasInfo = $state(0);
@@ -276,6 +315,14 @@
       .catch(() => {
         if (vigente) edicionesInfo = null;
       });
+    videoInfo = null;
+    if (foto.media_kind === "video") {
+      datosVideo(id)
+        .then((v) => {
+          if (vigente) videoInfo = v;
+        })
+        .catch(() => {});
+    }
     // El EXIF se lee del original: si el disco no está, solo falta la sección.
     pedirCamara(id)
       .then((c) => {
@@ -407,7 +454,7 @@
   let abriendoEditor = $state(false);
 
   async function abrirEditor() {
-    if (!foto || abriendoEditor || enEditor || completa?.estado === "error") return;
+    if (!foto || esVideo || abriendoEditor || enEditor || completa?.estado === "error") return;
     const { id, name } = foto;
     abriendoEditor = true;
     try {
@@ -506,7 +553,8 @@
     else if (enPapelera && esTeclaPapelera(e)) {
       if (foto && !borrado.enCurso) onEliminar?.(foto.id);
     } else if (enPapelera && !["ArrowRight", "ArrowLeft"].includes(e.key)) return;
-    else if ((e.key === "e" || e.key === "E") && !e.shiftKey) abrirEditor();
+    else if (esVideo && reproductor && accionVideo(e)) aplicarAccion(reproductor, accionVideo(e));
+    else if ((e.key === "e" || e.key === "E") && !e.shiftKey && !esVideo) abrirEditor();
     else if ((e.key === "t" || e.key === "T") && !e.shiftKey && foto) irAEtiquetas();
     else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
@@ -575,6 +623,7 @@
         <span>Eliminar para siempre</span>
       </button>
     {:else}
+    {#if !esVideo}
     <button
       type="button"
       class="boton editar"
@@ -585,6 +634,7 @@
     >
       <Icono nombre="editar" />
     </button>
+    {/if}
     <div class="exportar" bind:this={menu}>
       <button
         type="button"
@@ -607,10 +657,19 @@
               {conEdicion ? "Con las ediciones y sus datos" : "El archivo tal cual, con sus datos"}
             </span>
           </button>
-          <button type="button" role="menuitem" onclick={() => exportarComo("reducida")}>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={esVideo}
+            onclick={() => exportarComo("reducida")}
+          >
             Tamaño reducido (2048 px)
             <span>
-              {conEdicion ? "Con las ediciones, sin ubicación" : "JPEG para compartir, sin ubicación"}
+              {esVideo
+                ? "Solo tamaño original"
+                : conEdicion
+                  ? "Con las ediciones, sin ubicación"
+                  : "JPEG para compartir, sin ubicación"}
             </span>
           </button>
         </div>
@@ -667,6 +726,32 @@
   <div class="escenario">
     {#if foto}
       {#key foto.id}
+        {#if esVideo && !noReproducible}
+          <!-- Controles nativos del motor web; se para solo al cambiar de
+               elemento porque el `{#key}` lo vuelve a crear. -->
+          <!-- svelte-ignore a11y_media_has_caption -->
+          <video
+            class="video"
+            bind:this={reproductor}
+            src={videoUrl(foto.id)}
+            poster={miniaturaUrl(foto.id)}
+            controls
+            autoplay
+            playsinline
+            preload="auto"
+            onloadstart={(e) => alCargarVideo(e.currentTarget)}
+            onvolumechange={(e) => alCambiarVolumen(e.currentTarget)}
+            onerror={() => (noReproducible = true)}
+          ></video>
+        {:else if esVideo}
+          <img class="miniatura apagada" src={miniaturaUrl(foto.id)} alt="" draggable="false" />
+          <div class="no-reproducible" role="status">
+            <p>Este vídeo no se puede reproducir en este equipo</p>
+            <button type="button" class="texto" disabled={abriendoFuera} onclick={abrirFuera}>
+              Abrir con otra aplicación
+            </button>
+          </div>
+        {:else}
         <!-- La miniatura ampliada se ve al instante; la completa la tapa al cargar. -->
         <img
           class="miniatura"
@@ -677,8 +762,9 @@
         {#if completa?.estado === "lista"}
           <img class="completa" src={completa.src} alt={foto.name} draggable="false" />
         {/if}
+        {/if}
       {/key}
-      {#if completa?.estado === "error"}
+      {#if completa?.estado === "error" && !esVideo}
         <p class="aviso" role="status">{completa.aviso}</p>
       {/if}
     {/if}
@@ -779,6 +865,18 @@
           <dd>{fecha(info.modified_at)}</dd>
           <dt>Formato</dt>
           <dd>{info.format || "Desconocido"}</dd>
+          {#if esVideo}
+            {@const ms = videoInfo?.duration_ms ?? info.duration_ms}
+            {#if ms}<dt>Duración</dt><dd>{duracion(ms)}</dd>{/if}
+            {#if videoInfo?.fps}
+              <dt>Fotogramas</dt>
+              <dd>{videoInfo.fps.toLocaleString("es", { maximumFractionDigits: 2 })} por segundo</dd>
+            {/if}
+            {#if videoInfo?.video_codec || videoInfo?.audio_codec}
+              <dt>Códecs</dt>
+              <dd>{[videoInfo.video_codec, videoInfo.audio_codec].filter(Boolean).join(" · ")}</dd>
+            {/if}
+          {/if}
         </dl>
         {#if foto && !enPapelera}
           <EtiquetasFoto
@@ -1207,6 +1305,38 @@
     height: calc(100% - 32px);
     object-fit: contain;
     user-select: none;
+  }
+
+  /* Vídeos (spec 019). */
+  .escenario .video {
+    position: absolute;
+    inset: 16px 72px;
+    width: calc(100% - 144px);
+    height: calc(100% - 32px);
+    object-fit: contain;
+  }
+
+  .apagada {
+    opacity: 0.35;
+  }
+
+  .no-reproducible {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    border-radius: var(--radio);
+    background: var(--visor-superficie);
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .no-reproducible p {
+    margin: 0;
   }
 
   .aviso {

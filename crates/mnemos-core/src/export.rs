@@ -65,16 +65,19 @@ pub fn export(
     }
     match size {
         ExportSize::Original => {
-            // Se lee una sola vez: la huella sale de lo mismo que se escribe.
-            let bytes = fs::read(&src)?;
+            // Por trozos, sin cargar el archivo en memoria: un vídeo puede
+            // ocupar varios GB (spec 019).
+            let hash = hash_file(&src)?;
             let modified = fs::metadata(&src)?.modified()?;
-            let hash = blake3::hash(&bytes).to_hex().to_string();
             write_new(dest_dir, name, |out| {
-                out.write_all(&bytes)?;
+                io::copy(&mut File::open(&src)?, out)?;
                 out.set_modified(modified)?;
                 Ok(())
             })
             .and_then(|dest| verify(dest, &hash, &src))
+        }
+        ExportSize::Reduced if mnemos_imaging::is_video(&src) => {
+            Err(Error::VideoNotReducible(media.rel_path.to_string()))
         }
         ExportSize::Reduced => {
             let img = match mnemos_imaging::export_image(&src, media.orientation) {
@@ -355,6 +358,26 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn un_video_sale_identico_y_nunca_reducido() {
+        let video: &[u8] = include_bytes!("../../../tests/fixtures/video-girado.mp4");
+        let s = setup("VID_0001.mp4", |path| fs::write(path, video).unwrap());
+        let antes = snapshot(&s);
+        let err = s
+            .lib
+            .export_photo(s.id, &s.dest, ExportSize::Reduced)
+            .unwrap_err();
+        assert!(matches!(err, Error::VideoNotReducible(_)), "{err}");
+        assert_eq!(fs::read_dir(&s.dest).unwrap().count(), 0);
+        let out = s
+            .lib
+            .export_photo(s.id, &s.dest, ExportSize::Original)
+            .unwrap();
+        assert_eq!(out, s.dest.join("VID_0001.mp4"));
+        assert_eq!(fs::read(out).unwrap(), video);
+        assert_eq!(snapshot(&s), antes);
     }
 
     #[test]

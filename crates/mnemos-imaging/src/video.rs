@@ -25,7 +25,7 @@ pub fn is_video(path: &Path) -> bool {
 }
 
 /// Lo que se sabe de un vídeo sin reproducirlo.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct VideoInfo {
     pub duration_ms: Option<u64>,
     /// Ancho y alto con el giro ya aplicado, como se ve.
@@ -35,6 +35,7 @@ pub struct VideoInfo {
     pub rotation: u16,
     /// Fecha de grabación: la de Apple (con su desfase horario) o la de
     /// creación del contenedor (en UTC).
+    #[serde(skip)]
     pub capture_time: Option<CaptureTime>,
     pub fps: Option<f64>,
     /// Códecs con su nombre común: «H.264», «HEVC», «AAC»…
@@ -658,6 +659,17 @@ mod tests {
         // Caja de tamaño imposible dentro de moov.
         let dentro = bx(b"moov", &[0, 0, 0, 3, b't', b'r', b'a', b'k']);
         assert_eq!(info(&dentro), Some(VideoInfo::default()));
+    }
+
+    #[test]
+    fn la_camara_de_un_video_sale_del_contenedor() {
+        let c = crate::camera_info(&Path::new(FIXTURES).join("video-camara.mov")).unwrap();
+        assert_eq!(c.camera.as_deref(), Some("Pentax K-70"));
+        assert_eq!(c.gps, Some((43.1953, -4.8547)));
+        assert_eq!(
+            crate::camera_info(&Path::new(FIXTURES).join("video-girado.mp4")),
+            None
+        );
     }
 
     #[test]

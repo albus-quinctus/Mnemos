@@ -10,6 +10,7 @@ mod media;
 mod organizacion;
 mod papelera;
 mod portatil;
+mod videos;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -668,6 +669,8 @@ pub fn run() {
             miniaturas_video_pendientes,
             guardar_miniatura_video,
             miniatura_video_fallida,
+            videos::datos_video,
+            videos::abrir_con_otra_aplicacion,
             importar,
             cancelar_importacion,
             exportacion::exportar_varias,

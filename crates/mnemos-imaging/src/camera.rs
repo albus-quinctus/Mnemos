@@ -35,8 +35,18 @@ impl CameraInfo {
 }
 
 /// Datos de cámara del EXIF de `path`, o `None` si no tiene EXIF legible o no
-/// trae ninguno. Solo lee el archivo.
+/// trae ninguno. De un vídeo (spec 019), la marca, el modelo y la ubicación
+/// que guarde su contenedor. Solo lee el archivo.
 pub fn camera_info(path: &Path) -> Option<CameraInfo> {
+    if crate::is_video(path) {
+        let v = crate::video_info(path)?;
+        let info = CameraInfo {
+            camera: camera_name(v.make, v.model),
+            gps: v.gps,
+            ..CameraInfo::default()
+        };
+        return (!info.is_empty()).then_some(info);
+    }
     let file = File::open(path).ok()?;
     camera_info_from_container(&mut BufReader::new(file))
 }

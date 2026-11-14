@@ -4,7 +4,7 @@ import type { CopiaDuplicada } from "$lib/biblioteca";
 import { botonAplicar, lineaCompartida, rutasAviso, tituloAviso } from "./compartida";
 
 function copia(id: number, rel_path: string, exists = true): CopiaDuplicada {
-  return { id, rel_path, size_bytes: 1, date: 0, favorite: false, archived: false, exists };
+  return { id, rel_path, size_bytes: 1, date: 0, favorite: false, archived: false, exists, media_kind: "foto", duration_ms: null };
 }
 
 describe("aviso de ediciones compartidas", () => {
