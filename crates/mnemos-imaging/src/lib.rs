@@ -3,7 +3,8 @@
 //! Reconoce los formatos de imagen, lee sus dimensiones y su orientación, y
 //! genera miniaturas. Lee del EXIF la fecha de captura y los datos de cámara
 //! para el panel de información, y define las recetas de edición no
-//! destructiva (spec 009).
+//! destructiva (spec 009). De los vídeos lee lo que dice su contenedor
+//! (spec 019).
 
 mod camera;
 mod capture;
@@ -11,6 +12,7 @@ mod copy;
 mod raw;
 pub mod recipe;
 mod thumbnail;
+mod video;
 
 pub use camera::{CameraInfo, camera_info};
 pub use capture::{CaptureTime, capture_time};
@@ -26,6 +28,7 @@ pub use thumbnail::{
     THUMBNAIL_HEIGHT, THUMBNAIL_MAX_WIDTH, THUMBNAIL_QUALITY, Thumbnail, ThumbnailError, thumbnail,
     thumbnail_edited, thumbnail_size,
 };
+pub use video::{VIDEO_EXTENSIONS, VideoInfo, is_video, video_info};
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
