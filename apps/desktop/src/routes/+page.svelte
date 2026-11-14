@@ -8,6 +8,9 @@
   import Albumes from "$lib/albumes/Albumes.svelte";
   import CabeceraAlbum from "$lib/albumes/CabeceraAlbum.svelte";
   import Duplicados from "$lib/duplicados/Duplicados.svelte";
+  import CabeceraEtiqueta from "$lib/etiquetas/CabeceraEtiqueta.svelte";
+  import ConfirmarEtiqueta from "$lib/etiquetas/ConfirmarEtiqueta.svelte";
+  import Etiquetas from "$lib/etiquetas/Etiquetas.svelte";
   import { irA, navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
@@ -65,11 +68,14 @@
   $effect(() => {
     const seccion = navegacion.seccion;
     const album = navegacion.album;
+    const etiqueta = navegacion.etiqueta;
     const consulta = busqueda.consulta;
     untrack(() => {
       if (consulta) cambiarAmbito({ busqueda: consulta });
       else if (seccion === "albumes")
         cambiarAmbito({ vista: album === null ? "fotos" : { album } });
+      else if (seccion === "etiquetas")
+        cambiarAmbito({ vista: etiqueta === null ? "fotos" : { etiqueta } });
       else cambiarAmbito({ vista: seccion === "duplicados" ? "fotos" : seccion });
     });
   });
@@ -132,6 +138,27 @@
         </div>
       {/key}
     {/if}
+    <!-- Etiquetas (spec 016): la lista, o las fotos de una con la misma cuadrícula. -->
+    {#if navegacion.seccion === "etiquetas" && !busqueda.consulta}
+      {#key `${info.root}#${importacion.version}#${navegacion.etiqueta}`}
+        <div class="capa encima">
+          {#if navegacion.etiqueta === null}
+            <Etiquetas />
+          {:else}
+            <div class="album">
+              <CabeceraEtiqueta id={navegacion.etiqueta} version={cambios.version} />
+              <div class="album-fotos">
+                <Cuadricula
+                  vista={{ etiqueta: navegacion.etiqueta }}
+                  activa={!busqueda.consulta}
+                  onSalir={() => irA("etiquetas")}
+                />
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/key}
+    {/if}
     {#if navegacion.seccion === "duplicados" && !busqueda.consulta}
       {#key `${info.root}#${importacion.version}`}
         <div class="capa encima">
@@ -147,6 +174,7 @@
       {/key}
     {/if}
   </div>
+  <ConfirmarEtiqueta />
 {:else}
   <section class="abrir">
     <h1>Fotos</h1>
@@ -184,7 +212,7 @@
     inset: 0;
   }
 
-  /* Un álbum: su cabecera arriba y la cuadrícula, con su propio scroll, debajo. */
+  /* Un álbum o una etiqueta: su cabecera arriba y la cuadrícula, con su propio scroll, debajo. */
   .album {
     display: flex;
     flex-direction: column;
