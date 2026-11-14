@@ -9,6 +9,9 @@
 //!
 //! Spec 014, tarea 8: crear, renombrar, llenar, vaciar y eliminar álbumes
 //! solo cambia la base de datos; los nombres nunca llegan al disco.
+//!
+//! Spec 019, tarea 12: importar, indexar, sacar la miniatura, exportar y
+//! organizar vídeos tampoco tocan sus originales.
 
 #![cfg(test)]
 
@@ -272,4 +275,65 @@ fn eliminar_para_siempre_solo_borra_lo_de_la_papelera() {
         lib.view_page(View::Photos, None, 100).unwrap().photos.len(),
         ids.len() - 2
     );
+}
+
+#[test]
+fn los_videos_no_se_tocan() {
+    let origen = tempfile::tempdir().unwrap();
+    for nombre in ["video-girado.mp4", "video-camara.mov"] {
+        fs::copy(Path::new(FIXTURES).join(nombre), origen.path().join(nombre)).unwrap();
+    }
+    let origen_antes = estado(origen.path());
+    let raiz = tempfile::tempdir().unwrap();
+    let mut lib = Library::create(raiz.path()).unwrap();
+    let informe = lib.import_from(origen.path()).unwrap();
+    assert_eq!((informe.copied, informe.videos), (2, 2));
+    assert_eq!(
+        estado(origen.path()),
+        origen_antes,
+        "se ha tocado el origen"
+    );
+
+    let antes = estado(raiz.path());
+    let ids: Vec<i64> = lib
+        .view_page(View::Photos, None, 100)
+        .unwrap()
+        .photos
+        .iter()
+        .map(|f| f.id)
+        .collect();
+    assert_eq!(ids.len(), 2);
+
+    // Miniatura (la saca la interfaz), indexado y metadatos.
+    let jpeg = {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::RgbImage::new(64, 36)
+            .write_to(&mut out, image::ImageFormat::Jpeg)
+            .unwrap();
+        out.into_inner()
+    };
+    lib.save_video_thumbnail(ids[0], &jpeg).unwrap().unwrap();
+    lib.index().unwrap();
+    lib.photo_details(ids[0]).unwrap().unwrap();
+
+    // Organizar.
+    lib.set_favorite(&ids, true).unwrap();
+    lib.set_archived(&ids, true).unwrap();
+    let album = lib.create_album("Vídeos").unwrap();
+    lib.add_to_album(album, &ids).unwrap();
+    lib.send_to_trash(&ids).unwrap();
+    lib.restore_from_trash(&ids).unwrap();
+
+    // Exportar en tamaño original (el reducido se rechaza).
+    let destino = tempfile::tempdir().unwrap();
+    for &id in &ids {
+        lib.export_photo(id, destino.path(), mnemos_core::ExportSize::Original)
+            .unwrap();
+        assert!(
+            lib.export_photo(id, destino.path(), mnemos_core::ExportSize::Reduced)
+                .is_err()
+        );
+    }
+
+    assert_eq!(estado(raiz.path()), antes, "se ha tocado un original");
 }

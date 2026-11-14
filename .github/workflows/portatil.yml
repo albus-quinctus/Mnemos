@@ -52,6 +52,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+          # GStreamer que la AppImage lleva dentro para reproducir vídeos sin
+          # depender del sistema (spec 019): MP4/MOV, WebM/MKV y H.264 (libav).
+          sudo apt-get install -y gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-libav
       - run: pnpm install --frozen-lockfile
         working-directory: apps/desktop
       - run: pnpm tauri build ${{ matrix.args }}
@@ -68,6 +72,19 @@ jobs:
             macOS)   cp -R target/universal-apple-darwin/release/bundle/macos/MNEMOS.app salida/ ;;
           esac
           tar -cf ejecutable-${{ runner.os }}.tar -C salida .
+      - name: Comprobar que la AppImage reproduce vídeo (spec 019)
+        if: runner.os == 'Linux'
+        run: |
+          cd "$RUNNER_TEMP"
+          "$GITHUB_WORKSPACE/salida/MNEMOS-linux.AppImage" --appimage-extract > /dev/null
+          for plugin in libgstlibav.so libgstisomp4.so libgstmatroska.so libgstplayback.so; do
+            if ! find squashfs-root -name "$plugin" | grep -q .; then
+              echo "La AppImage no lleva $plugin: los vídeos no se podrán reproducir"
+              exit 1
+            fi
+          done
+          du -sh squashfs-root
+          rm -rf squashfs-root
       - uses: actions/upload-artifact@v4
         with:
           name: ejecutable-${{ runner.os }}
