@@ -3,6 +3,7 @@
     cancelarImportacion,
     cerrarImportacion,
     importacion,
+    textoCopiadas,
   } from "./importacion.svelte";
 
   const evento = $derived(importacion.actual);
@@ -27,12 +28,12 @@
       <progress max={evento.total} value={evento.procesadas}></progress>
       <p class="cuentas">{evento.procesadas} de {evento.total}</p>
     {:else if enCurso}
-      <p class="cuentas">Buscando fotos…</p>
+      <p class="cuentas">Buscando fotos y vídeos…</p>
     {/if}
 
     {#if evento.estado !== "fallida"}
       <p class="cuentas">
-        {evento.copiadas} copiadas · {evento.duplicadas} repetidas · {evento.errores} con error
+        {textoCopiadas(evento.copiadas, evento.videos ?? 0)} · {evento.duplicadas} repetidas · {evento.errores} con error
       </p>
     {/if}
 

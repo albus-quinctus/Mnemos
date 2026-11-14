@@ -7,6 +7,7 @@ export type EventoImportacion = {
   total: number;
   procesadas: number;
   copiadas: number;
+  videos: number; // de las copiadas, cuántas son vídeos (spec 019)
   duplicadas: number;
   en_papelera: number; // ya estaban, pero en la Papelera (spec 015)
   errores: number;
@@ -45,6 +46,7 @@ export async function importarCarpeta(): Promise<void> {
     total: 0,
     procesadas: 0,
     copiadas: 0,
+    videos: 0,
     duplicadas: 0,
     en_papelera: 0,
     errores: 0,
@@ -63,4 +65,13 @@ export function cancelarImportacion(): Promise<void> {
 
 export function cerrarImportacion(): void {
   importacion.actual = null;
+}
+
+// «12 copiadas» o, si hay vídeos, «10 fotos y 2 vídeos copiados» (spec 019).
+export function textoCopiadas(copiadas: number, videos: number): string {
+  if (videos === 0) return `${copiadas} copiadas`;
+  const fotos = copiadas - videos;
+  const v = `${videos} ${videos === 1 ? "vídeo" : "vídeos"}`;
+  if (fotos === 0) return `${v} ${videos === 1 ? "copiado" : "copiados"}`;
+  return `${fotos} ${fotos === 1 ? "foto" : "fotos"} y ${v} copiados`;
 }

@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 
 use crate::error::{Error, Result};
 use crate::files::{hash_file, is_hidden, unix_secs, year_month};
-use crate::index::{FileError, NewPhoto, hash_exists, insert_photo, read_orientation};
+use crate::index::{FileError, MediaProps, NewPhoto, hash_exists, insert_photo, is_media};
 use crate::library::{DATA_DIR, Library, ORIGINALS_DIR, TMP_DIR};
 use crate::paths::RelPath;
 use crate::taken::{Taken, improve_taken};
@@ -24,7 +24,10 @@ use crate::takeout::{self, Sidecars};
 /// Resultado de una importación.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct ImportReport {
+    /// Fotos y vídeos copiados.
     pub copied: u64,
+    /// De los copiados, cuántos son vídeos (spec 019).
+    pub videos: u64,
     /// Fotos cuyo contenido ya estaba en la biblioteca o repetido en el origen.
     pub duplicates: u64,
     /// Fotos que ya estaban en la biblioteca, pero solo en la Papelera (spec
@@ -44,7 +47,8 @@ pub struct Progreso {
 }
 
 enum Outcome {
-    Copied,
+    /// Copiado; `true` si es un vídeo.
+    Copied(bool),
     Duplicate,
     InTrash,
 }
@@ -94,7 +98,10 @@ impl Library {
                 takeout_applied: &mut takeout_applied,
             };
             match import_file(&self.conn, &self.root, &tmp, archivo, seen) {
-                Ok(Outcome::Copied) => report.copied += 1,
+                Ok(Outcome::Copied(video)) => {
+                    report.copied += 1;
+                    report.videos += u64::from(video);
+                }
                 Ok(Outcome::Duplicate) => report.duplicates += 1,
                 Ok(Outcome::InTrash) => report.in_trash += 1,
                 Err(err) => report.errors.push(FileError::new(archivo, err)),
@@ -121,10 +128,7 @@ fn candidatos(source: &Path, root: &Path, report: &mut ImportReport) -> Vec<Path
     let mut archivos = Vec::new();
     for entry in walker {
         match entry {
-            Ok(entry)
-                if entry.file_type().is_file()
-                    && mnemos_imaging::is_supported_image(entry.path()) =>
-            {
+            Ok(entry) if entry.file_type().is_file() && is_media(entry.path()) => {
                 archivos.push(entry.into_path());
             }
             Ok(_) => {}
@@ -218,12 +222,12 @@ fn import_file(
     let rel = RelPath::from_absolute(root, &dest)?;
     // La foto y su entrada en el índice de búsqueda se guardan juntas.
     let tx = conn.unchecked_transaction()?;
+    let props = MediaProps::of_file(&dest);
     let photo = NewPhoto {
         size: meta.len() as i64,
         modified: unix_secs(modified),
         hash: &hash,
-        dims: mnemos_imaging::dimensions(&dest),
-        orientation: read_orientation(&dest),
+        props,
         taken,
     };
     insert_photo(&tx, &rel, &photo)?;
@@ -232,7 +236,7 @@ fn import_file(
     }
     tx.commit()?;
     seen.imported.insert(hash);
-    Ok(Outcome::Copied)
+    Ok(Outcome::Copied(props.video))
 }
 
 /// Copia `src` en `dest`, conserva su fecha de modificación y comprueba que
@@ -878,5 +882,140 @@ mod tests {
         let err = lib.import_from(&falta).unwrap_err();
         assert!(matches!(err, Error::SourceUnreadable { .. }), "{err}");
         assert!(err.to_string().contains("no-existe"), "{err}");
+    }
+
+    const VIDEO_GIRADO: &[u8] = include_bytes!("../../../tests/fixtures/video-girado.mp4");
+
+    #[test]
+    fn importa_videos_con_su_fecha_giro_y_duracion() {
+        let (dir, mut lib, src) = setup();
+        write_png(&src.join("foto.png"), 4, 3, b"a");
+        let video = src.join("VID_viaje.mp4");
+        fs::write(&video, VIDEO_GIRADO).unwrap();
+        for f in fs::read_dir(&src).unwrap() {
+            set_mtime(&f.unwrap().path(), 1_800_000_000); // 2027
+        }
+
+        let report = lib.import_from(&src).unwrap();
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        assert_eq!((report.copied, report.videos), (2, 1));
+        // El origen no se toca y la copia es idéntica.
+        assert_eq!(fs::read(&video).unwrap(), VIDEO_GIRADO);
+        let dest = dir
+            .path()
+            .join("Biblioteca/Originales/2019/05/VID_viaje.mp4");
+        assert_eq!(fs::read(&dest).unwrap(), VIDEO_GIRADO);
+
+        let fila = lib
+            .connection()
+            .query_row(
+                "SELECT media_kind, duration_ms, width, height, orientation, taken_source,
+                        taken_at
+                 FROM photos WHERE rel_path LIKE '%VID_viaje.mp4'",
+                [],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, Option<i64>>(1)?,
+                        r.get::<_, Option<u32>>(2)?,
+                        r.get::<_, Option<u32>>(3)?,
+                        r.get::<_, u16>(4)?,
+                        r.get::<_, String>(5)?,
+                        r.get::<_, i64>(6)?,
+                    ))
+                },
+            )
+            .unwrap();
+        // Sin girar en la base y con orientación 6: la cuadrícula lo pone en
+        // vertical, como una foto de móvil.
+        assert_eq!(
+            fila,
+            (
+                "video".to_owned(),
+                Some(1000),
+                Some(32),
+                Some(18),
+                6,
+                "video".to_owned(),
+                1_557_671_400
+            )
+        );
+        let foto: String = lib
+            .connection()
+            .query_row(
+                "SELECT media_kind FROM photos WHERE rel_path LIKE '%foto.png'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(foto, "foto");
+
+        // La cuadrícula lo enseña en vertical, con su duración.
+        let page = lib.timeline_page(None, 10).unwrap();
+        let v = page
+            .photos
+            .iter()
+            .find(|p| p.media_kind == "video")
+            .unwrap();
+        assert_eq!(
+            (v.width, v.height, v.duration_ms),
+            (Some(18), Some(32), Some(1000))
+        );
+
+        // Las miniaturas de vídeo no van a la cola del núcleo (spec 019).
+        let jobs = lib.pending_thumbnails().unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert!(jobs[0].rel_path.as_str().ends_with("foto.png"));
+    }
+
+    #[test]
+    fn un_video_archivado_en_takeout_entra_archivado() {
+        let (_dir, mut lib, src) = setup();
+        let video = src.join("VID_20190512_143000.mp4");
+        fs::write(&video, VIDEO_GIRADO).unwrap();
+        fs::write(
+            src.join("VID_20190512_143000.mp4.supplemental-metadata.json"),
+            r#"{"title":"VID_20190512_143000.mp4","photoTakenTime":{"timestamp":"1557671400"},
+                "favorited":true,"archived":true}"#,
+        )
+        .unwrap();
+
+        let report = lib.import_from(&src).unwrap();
+        assert_eq!(report.videos, 1, "{:?}", report.errors);
+        let (favorita, archivada): (bool, bool) = lib
+            .connection()
+            .query_row(
+                "SELECT favorite, archived_at IS NOT NULL FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(favorita && archivada);
+    }
+
+    #[test]
+    fn un_video_sin_moov_entra_sin_duracion() {
+        let (_dir, mut lib, src) = setup();
+        fs::write(src.join("roto.mov"), b"no es un video").unwrap();
+        fs::write(src.join("clip.webm"), b"tampoco").unwrap();
+        set_mtime(&src.join("roto.mov"), NOV_2023);
+        set_mtime(&src.join("clip.webm"), NOV_2023);
+
+        let report = lib.import_from(&src).unwrap();
+        assert_eq!(
+            (report.copied, report.videos),
+            (2, 2),
+            "{:?}",
+            report.errors
+        );
+        let filas: Vec<(String, Option<i64>, Option<u32>)> = lib
+            .connection()
+            .prepare("SELECT media_kind, duration_ms, width FROM photos")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(filas, vec![("video".to_owned(), None, None); 2]);
     }
 }
