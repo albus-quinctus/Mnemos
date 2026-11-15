@@ -5,7 +5,7 @@ use std::path::Path;
 
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{DynamicImage, GrayImage, ImageFormat, ImageReader, Limits, RgbImage};
+use image::{DynamicImage, GrayImage, ImageFormat, ImageReader, Limits, RgbImage, RgbaImage};
 use jpeg_decoder::PixelFormat;
 
 use crate::recipe::{Geometry, Transform, crop_rect};
@@ -175,6 +175,34 @@ fn cover_size(width: u32, height: u32, geometry: &Geometry, size: Size) -> (u32,
     (side(width), side(height))
 }
 
+/// Lado mayor de la imagen que se copia al portapapeles (spec 020).
+pub const CLIPBOARD_MAX_SIDE: u32 = 4096;
+
+/// Imagen para el portapapeles (spec 020): la foto tal como se ve, ya girada
+/// y con la geometría de la receta, con el lado mayor de
+/// [`CLIPBOARD_MAX_SIDE`] como mucho y sin metadatos. La transparencia queda
+/// sobre fondo blanco, como en el resto de imágenes generadas.
+pub fn clipboard_image(
+    path: &Path,
+    orientation: u16,
+    geometry: &Geometry,
+) -> Result<RgbaImage, ThumbnailError> {
+    let cover = |w: u32, h: u32| cover_size(w, h, geometry, clipboard_size);
+    let rgb = render_rgb(
+        decode(path, orientation, &cover)?,
+        orientation,
+        geometry,
+        clipboard_size,
+    );
+    Ok(DynamicImage::ImageRgb8(rgb).into_rgba8())
+}
+
+/// Tamaño de la imagen del portapapeles: el lado mayor se limita a
+/// [`CLIPBOARD_MAX_SIDE`] y nunca se amplía.
+pub fn clipboard_size(width: u32, height: u32) -> (u32, u32) {
+    fit_long_side(width, height, CLIPBOARD_MAX_SIDE)
+}
+
 /// Tamaño de una foto exportada en tamaño reducido: el lado mayor se limita a
 /// [`EXPORT_MAX_SIDE`] y nunca se amplía.
 pub fn export_size(width: u32, height: u32) -> (u32, u32) {
@@ -300,12 +328,30 @@ fn limits() -> Limits {
 /// completo, no de la versión reducida, para que no cambie por los redondeos
 /// de la reducción.
 fn render(
-    Decoded { mut img, full }: Decoded,
+    decoded: Decoded,
     orientation: u16,
     geometry: &Geometry,
     size: Size,
     quality: u8,
 ) -> Result<Thumbnail, ThumbnailError> {
+    let small = render_rgb(decoded, orientation, geometry, size);
+    let (width, height) = small.dimensions();
+    let mut jpeg = Vec::new();
+    JpegEncoder::new_with_quality(Cursor::new(&mut jpeg), quality).encode_image(&small)?;
+    Ok(Thumbnail {
+        jpeg,
+        width,
+        height,
+    })
+}
+
+/// Orienta, aplica la geometría y reduce, sin codificar.
+fn render_rgb(
+    Decoded { mut img, full }: Decoded,
+    orientation: u16,
+    geometry: &Geometry,
+    size: Size,
+) -> RgbImage {
     let swaps = crate::swaps_dimensions(orientation);
     let oriented = if swaps { (full.1, full.0) } else { full };
     let (out_w, out_h) = geometry.output_size(oriented.0, oriented.1);
@@ -324,14 +370,7 @@ fn render(
     } else {
         (width, height)
     };
-    let small = transform.apply(resize(&img, pre_w, pre_h));
-    let mut jpeg = Vec::new();
-    JpegEncoder::new_with_quality(Cursor::new(&mut jpeg), quality).encode_image(&small)?;
-    Ok(Thumbnail {
-        jpeg,
-        width,
-        height,
-    })
+    transform.apply(resize(&img, pre_w, pre_h))
 }
 
 /// Tamaño de la miniatura de una imagen ya girada de `width` × `height`.
@@ -674,6 +713,31 @@ mod tests {
     }
 
     #[test]
+    fn la_imagen_del_portapapeles_se_gira_y_se_limita_sin_ampliar() {
+        assert_eq!(clipboard_size(6000, 4000), (4096, 2731));
+        assert_eq!(clipboard_size(800, 600), (800, 600));
+
+        let dir = tempdir("portapapeles");
+        let path = dir.join("foto.jpg");
+        write_image(&path, 6000, 4000, ImageFormat::Jpeg);
+        let img = clipboard_image(&path, 6, &Geometry::default()).unwrap();
+        assert_eq!(img.dimensions(), (2731, 4096));
+        let pequena = dir.join("pequena.png");
+        write_image(&pequena, 300, 200, ImageFormat::Png);
+        let img = clipboard_image(&pequena, 1, &Geometry::default()).unwrap();
+        assert_eq!(img.dimensions(), (300, 200));
+        assert!(img.pixels().all(|p| p.0[3] == 255));
+
+        let heic = dir.join("iphone.heic");
+        std::fs::write(&heic, b"\0\0\0\x18ftypheic").unwrap();
+        assert!(matches!(
+            clipboard_image(&heic, 1, &Geometry::default()),
+            Err(ThumbnailError::Unsupported)
+        ));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn reconoce_lo_que_el_motor_web_muestra_tal_cual() {
         let dir = tempdir("mime");
         for (name, format, mime) in [
@@ -822,6 +886,30 @@ mod tests {
                 }
             }
         }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn el_portapapeles_lleva_la_foto_editada() {
+        let dir = tempdir("portapapeles-receta");
+        let path = dir.join("cuadrantes.png");
+        escribe_cuadrantes(&path, 800, 400, ImageFormat::Png);
+        let g = Geometry {
+            rotate: 90,
+            flip_horizontal: false,
+            crop: None,
+        };
+        let img = clipboard_image(&path, 1, &g).unwrap();
+        assert_eq!(img.dimensions(), (400, 800));
+        let esperada = gira_90([0, 1, 2, 3]);
+        let px = |x: u32, y: u32| {
+            let [r, g, b, _] = img.get_pixel(x, y).0;
+            color(&image::Rgb([r, g, b]))
+        };
+        assert_eq!(
+            [px(100, 200), px(300, 200), px(100, 600), px(300, 600)],
+            esperada
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
