@@ -280,6 +280,30 @@ export function cancelarExportacion(): Promise<void> {
   return invoke("cancelar_exportacion");
 }
 
+// Copiar, descargar y «Guardar como…» (spec 020). Copiar devuelve `false`
+// si mientras tanto se pidió otra copia, que es la que queda. Descargar y
+// guardar devuelven la ruta del archivo creado.
+export function copiarImagen(id: number): Promise<boolean> {
+  return invoke("copiar_imagen", { id });
+}
+
+export function descargar(id: number): Promise<string> {
+  return invoke("descargar", { id });
+}
+
+/** Lote de la spec 017 hacia Descargas; devuelve la carpeta. */
+export function descargarVarias(ids: number[]): Promise<string> {
+  return invoke("descargar_varias", { ids });
+}
+
+export function guardarComo(id: number, ruta: string): Promise<string> {
+  return invoke("guardar_como", { id, ruta });
+}
+
+export function mostrarEnCarpeta(ruta: string): Promise<void> {
+  return invoke("mostrar_en_carpeta", { ruta });
+}
+
 // Editor no destructivo (spec 009). La geometría es la de la receta
 // (`mnemos_imaging::recipe::Geometry`): giro en grados en sentido horario
 // sobre la foto ya girada según el EXIF, volteo después del giro y recorte en
