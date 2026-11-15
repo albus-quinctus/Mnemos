@@ -32,10 +32,14 @@
     alternarFavoritos,
     enviarSeleccionAPapelera,
     esTeclaPapelera,
+    mostrarAviso,
     registrarFotos,
   } from "$lib/seleccion/acciones.svelte";
   import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
+  import { copiarImagen } from "$lib/biblioteca";
+  import { copiaTexto, esTeclaCopiar, esTeclaDescargar, mayuscula } from "$lib/copiar/copiar";
+  import { descargarSeleccion } from "$lib/exportacion/exportacion.svelte";
   import BarraMeses from "./BarraMeses.svelte";
   import { cargarTitulos } from "./titulos.svelte";
   import TituloDia from "./TituloDia.svelte";
@@ -135,6 +139,19 @@
       e.preventDefault();
       return;
     }
+    // Copiar y descargar la selección (spec 020), salvo en la Papelera.
+    if (haySeleccion() && vista !== "papelera") {
+      if (esTeclaCopiar(e) && !copiaTexto(e.target, String(window.getSelection() ?? ""))) {
+        e.preventDefault();
+        void copiarSeleccion();
+        return;
+      }
+      if (esTeclaDescargar(e)) {
+        e.preventDefault();
+        void descargarSeleccion([...seleccion.ids]);
+        return;
+      }
+    }
     // Con selección, F marca favoritos, Mayús + A archiva y Supr envía a la
     // Papelera, como en el visor.
     if (!haySeleccion() || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -143,6 +160,21 @@
     else if (esTeclaPapelera(e) && vista !== "papelera") enviarSeleccionAPapelera();
     else return;
     e.preventDefault();
+  }
+
+  // Con una sola foto seleccionada, Ctrl + C la copia (spec 020).
+  async function copiarSeleccion() {
+    const ids = [...seleccion.ids];
+    if (ids.length !== 1) {
+      mostrarAviso({ texto: "Solo se puede copiar una foto a la vez", error: true });
+      return;
+    }
+    mostrarAviso({ texto: "Copiando…" });
+    try {
+      if (await copiarImagen(ids[0])) mostrarAviso({ texto: "Imagen copiada" });
+    } catch (e) {
+      mostrarAviso({ texto: mayuscula(String(e)), error: true });
+    }
   }
 
   // Archivar desde el visor: en Fotos la foto deja de estar y el visor pasa a

@@ -164,6 +164,6 @@ de la spec 017. Lo único nuevo de verdad es el portapapeles.
 3. [x] `mnemos-core`: `export_to_file` (temporal y renombrado, extensión añadida, nunca dentro de la biblioteca). Pruebas. Con `Library::save_photo_as`; sus dos llamadas nuevas están en la lista de `tests/solo_la_papelera_borra.rs`.
 4. [x] App: `tauri-plugin-clipboard-manager` y comando `copiar_imagen` en hilo aparte. `cargo deny` en verde. En `apps/desktop/src-tauri/src/copiar.rs`; `deny.toml` admite la licencia `BSL-1.0` (de `clipboard-win`, el portapapeles de Windows).
 5. [x] App: comandos `descargar`, `descargar_varias`, `guardar_como` y `mostrar_en_carpeta`; permiso `dialog:allow-save`. Envoltorios en `biblioteca.ts`.
-6. [ ] Visor: menú nuevo, clic derecho propio, atajos y aviso con «Mostrar en la carpeta». Pruebas de la interfaz.
-7. [ ] Cuadrícula y barra: «Descargar» en el menú, `Ctrl` + `C` y `Mayús` + `D` con la selección. Pruebas de la interfaz.
+6. [x] Visor: menú nuevo, clic derecho propio, atajos y aviso con «Mostrar en la carpeta». Pruebas de la interfaz. Atajos y rutas en `lib/copiar/copiar.ts`, con pruebas.
+7. [x] Cuadrícula y barra: «Descargar» en el menú, `Ctrl` + `C` y `Mayús` + `D` con la selección. Pruebas de la interfaz. `descargarSeleccion` en `lib/exportacion/`; la tarjeta dice «Descargando…» y, al terminar, «Mostrar en la carpeta» (también al exportar).
 8. [ ] AppImage nueva y prueba real de Paulo en Sway: copiar y pegar en otra app, Descargar, Guardar como.
