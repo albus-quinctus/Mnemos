@@ -32,6 +32,7 @@
   import EtiquetasFoto from "$lib/etiquetas/EtiquetasFoto.svelte";
   import { abrirEtiqueta } from "$lib/navegacion.svelte";
   import { fotoUrl, miniaturaUrl, videoUrl } from "$lib/media";
+  import { describirErrorVideo } from "$lib/miniaturas-video/generador";
   import { accionVideo, aplicarAccion, sonido } from "./reproductor";
   import {
     archivarFoto,
@@ -152,11 +153,18 @@
   const esVideo = $derived(foto?.media_kind === "video");
   let reproductor = $state<HTMLVideoElement | null>(null);
   let noReproducible = $state(false);
+  let errorVideo = $state("");
   let abriendoFuera = $state(false);
   $effect(() => {
     void foto?.id;
     noReproducible = false;
+    errorVideo = "";
   });
+
+  function alFallarVideo() {
+    errorVideo = describirErrorVideo(reproductor?.error ?? null);
+    noReproducible = true;
+  }
 
   async function abrirFuera() {
     if (!foto || abriendoFuera) return;
@@ -741,12 +749,13 @@
             preload="auto"
             onloadstart={(e) => alCargarVideo(e.currentTarget)}
             onvolumechange={(e) => alCambiarVolumen(e.currentTarget)}
-            onerror={() => (noReproducible = true)}
+            onerror={alFallarVideo}
           ></video>
         {:else if esVideo}
           <img class="miniatura apagada" src={miniaturaUrl(foto.id)} alt="" draggable="false" />
           <div class="no-reproducible" role="status">
             <p>Este vídeo no se puede reproducir en este equipo</p>
+            {#if errorVideo}<p class="detalle-error">{errorVideo}</p>{/if}
             <button type="button" class="texto" disabled={abriendoFuera} onclick={abrirFuera}>
               Abrir con otra aplicación
             </button>
@@ -1337,6 +1346,13 @@
 
   .no-reproducible p {
     margin: 0;
+  }
+
+  .no-reproducible .detalle-error {
+    max-width: 48ch;
+    font-size: 12px;
+    opacity: 0.7;
+    overflow-wrap: anywhere;
   }
 
   .aviso {

@@ -14,7 +14,7 @@ mod videos;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use mnemos_core::thumbnails::{DEFAULT_WORKERS, ThumbnailEvent};
 use mnemos_core::{
@@ -244,6 +244,9 @@ fn miniatura_video_fallida(
     motivo: String,
     estado: State<'_, OpenLibrary>,
 ) -> Result<(), String> {
+    if registro_video() {
+        eprintln!("MNEMOS vídeo {id}: miniatura fallida: {motivo}");
+    }
     let copias = with_library(&estado, |lib| lib.video_copies(id))?;
     let _ = app.emit(
         "miniaturas",
@@ -561,6 +564,14 @@ fn cancelar_importacion(importacion: State<'_, Importacion>) {
     }
 }
 
+/// Con `MNEMOS_REGISTRO_VIDEO` en el entorno, cada petición de vídeo y cada
+/// miniatura de vídeo fallida se escriben en la salida de errores, para
+/// diagnosticar por qué el motor web no reproduce un vídeo.
+fn registro_video() -> bool {
+    static ACTIVO: OnceLock<bool> = OnceLock::new();
+    *ACTIVO.get_or_init(|| std::env::var_os("MNEMOS_REGISTRO_VIDEO").is_some())
+}
+
 /// Atiende `mnemos://localhost/miniatura/<id>`, `…/foto/<id>`, `…/original/<id>`
 /// y `…/video/<id>`.
 fn serve(
@@ -568,6 +579,13 @@ fn serve(
     request: &tauri::http::Request<Vec<u8>>,
 ) -> tauri::http::Response<Vec<u8>> {
     if request.method() != Method::GET {
+        if registro_video() {
+            eprintln!(
+                "MNEMOS petición {} {} -> 405",
+                request.method(),
+                request.uri().path()
+            );
+        }
         return media::status(StatusCode::METHOD_NOT_ALLOWED);
     }
     let Some((kind, id)) = media::parse(request.uri().path()) else {
@@ -592,7 +610,26 @@ fn serve(
             .headers()
             .get(header::RANGE)
             .and_then(|v| v.to_str().ok());
-        return media::respond_video(&media.rel_path.to_path(&root), range);
+        let response = media::respond_video(&media.rel_path.to_path(&root), range);
+        if registro_video() {
+            let cabecera = |nombre| {
+                response
+                    .headers()
+                    .get(nombre)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("-")
+                    .to_owned()
+            };
+            eprintln!(
+                "MNEMOS vídeo {id}: Range {} -> {} Content-Range {} Content-Length {} Content-Type {}",
+                range.unwrap_or("-"),
+                response.status(),
+                cabecera(header::CONTENT_RANGE),
+                cabecera(header::CONTENT_LENGTH),
+                cabecera(header::CONTENT_TYPE),
+            );
+        }
+        return response;
     }
     let if_none_match = request
         .headers()
