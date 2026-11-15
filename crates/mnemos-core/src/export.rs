@@ -38,6 +38,13 @@ impl Library {
         let media = self.photo_media(id)?.ok_or(Error::PhotoNotFound(id))?;
         export(&self.root, &media, dest_dir, size)
     }
+
+    /// «Guardar como…» de la foto `id` en `dest_file` (ver
+    /// [`export_to_file`]).
+    pub fn save_photo_as(&self, id: i64, dest_file: &Path) -> Result<PathBuf> {
+        let media = self.photo_media(id)?.ok_or(Error::PhotoNotFound(id))?;
+        export_to_file(&self.root, &media, dest_file)
+    }
 }
 
 /// Exporta la foto `media` de la biblioteca de `root` a `dest_dir`. No
@@ -90,6 +97,127 @@ pub fn export(
             })
         }
     }
+}
+
+/// «Guardar como…» (spec 020): guarda la foto `media` en el archivo
+/// `dest_file`, elegido por el usuario en el diálogo del sistema, y devuelve
+/// la ruta final.
+///
+/// Guarda lo mismo que [`ExportSize::Original`]: el archivo tal cual,
+/// verificado con BLAKE3, o la foto editada a tamaño completo si hay una
+/// edición a la vista. Si el nombre no acaba en una extensión del formato que
+/// se guarda, se le añade. Un archivo existente se reemplaza (el diálogo ya lo
+/// ha preguntado), pero solo al terminar: se escribe a un temporal en la
+/// misma carpeta y se renombra encima, así que si algo falla el anterior
+/// queda intacto. Nunca escribe dentro de la biblioteca.
+pub fn export_to_file(root: &Path, media: &PhotoMedia, dest_file: &Path) -> Result<PathBuf> {
+    let dir = match dest_file.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    };
+    if inside(root, dir)? {
+        return Err(Error::DestinationInsideLibrary(dir.to_owned()));
+    }
+    let src = media.rel_path.to_path(root);
+    if !src.is_file() {
+        return Err(Error::OriginalMissing(media.rel_path.to_string()));
+    }
+    let modified = fs::metadata(&src)?.modified()?;
+    if let Some(edit) = &media.edit {
+        let copy = mnemos_imaging::edited_copy(&src, media.orientation, &edit.geometry).map_err(
+            |err| match err {
+                mnemos_imaging::ThumbnailError::Io(e) => Error::Io(e),
+                other => Error::CannotRender {
+                    path: media.rel_path.to_string(),
+                    message: other.to_string(),
+                },
+            },
+        )?;
+        let dest = with_extension(dest_file, copy.format.extension(), |e| {
+            copy.format.matches_extension(e)
+        });
+        return replace(&dest, |out| {
+            out.write_all(&copy.bytes)?;
+            out.set_modified(modified)?;
+            Ok(())
+        });
+    }
+    let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let dest = if ext.is_empty() {
+        dest_file.to_owned()
+    } else {
+        with_extension(dest_file, ext, |e| same_format(e, ext))
+    };
+    let hash = hash_file(&src)?;
+    let part = write_part(dir, |out| {
+        io::copy(&mut File::open(&src)?, out)?;
+        out.set_modified(modified)?;
+        Ok(())
+    })?;
+    if hash_file(&part)? != hash {
+        let _ = fs::remove_file(&part);
+        return Err(Error::CopyMismatch(src));
+    }
+    finish(part, dest)
+}
+
+/// `dest` tal cual si su extensión cumple `ok`; si no, con `.ext` añadida.
+fn with_extension(dest: &Path, ext: &str, ok: impl Fn(&str) -> bool) -> PathBuf {
+    match dest.extension().and_then(|e| e.to_str()) {
+        Some(e) if ok(e) => dest.to_owned(),
+        _ => {
+            let mut name = dest.as_os_str().to_owned();
+            name.push(".");
+            name.push(ext);
+            PathBuf::from(name)
+        }
+    }
+}
+
+/// Indica si dos extensiones son del mismo formato, sin distinguir caja
+/// (`jpg` y `JPEG`, `tif` y `tiff`, `heic` y `heif`).
+fn same_format(a: &str, b: &str) -> bool {
+    const FAMILIAS: &[&[&str]] = &[
+        &["jpg", "jpeg", "jpe", "jfif", "jfi", "jif"],
+        &["tif", "tiff"],
+        &["heic", "heif"],
+    ];
+    let (a, b) = (a.to_ascii_lowercase(), b.to_ascii_lowercase());
+    a == b
+        || FAMILIAS
+            .iter()
+            .any(|f| f.contains(&a.as_str()) && f.contains(&b.as_str()))
+}
+
+/// Escribe con `fill` a un temporal junto a `dest` y lo renombra encima.
+fn replace(dest: &Path, fill: impl FnOnce(&mut File) -> io::Result<()>) -> Result<PathBuf> {
+    let dir = match dest.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    };
+    finish(write_part(dir, fill)?, dest.to_owned())
+}
+
+/// Lleva el temporal `part` a `dest`, reemplazando lo que hubiera. Si falla,
+/// borra el temporal.
+fn finish(part: PathBuf, dest: PathBuf) -> Result<PathBuf> {
+    match fs::rename(&part, &dest) {
+        Ok(()) => Ok(dest),
+        Err(e) => {
+            let _ = fs::remove_file(&part);
+            Err(e.into())
+        }
+    }
+}
+
+/// Crea en `dir` un temporal oculto con un nombre libre, lo llena con `fill`
+/// y lo lleva al disco. Si algo falla, lo borra.
+fn write_part(dir: &Path, fill: impl FnOnce(&mut File) -> io::Result<()>) -> Result<PathBuf> {
+    write_new(
+        dir,
+        &format!(".mnemos-guardando-{}.part", std::process::id()),
+        fill,
+    )
 }
 
 /// Exporta la foto con la geometría de su edición aplicada. El original solo
@@ -514,6 +642,104 @@ mod tests {
             fs::read(out).unwrap(),
             fs::read(s.lib.root().join("Originales/a.jpg")).unwrap()
         );
+    }
+
+    // ── Guardar como (spec 020) ──
+
+    /// Nombres de los archivos de `dir`, ordenados.
+    fn nombres(dir: &Path) -> Vec<String> {
+        let mut v: Vec<String> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn guardar_como_usa_el_nombre_elegido_y_anade_la_extension() {
+        let s = setup("Ruta del Cares.jpg", jpeg(64, 48));
+        let antes = snapshot(&s);
+        let original = s.lib.root().join("Originales/Ruta del Cares.jpg");
+        let out = s.lib.save_photo_as(s.id, &s.dest.join("viaje")).unwrap();
+        assert_eq!(out, s.dest.join("viaje.jpg"));
+        assert_eq!(fs::read(&out).unwrap(), fs::read(&original).unwrap());
+        assert_eq!(
+            fs::metadata(&out).unwrap().modified().unwrap(),
+            fs::metadata(&original).unwrap().modified().unwrap()
+        );
+        // Otra extensión del mismo formato vale tal cual; otra distinta no.
+        let out = s
+            .lib
+            .save_photo_as(s.id, &s.dest.join("Cares.JPEG"))
+            .unwrap();
+        assert_eq!(out, s.dest.join("Cares.JPEG"));
+        let out = s
+            .lib
+            .save_photo_as(s.id, &s.dest.join("Cares.png"))
+            .unwrap();
+        assert_eq!(out, s.dest.join("Cares.png.jpg"));
+        assert_eq!(
+            nombres(&s.dest),
+            ["Cares.JPEG", "Cares.png.jpg", "viaje.jpg"]
+        );
+        assert_eq!(snapshot(&s), antes);
+    }
+
+    #[test]
+    fn guardar_como_reemplaza_el_existente_sin_dejar_temporales() {
+        let s = setup("a.jpg", jpeg(16, 16));
+        fs::write(s.dest.join("a.jpg"), b"viejo").unwrap();
+        let out = s.lib.save_photo_as(s.id, &s.dest.join("a.jpg")).unwrap();
+        assert_eq!(out, s.dest.join("a.jpg"));
+        assert_eq!(
+            fs::read(&out).unwrap(),
+            fs::read(s.lib.root().join("Originales/a.jpg")).unwrap()
+        );
+        assert_eq!(nombres(&s.dest), ["a.jpg"]);
+    }
+
+    #[test]
+    fn guardar_como_rechaza_la_biblioteca_y_lo_que_falta() {
+        let s = setup("a.jpg", jpeg(16, 16));
+        let original = s.lib.root().join(ORIGINALS_DIR).join("a.jpg");
+        let antes = snapshot(&s);
+        for dest in [original.clone(), s.lib.root().join("otra.jpg")] {
+            let err = s.lib.save_photo_as(s.id, &dest).unwrap_err();
+            assert!(
+                matches!(err, Error::DestinationInsideLibrary(_)),
+                "{dest:?}: {err}"
+            );
+        }
+        assert_eq!(snapshot(&s), antes);
+        assert!(matches!(
+            s.lib.save_photo_as(s.id + 1, &s.dest.join("x.jpg")),
+            Err(Error::PhotoNotFound(_))
+        ));
+        fs::remove_file(&original).unwrap();
+        assert!(matches!(
+            s.lib.save_photo_as(s.id, &s.dest.join("x.jpg")),
+            Err(Error::OriginalMissing(_))
+        ));
+        assert!(nombres(&s.dest).is_empty());
+    }
+
+    #[test]
+    fn guardar_como_una_editada_sale_con_la_edicion_y_su_formato() {
+        let mut s = setup("Picos.jpg", jpeg(400, 200));
+        s.lib
+            .save_edit(s.id, geometry(90, Some((0.0, 0.0, 0.5, 1.0))))
+            .unwrap();
+        let antes = snapshot(&s);
+        let out = s
+            .lib
+            .save_photo_as(s.id, &s.dest.join("picos.png"))
+            .unwrap();
+        assert_eq!(out, s.dest.join("picos.png.jpg"));
+        let bytes = fs::read(&out).unwrap();
+        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg).unwrap();
+        assert_eq!((img.width(), img.height()), (100, 400));
+        assert_eq!(snapshot(&s), antes);
     }
 
     #[test]
