@@ -166,14 +166,20 @@ pub async fn guardar_como(
 }
 
 /// Abre el gestor de archivos en la carpeta de `ruta`, con el archivo
-/// marcado donde el sistema lo permite.
+/// marcado donde el sistema lo permite. Si `ruta` es una carpeta (el destino
+/// de un lote), abre esa carpeta.
 #[tauri::command]
 pub fn mostrar_en_carpeta(ruta: String) -> Result<(), String> {
     let ruta = PathBuf::from(ruta);
     if !ruta.exists() {
         return Err("El archivo ya no está ahí".into());
     }
-    orden_mostrar(&ruta)
+    let mut orden = if ruta.is_dir() {
+        orden_abrir_carpeta(&ruta)
+    } else {
+        orden_mostrar(&ruta)
+    };
+    orden
         .spawn()
         .map(|_| ())
         .map_err(|e| format!("No se puede abrir la carpeta: {e}"))
@@ -199,6 +205,20 @@ fn orden_mostrar(ruta: &Path) -> Command {
         orden.arg(carpeta);
         orden
     }
+}
+
+/// La orden de cada sistema para abrir una carpeta en su gestor de archivos.
+fn orden_abrir_carpeta(carpeta: &Path) -> Command {
+    let programa = if cfg!(target_os = "windows") {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    let mut orden = Command::new(programa);
+    orden.arg(carpeta);
+    orden
 }
 
 #[cfg(test)]
