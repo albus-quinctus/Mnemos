@@ -175,13 +175,10 @@ fn cover_size(width: u32, height: u32, geometry: &Geometry, size: Size) -> (u32,
     (side(width), side(height))
 }
 
-/// Lado mayor de la imagen que se copia al portapapeles (spec 020).
-pub const CLIPBOARD_MAX_SIDE: u32 = 4096;
-
 /// Imagen para el portapapeles (spec 020): la foto tal como se ve, ya girada
-/// y con la geometría de la receta, con el lado mayor de
-/// [`CLIPBOARD_MAX_SIDE`] como mucho y sin metadatos. La transparencia queda
-/// sobre fondo blanco, como en el resto de imágenes generadas.
+/// y con la geometría de la receta, a tamaño completo (Paulo lo eligió así el
+/// 15 nov) y sin metadatos. La transparencia queda sobre fondo blanco, como
+/// en el resto de imágenes generadas.
 pub fn clipboard_image(
     path: &Path,
     orientation: u16,
@@ -197,10 +194,9 @@ pub fn clipboard_image(
     Ok(DynamicImage::ImageRgb8(rgb).into_rgba8())
 }
 
-/// Tamaño de la imagen del portapapeles: el lado mayor se limita a
-/// [`CLIPBOARD_MAX_SIDE`] y nunca se amplía.
-pub fn clipboard_size(width: u32, height: u32) -> (u32, u32) {
-    fit_long_side(width, height, CLIPBOARD_MAX_SIDE)
+/// Tamaño de la imagen del portapapeles: el completo, sin reducir.
+fn clipboard_size(width: u32, height: u32) -> (u32, u32) {
+    (width.max(1), height.max(1))
 }
 
 /// Tamaño de una foto exportada en tamaño reducido: el lado mayor se limita a
@@ -713,18 +709,15 @@ mod tests {
     }
 
     #[test]
-    fn la_imagen_del_portapapeles_se_gira_y_se_limita_sin_ampliar() {
-        assert_eq!(clipboard_size(6000, 4000), (4096, 2731));
-        assert_eq!(clipboard_size(800, 600), (800, 600));
-
+    fn la_imagen_del_portapapeles_va_girada_y_a_tamano_completo() {
         let dir = tempdir("portapapeles");
         let path = dir.join("foto.jpg");
         write_image(&path, 6000, 4000, ImageFormat::Jpeg);
         let img = clipboard_image(&path, 6, &Geometry::default()).unwrap();
-        assert_eq!(img.dimensions(), (2731, 4096));
-        let pequena = dir.join("pequena.png");
-        write_image(&pequena, 300, 200, ImageFormat::Png);
-        let img = clipboard_image(&pequena, 1, &Geometry::default()).unwrap();
+        assert_eq!(img.dimensions(), (4000, 6000));
+        let png = dir.join("pequena.png");
+        write_image(&png, 300, 200, ImageFormat::Png);
+        let img = clipboard_image(&png, 1, &Geometry::default()).unwrap();
         assert_eq!(img.dimensions(), (300, 200));
         assert!(img.pixels().all(|p| p.0[3] == 255));
 

@@ -44,10 +44,9 @@ de la spec 017. Lo único nuevo de verdad es el portapapeles.
   su orientación y con la edición aplicada si hay una versión a la vista
   (spec 009). Se pega como imagen en cualquier aplicación (chat, documento,
   editor de imágenes).
-- **Tamaño:** el lado mayor como mucho de 4096 px (nunca se amplía). Una foto
-  de 24 MP sin reducir son unos 100 MB en memoria y varios segundos de espera
-  al pegar; 4096 px sobra para un chat o un documento. Para la foto entera
-  está Descargar.
+- **Tamaño:** completo, sin reducir (Paulo lo eligió el 15 nov). Una foto de
+  24 MP son unos 100 MB en memoria y puede tardar unos segundos en copiarse y
+  pegarse; mientras, el aviso «Copiando…».
 - Va **sin metadatos**: el portapapeles de imágenes no los lleva.
 - Mientras se prepara, el aviso «Copiando…»; al terminar, «Imagen copiada»
   unos segundos (`capturas/020-copiada-*.png`).
@@ -101,7 +100,7 @@ de la spec 017. Lo único nuevo de verdad es el portapapeles.
   soporte de Wayland (`wayland-data-control`): funciona en Sway, KDE y
   Hyprland; en X11 y XWayland también. En Windows pone la imagen como DIB y
   PNG; en macOS como imagen del sistema.
-- `mnemos-imaging`: `clipboard_image(path, geometry, max_side) -> RgbaImage`,
+- `mnemos-imaging`: `clipboard_image(path, orientation, geometry) -> RgbaImage`,
   con la misma decodificación que el visor y la exportación reducida (RAW por
   su vista previa, receta aplicada).
 - Comando `copiar_imagen(id)` fuera del bloqueo de la biblioteca, en un hilo
@@ -139,7 +138,7 @@ de la spec 017. Lo único nuevo de verdad es el portapapeles.
 - Rutas con espacios, tildes o caracteres especiales en Windows, macOS y Linux.
 
 ## Criterios de aceptación
-- [ ] `clipboard_image` devuelve la foto girada, con la receta aplicada y el lado mayor ≤ 4096 px; un RAW usa su vista previa; HEIC da error claro (prueba automática).
+- [x] `clipboard_image` devuelve la foto girada, con la receta aplicada y a tamaño completo; un RAW usa su vista previa; HEIC da error claro (prueba automática).
 - [ ] Copiar imagen en Sway pega la foto en otra app (Paulo, a mano), también en Windows y macOS si hay equipo.
 - [ ] Descargar deja en la carpeta de Descargas lo mismo que «Exportar · Tamaño original», con `nombre (N).ext` si se repite (prueba automática con una carpeta temporal como Descargas).
 - [ ] Guardar como escribe el nombre elegido, añade la extensión que falta, reemplaza el existente solo al terminar y rechaza destinos dentro de la biblioteca (prueba automática).
@@ -161,7 +160,7 @@ de la spec 017. Lo único nuevo de verdad es el portapapeles.
 
 ## Tareas (≤1 h cada una)
 1. [x] Spec y capturas del diseño (`capturas/020-*.png` en los archivos del proyecto). Spec fusionada el 15 nov.
-2. [x] `mnemos-imaging`: `clipboard_image` con lado mayor de 4096 px, reutilizando la decodificación del visor. Pruebas. Devuelve un `RgbaImage` (`CLIPBOARD_MAX_SIDE`, `clipboard_size`).
+2. [x] `mnemos-imaging`: `clipboard_image` a tamaño completo, reutilizando la decodificación del visor. Pruebas. Devuelve un `RgbaImage`.
 3. [x] `mnemos-core`: `export_to_file` (temporal y renombrado, extensión añadida, nunca dentro de la biblioteca). Pruebas. Con `Library::save_photo_as`; sus dos llamadas nuevas están en la lista de `tests/solo_la_papelera_borra.rs`.
 4. [ ] App: `tauri-plugin-clipboard-manager` y comando `copiar_imagen` en hilo aparte. `cargo deny` en verde.
 5. [ ] App: comandos `descargar`, `descargar_varias`, `guardar_como` y `mostrar_en_carpeta`; permiso `dialog:allow-save`.

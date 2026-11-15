@@ -18,7 +18,7 @@ pub use camera::{CameraInfo, camera_info};
 pub use capture::{CaptureTime, capture_time};
 pub use copy::{COPY_QUALITY, CopyFormat, EditedCopy, edited_copy};
 pub use raw::raw_preview;
-pub use thumbnail::{CLIPBOARD_MAX_SIDE, clipboard_image, clipboard_size};
+pub use thumbnail::clipboard_image;
 pub use thumbnail::{
     DISPLAY_MAX_SIDE, DISPLAY_QUALITY, display_image, display_image_edited, display_size, web_mime,
 };
