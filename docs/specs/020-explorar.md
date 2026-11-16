@@ -1,6 +1,6 @@
 # 020 · Explorar
 
-- Estado: borrador
+- Estado: aprobada
 - Fase: F2 (fase A) · F4 (fases B y C)
 
 ## Qué y por qué
@@ -211,10 +211,9 @@ elemento:
 - Ocultar o reordenar las filas de Explorar.
 
 ## Tareas (≤1 h cada una)
-1. [ ] Capturas del diseño (Explorar, colección abierta, recuerdo abierto y
-       estado vacío), en claro y oscuro, pendientes de aprobar por Paulo
-       (`capturas/020-*.png`). Los números son de ejemplo, con la biblioteca
-       del disco como referencia.
+1. [x] Capturas del diseño (Explorar, colección abierta, recuerdo abierto y
+       estado vacío), en claro y oscuro, aprobadas por Paulo el 16 nov
+       (`capturas/020-*.png`).
 2. [ ] Núcleo: `Collection` y `View::Collection` (videos, capturas,
        panorámicas, editadas, raw) en meses, páginas y `Scope`; lista de
        patrones de capturas en un solo sitio; pruebas.
