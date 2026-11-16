@@ -228,8 +228,11 @@ elemento:
        `docs/rendimiento.md` (31–58 ms). `crates/mnemos-core/src/explore.rs`:
        `Explore { memories, collections, tags, tags_total }`; los rangos de
        los recuerdos se calculan en SQLite en hora local.
-5. [ ] Comando de Tauri `explorar`, envoltorios en `biblioteca.ts` y las dos
-       formas nuevas de `Vista`.
+5. [x] Comando de Tauri `explorar`, envoltorios en `biblioteca.ts` y las dos
+       formas nuevas de `Vista`. `src-tauri/src/explorar.rs` (usa la hora del
+       equipo) y en `biblioteca.ts`: `explorar()`, `Explorar`, `Recuerdo`,
+       `TarjetaColeccion`, `Coleccion` y `Vista` con `{ coleccion }` y
+       `{ rango: { desde, hasta } }`.
 6. [ ] Pantalla Explorar (`lib/explorar/`): entrada del menú, filas con
        desplazamiento horizontal y flechas, tarjetas, estados vacíos;
        `Seccion` gana `explorar` en `navegacion.svelte.ts`.
