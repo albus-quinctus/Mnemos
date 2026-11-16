@@ -1,6 +1,6 @@
 # 021 · Explorar
 
-- Estado: aprobada
+- Estado: en curso
 - Fase: F2 (fase A) · F4 (fases B y C)
 
 ## Qué y por qué
@@ -214,9 +214,10 @@ elemento:
 1. [x] Capturas del diseño (Explorar, colección abierta, recuerdo abierto y
        estado vacío), en claro y oscuro, aprobadas por Paulo el 16 nov
        (`capturas/021-*.png`).
-2. [ ] Núcleo: `Collection` y `View::Collection` (videos, capturas,
+2. [x] Núcleo: `Collection` y `View::Collection` (videos, capturas,
        panorámicas, editadas, raw) en meses, páginas y `Scope`; lista de
-       patrones de capturas en un solo sitio; pruebas.
+       patrones de capturas en un solo sitio; pruebas. Hecho en `crates/mnemos-core/src/collections.rs`
+       (`SCREENSHOT_PATTERNS` mira solo el nombre del archivo, no la carpeta).
 3. [ ] Núcleo: `recientes` ordenada y agrupada por `imported_at`, y
        `View::Range` para los recuerdos; pruebas.
 4. [ ] Núcleo: `explore(hoy)` con las tres filas y sus portadas; pruebas de fin

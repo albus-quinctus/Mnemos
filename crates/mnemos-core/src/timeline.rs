@@ -9,6 +9,7 @@ use rusqlite::params_from_iter;
 use rusqlite::types::Value;
 use serde::{Deserialize, Serialize};
 
+use crate::collections::Collection;
 use crate::error::Result;
 use crate::library::Library;
 
@@ -65,6 +66,9 @@ pub enum View {
     /// Las fotos de un álbum, archivadas o no (spec 014).
     #[serde(rename = "album")]
     Album(i64),
+    /// Una colección automática de Explorar, sin archivadas (spec 021).
+    #[serde(rename = "coleccion")]
+    Collection(Collection),
 }
 
 impl View {
@@ -95,6 +99,7 @@ impl View {
                     order: DATE,
                 };
             }
+            View::Collection(collection) => return collection.filter(),
         };
         Filter {
             sql: sql.to_owned(),
