@@ -4,6 +4,7 @@
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
 pub mod albums;
+pub mod collections;
 mod copies;
 pub mod day_titles;
 pub mod db;
@@ -28,6 +29,7 @@ pub mod timeline;
 pub mod trash;
 
 pub use albums::{Album, MAX_ALBUM_NAME};
+pub use collections::Collection;
 pub use day_titles::{DayTitle, MAX_DAY_TITLE};
 pub use duplicates::{
     DuplicateCopy, DuplicateCursor, DuplicateGroup, DuplicatePage, DuplicateSummary,
