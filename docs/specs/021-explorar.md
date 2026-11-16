@@ -189,15 +189,15 @@ elemento:
 ## Criterios de aceptación
 - [ ] La entrada «Explorar» del menú lateral abre la pantalla con las filas
       Recuerdos, Colecciones y Tus etiquetas; las filas vacías no salen.
-- [ ] Recuerdos enseña una tarjeta por año con fotos en la semana de hoy, con
+- [x] Recuerdos enseña una tarjeta por año con fotos en la semana de hoy, con
       prueba de los casos de fin de año y 29 de febrero.
-- [ ] Vídeos, Capturas de pantalla, Panorámicas, Editadas, RAW y Añadidas
+- [x] Vídeos, Capturas de pantalla, Panorámicas, Editadas, RAW y Añadidas
       recientemente cuentan y abren las fotos correctas (pruebas en el núcleo).
 - [ ] Abrir una tarjeta enseña la cuadrícula con selección y visor, y `Esc`
       vuelve a Explorar.
-- [ ] Archivadas y Papelera quedan fuera de las colecciones y los recuerdos.
-- [ ] `explore` tarda menos de 100 ms con 10 000 fotos (`docs/rendimiento.md`).
-- [ ] Los originales no se modifican (prueba automática en
+- [x] Archivadas y Papelera quedan fuera de las colecciones y los recuerdos.
+- [x] `explore` tarda menos de 100 ms con 10 000 fotos (`docs/rendimiento.md`).
+- [x] Los originales no se modifican (prueba automática en
       `crates/mnemos-core/tests/originales_intactos.rs`).
 
 ## Fuera de alcance (fase A)
@@ -244,6 +244,8 @@ elemento:
        guarda la vista y el título (`abrirEnExplorar`); `CabeceraColeccion.svelte`
        cuenta los elementos con `vistaMeses`. Capturas de la pantalla real
        (con datos de prueba) en `capturas/021-real-*.png`.
-8. [ ] `tests/originales_intactos.rs` y sección «Explorar» en
-       `docs/arquitectura.md`.
+8. [x] `tests/originales_intactos.rs` y sección «Explorar» en
+       `docs/arquitectura.md`. `explorar_no_toca_los_originales` abre cada
+       colección y cada recuerdo (meses, páginas y «Seleccionar todo») y
+       compara la huella de todos los originales.
 9. [ ] Probarlo en la app real con la biblioteca del disco (Paulo).
