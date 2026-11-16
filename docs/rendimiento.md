@@ -71,6 +71,18 @@ Spec 015, tarea 3. Contenedor de desarrollo, en modo release. El objetivo es men
 
 Con las 10 000 en la Papelera (su peor caso), los meses y la primera página de la vista Papelera tardan 4,7 ms.
 
+### Explorar en el núcleo, 10 000 fotos (2026-11-16)
+Spec 021, tarea 4. `explore` con 10 000 fotos repartidas en 15 años (capturas, RAW, vídeos, panorámicas, editadas, favoritas y archivadas) y 50 etiquetas. Contenedor de desarrollo, en modo release: `cargo test --release -p mnemos-core --test rendimiento_explorar -- --ignored --nocapture`. El objetivo es menos de 100 ms, sin índices nuevos.
+
+| Consulta | Tiempo |
+|---|---|
+| `explore` completo (14 recuerdos, 6 colecciones, 10 etiquetas) | 31–58 ms |
+| Capturas de pantalla (meses) | 10–22 ms |
+| RAW (meses) | 11 ms |
+| Las demás colecciones (meses) | 1–5 ms |
+
+Las capturas eran lo más lento (89 ms): sacar el nombre del archivo en SQL es caro, así que antes se descartan las rutas que no contienen ningún patrón.
+
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
 |---|---|---|
