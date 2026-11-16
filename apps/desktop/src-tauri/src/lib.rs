@@ -1,6 +1,7 @@
 mod acceso_directo;
 mod albumes;
 mod configuracion;
+mod copiar;
 mod duplicados;
 #[cfg(target_os = "linux")]
 mod entorno_linux;
@@ -643,6 +644,8 @@ pub fn run() {
         .manage(papelera::Borrado::default())
         .manage(exportacion::Exportacion::default())
         .plugin(tauri_plugin_dialog::init())
+        // Solo desde Rust (spec 020): ningún permiso suyo en `capabilities/`.
+        .plugin(tauri_plugin_clipboard_manager::init())
         .register_asynchronous_uri_scheme_protocol("mnemos", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             // Decodificar un RAW o un TIFF lleva tiempo: fuera del hilo de la interfaz.
@@ -675,6 +678,11 @@ pub fn run() {
             cancelar_importacion,
             exportacion::exportar_varias,
             exportacion::cancelar_exportacion,
+            copiar::copiar_imagen,
+            copiar::descargar,
+            copiar::descargar_varias,
+            copiar::guardar_como,
+            copiar::mostrar_en_carpeta,
             poner_tema,
             alternar_pantalla_completa,
             pantalla_completa,

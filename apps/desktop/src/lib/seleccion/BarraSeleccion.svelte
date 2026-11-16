@@ -23,7 +23,11 @@
   } from "./acciones.svelte";
   import { borrado, pedirEliminar } from "$lib/papelera/papelera.svelte";
   import type { TamanoExportacion } from "$lib/biblioteca";
-  import { enCurso, exportarVarias } from "$lib/exportacion/exportacion.svelte";
+  import {
+    descargarSeleccion,
+    enCurso,
+    exportarVarias,
+  } from "$lib/exportacion/exportacion.svelte";
 
   const cuantas = $derived(seleccion.ids.size);
   const quitar = $derived(todasFavoritas());
@@ -39,6 +43,11 @@
   function exportarComo(tamano: TamanoExportacion) {
     menuExportar = false;
     void exportarVarias([...seleccion.ids], tamano);
+  }
+
+  function descargar() {
+    menuExportar = false;
+    void descargarSeleccion([...seleccion.ids]);
   }
 
   function alPulsarFuera(e: PointerEvent) {
@@ -155,7 +164,7 @@
       class:activo={menuExportar}
       aria-haspopup="menu"
       aria-expanded={menuExportar}
-      title="Exportar"
+      title="Descargar o exportar"
       disabled={enCurso()}
       onclick={() => (menuExportar = !menuExportar)}
     >
@@ -164,6 +173,11 @@
     </button>
     {#if menuExportar}
       <div class="menu" role="menu" aria-label="Exportar">
+        <button type="button" role="menuitem" onclick={descargar}>
+          Descargar
+          <span>A Descargas, en tamaño original (Mayús + D)</span>
+        </button>
+        <hr />
         <button type="button" role="menuitem" onclick={() => exportarComo("original")}>
           Tamaño original
           <span>Los archivos tal cual, con sus datos</span>
@@ -300,6 +314,13 @@
   .menu button:focus-visible {
     background: var(--superficie-alta);
     outline: none;
+  }
+
+  .menu hr {
+    width: 100%;
+    margin: 6px 0;
+    border: 0;
+    border-top: 1px solid var(--borde);
   }
 
   .menu span {

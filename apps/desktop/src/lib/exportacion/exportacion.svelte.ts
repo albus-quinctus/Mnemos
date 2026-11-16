@@ -5,12 +5,16 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   cancelarExportacion as cancelar,
+  descargarVarias,
   exportarVarias as empezar,
   type EventoExportacion,
   type TamanoExportacion,
 } from "../biblioteca";
 
-export const exportacion = $state<{ actual: EventoExportacion | null }>({ actual: null });
+export const exportacion = $state<{ actual: EventoExportacion | null; descarga: boolean }>({
+  actual: null,
+  descarga: false,
+});
 
 // Última carpeta a la que se exportó en esta sesión, desde la barra o desde
 // el visor: el selector la propone.
@@ -46,6 +50,7 @@ export async function exportarVarias(ids: number[], tamano: TamanoExportacion): 
   });
   if (typeof carpeta !== "string") return;
   destino.ultima = carpeta;
+  exportacion.descarga = false;
   exportacion.actual = {
     estado: "en_curso",
     total: ids.length,
@@ -58,6 +63,34 @@ export async function exportarVarias(ids: number[], tamano: TamanoExportacion): 
   };
   try {
     await empezar(ids, carpeta, tamano);
+  } catch (e) {
+    const texto = String(e);
+    exportacion.actual = {
+      ...exportacion.actual,
+      estado: "detenida",
+      mensaje: texto.charAt(0).toUpperCase() + texto.slice(1),
+    };
+  }
+}
+
+// Descargar la selección (spec 020): el mismo lote, en tamaño original y a la
+// carpeta de Descargas, sin preguntar.
+export async function descargarSeleccion(ids: number[]): Promise<void> {
+  if (ids.length === 0 || enCurso()) return;
+  exportacion.descarga = true;
+  exportacion.actual = {
+    estado: "en_curso",
+    total: ids.length,
+    hechas: 0,
+    guardadas: 0,
+    carpeta: "Descargas",
+    ruta: null,
+    saltadas: [],
+    mensaje: null,
+  };
+  try {
+    const carpeta = await descargarVarias(ids);
+    if (exportacion.actual?.carpeta === "Descargas") exportacion.actual.carpeta = carpeta;
   } catch (e) {
     const texto = String(e);
     exportacion.actual = {
