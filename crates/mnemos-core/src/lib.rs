@@ -11,6 +11,7 @@ pub mod db;
 pub mod duplicates;
 pub mod edits;
 pub mod error;
+pub mod explore;
 pub mod export;
 pub mod export_many;
 mod files;
@@ -36,6 +37,7 @@ pub use duplicates::{
 };
 pub use edits::{EditSummary, EditVersion, StoredRecipe};
 pub use error::{Error, Result};
+pub use explore::{CollectionCard, Explore, Memory};
 pub use export::ExportSize;
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};

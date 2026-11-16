@@ -223,9 +223,11 @@ elemento:
        (`{"coleccion": "recientes"}`, `GridPhoto::date` es la fecha de
        importación) y `View::Range { desde, hasta }` (`{"rango": {...}}`, solo
        fotos con `taken_at` en `[desde, hasta)`).
-4. [ ] Núcleo: `explore(hoy)` con las tres filas y sus portadas; pruebas de fin
+4. [x] Núcleo: `explore(hoy)` con las tres filas y sus portadas; pruebas de fin
        de año, 29 de febrero, archivadas y Papelera; medida con 10 000 fotos en
-       `docs/rendimiento.md`.
+       `docs/rendimiento.md` (31–58 ms). `crates/mnemos-core/src/explore.rs`:
+       `Explore { memories, collections, tags, tags_total }`; los rangos de
+       los recuerdos se calculan en SQLite en hora local.
 5. [ ] Comando de Tauri `explorar`, envoltorios en `biblioteca.ts` y las dos
        formas nuevas de `Vista`.
 6. [ ] Pantalla Explorar (`lib/explorar/`): entrada del menú, filas con

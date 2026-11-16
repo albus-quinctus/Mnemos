@@ -80,12 +80,23 @@ impl Collection {
             }
             Collection::Videos => "media_kind = 'video'".to_owned(),
             Collection::Screenshots => {
-                let any = SCREENSHOT_PATTERNS
+                // Sacar el nombre del archivo en SQL es caro: primero se
+                // descartan las rutas que no contienen ningún patrón (un
+                // `LIKE` simple) y solo a las que quedan se les mira el nombre.
+                let somewhere = SCREENSHOT_PATTERNS
+                    .iter()
+                    .map(|p| {
+                        let p = p.trim_start_matches('%');
+                        format!("lower(rel_path) LIKE '%{p}' ESCAPE '\\'")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" OR ");
+                let name = SCREENSHOT_PATTERNS
                     .iter()
                     .map(|p| format!("lower({FILE_NAME}) LIKE '{p}' ESCAPE '\\'"))
                     .collect::<Vec<_>>()
                     .join(" OR ");
-                format!("({any})")
+                format!("({somewhere}) AND ({name})")
             }
             Collection::Panoramas => "media_kind = 'foto' AND width > 0 AND height > 0 \
                  AND max(width, height) >= 2 * min(width, height)"
