@@ -218,8 +218,11 @@ elemento:
        panorámicas, editadas, raw) en meses, páginas y `Scope`; lista de
        patrones de capturas en un solo sitio; pruebas. Hecho en `crates/mnemos-core/src/collections.rs`
        (`SCREENSHOT_PATTERNS` mira solo el nombre del archivo, no la carpeta).
-3. [ ] Núcleo: `recientes` ordenada y agrupada por `imported_at`, y
-       `View::Range` para los recuerdos; pruebas.
+3. [x] Núcleo: `recientes` ordenada y agrupada por `imported_at`, y
+       `View::Range` para los recuerdos; pruebas. `Collection::Recent`
+       (`{"coleccion": "recientes"}`, `GridPhoto::date` es la fecha de
+       importación) y `View::Range { desde, hasta }` (`{"rango": {...}}`, solo
+       fotos con `taken_at` en `[desde, hasta)`).
 4. [ ] Núcleo: `explore(hoy)` con las tres filas y sus portadas; pruebas de fin
        de año, 29 de febrero, archivadas y Papelera; medida con 10 000 fotos en
        `docs/rendimiento.md`.

@@ -1,5 +1,5 @@
 //! Colecciones automáticas de la pantalla Explorar (spec 021): vídeos,
-//! capturas de pantalla, panorámicas, editadas y RAW.
+//! capturas de pantalla, panorámicas, editadas, RAW y añadidas recientemente.
 //!
 //! Son vistas calculadas con columnas que ya existen: no guardan nada ni
 //! tocan archivos. Igual que Fotos, dejan fuera las archivadas y la Papelera.
@@ -26,16 +26,21 @@ pub enum Collection {
     /// Fotos RAW o DNG, por la extensión.
     #[serde(rename = "raw")]
     Raw,
+    /// Todas, por la fecha de importación: en esta colección,
+    /// `GridPhoto::date` es esa fecha, como en la Papelera.
+    #[serde(rename = "recientes")]
+    Recent,
 }
 
 impl Collection {
     /// Todas, en el orden de la fila «Colecciones».
-    pub const ALL: [Collection; 5] = [
+    pub const ALL: [Collection; 6] = [
         Collection::Videos,
         Collection::Screenshots,
         Collection::Panoramas,
         Collection::Edited,
         Collection::Raw,
+        Collection::Recent,
     ];
 }
 
@@ -66,6 +71,13 @@ const BASE: &str = " AND archived_at IS NULL AND trashed_at IS NULL";
 impl Collection {
     pub(crate) fn filter(self) -> Filter {
         let condition = match self {
+            Collection::Recent => {
+                return Filter {
+                    sql: BASE.to_owned(),
+                    params: Vec::new(),
+                    order: "imported_at",
+                };
+            }
             Collection::Videos => "media_kind = 'video'".to_owned(),
             Collection::Screenshots => {
                 let any = SCREENSHOT_PATTERNS
@@ -308,6 +320,100 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&View::Collection(Collection::Panoramas)).unwrap(),
             r#"{"coleccion":"panoramicas"}"#
+        );
+    }
+
+    /// Fila con fecha de captura e importación propias.
+    fn insertar(lib: &Library, rel: &str, taken: Option<i64>, imported: i64, archived: bool) {
+        lib.conn
+            .execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, taken_at, imported_at,
+                                     archived_at)
+                 VALUES (?1, 1, ?2, ?3, ?4, ?5)",
+                params![rel, OCT_2026, taken, imported, archived.then_some(OCT_2026)],
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn recientes_por_fecha_de_importacion() {
+        let (_d, lib) = library(&[]);
+        const DIA: i64 = 86_400;
+        // Foto antigua importada ayer y foto nueva importada hace un mes.
+        insertar(
+            &lib,
+            "Originales/antigua.jpg",
+            Some(OCT_2026 - 3000 * DIA),
+            OCT_2026 - DIA,
+            false,
+        );
+        insertar(
+            &lib,
+            "Originales/nueva.jpg",
+            Some(OCT_2026),
+            OCT_2026 - 30 * DIA,
+            false,
+        );
+        insertar(&lib, "Originales/hoy.jpg", None, OCT_2026, false);
+        insertar(&lib, "Originales/archivada.jpg", None, OCT_2026, true);
+
+        let vista = View::Collection(Collection::Recent);
+        let pagina = lib.view_page(vista, None, 100).unwrap();
+        let nombres: Vec<_> = pagina.photos.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(nombres, ["hoy.jpg", "antigua.jpg", "nueva.jpg"]);
+        // La fecha de la cuadrícula es la de importación, para agrupar por día.
+        assert_eq!(pagina.photos[1].date, OCT_2026 - DIA);
+
+        let meses = lib.view_months(vista).unwrap();
+        assert_eq!(meses.iter().map(|m| m.photos).sum::<u64>(), 3);
+        let scope = crate::selection::Scope::View(vista);
+        assert_eq!(lib.select_all(scope).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn rango_de_un_recuerdo() {
+        let (_d, lib) = library(&[]);
+        let desde = OCT_2026;
+        let hasta = OCT_2026 + 7 * 86_400;
+        insertar(&lib, "Originales/primera.jpg", Some(desde), 0, false);
+        insertar(
+            &lib,
+            "Originales/dentro.jpg",
+            Some(desde + 3 * 86_400),
+            0,
+            false,
+        );
+        insertar(&lib, "Originales/justo-fuera.jpg", Some(hasta), 0, false);
+        insertar(&lib, "Originales/antes.jpg", Some(desde - 1), 0, false);
+        insertar(&lib, "Originales/archivada.jpg", Some(desde + 60), 0, true);
+        // Sin fecha de captura: su fecha de modificación cae dentro, pero no
+        // cuenta.
+        insertar(&lib, "Originales/sin-fecha.jpg", None, 0, false);
+
+        let vista = View::Range { desde, hasta };
+        let nombres: Vec<_> = lib
+            .view_page(vista, None, 100)
+            .unwrap()
+            .photos
+            .into_iter()
+            .map(|p| p.name)
+            .collect();
+        assert_eq!(nombres, ["dentro.jpg", "primera.jpg"]);
+    }
+
+    #[test]
+    fn rango_y_recientes_se_serializan() {
+        let v: View = serde_json::from_str(r#"{"rango":{"desde":10,"hasta":20}}"#).unwrap();
+        assert_eq!(
+            v,
+            View::Range {
+                desde: 10,
+                hasta: 20
+            }
+        );
+        assert_eq!(
+            serde_json::to_string(&View::Collection(Collection::Recent)).unwrap(),
+            r#"{"coleccion":"recientes"}"#
         );
     }
 }
