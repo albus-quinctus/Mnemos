@@ -36,6 +36,12 @@
     ajustes:
       "M18.5 9.3 20.8 10v4l-2.3.7 1.1 2.1-2.8 2.8-2.1-1.1-.7 2.3h-4l-.7-2.3-2.1 1.1-2.8-2.8 1.1-2.1-2.3-.7v-4l2.3-.7-1.1-2.1 2.8-2.8 2.1 1.1.7-2.3h4l.7 2.3 2.1-1.1 2.8 2.8-1.1 2.1ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
     pantalla: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+    // Colecciones de Explorar (spec 021).
+    video: "M4 6h11v12H4zM15 10l5-3v10l-5-3",
+    captura: "M7 3h10v18H7zM10.5 18h3",
+    panoramica: "M3 7c6-2 12-2 18 0v10c-6-2-12-2-18 0z",
+    raw: "M4 6h16v12H4zM8 10v4M8 10h2a1 1 0 0 1 0 2H8m2 0 1 2M14 10l1.5 4 1.5-4",
+    reciente: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l3 2",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;

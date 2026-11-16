@@ -9,7 +9,7 @@
   // Las entradas sin `seccion` llegan en fases posteriores.
   const entradas: Entrada[] = [
     { nombre: "Fotos", icono: "fotos", seccion: "fotos" },
-    { nombre: "Explorar", icono: "explorar" },
+    { nombre: "Explorar", icono: "explorar", seccion: "explorar" },
     { nombre: "Álbumes", icono: "albumes", seccion: "albumes" },
     { nombre: "Etiquetas", icono: "etiquetas", seccion: "etiquetas" },
     { nombre: "Favoritos", icono: "estrella", seccion: "favoritos" },

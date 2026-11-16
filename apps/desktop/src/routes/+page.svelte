@@ -11,6 +11,8 @@
   import CabeceraEtiqueta from "$lib/etiquetas/CabeceraEtiqueta.svelte";
   import ConfirmarEtiqueta from "$lib/etiquetas/ConfirmarEtiqueta.svelte";
   import Etiquetas from "$lib/etiquetas/Etiquetas.svelte";
+  import CabeceraColeccion from "$lib/explorar/CabeceraColeccion.svelte";
+  import Explorar from "$lib/explorar/Explorar.svelte";
   import { irA, navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
@@ -72,6 +74,7 @@
     const seccion = navegacion.seccion;
     const album = navegacion.album;
     const etiqueta = navegacion.etiqueta;
+    const abiertoEnExplorar = navegacion.explorar;
     const consulta = busqueda.consulta;
     untrack(() => {
       if (consulta) cambiarAmbito({ busqueda: consulta });
@@ -79,6 +82,7 @@
         cambiarAmbito({ vista: album === null ? "fotos" : { album } });
       else if (seccion === "etiquetas")
         cambiarAmbito({ vista: etiqueta === null ? "fotos" : { etiqueta } });
+      else if (seccion === "explorar") cambiarAmbito({ vista: abiertoEnExplorar?.vista ?? "fotos" });
       else cambiarAmbito({ vista: seccion === "duplicados" ? "fotos" : seccion });
     });
   });
@@ -155,6 +159,27 @@
                   vista={{ etiqueta: navegacion.etiqueta }}
                   activa={!busqueda.consulta}
                   onSalir={() => irA("etiquetas")}
+                />
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/key}
+    {/if}
+    <!-- Explorar (spec 021): las filas, o una colección o un recuerdo con la misma cuadrícula. -->
+    {#if navegacion.seccion === "explorar" && !busqueda.consulta}
+      {#key `${info.root}#${importacion.version}#${JSON.stringify(navegacion.explorar?.vista ?? null)}`}
+        <div class="capa encima">
+          {#if navegacion.explorar === null}
+            <Explorar version={cambios.version} />
+          {:else}
+            <div class="album">
+              <CabeceraColeccion abierto={navegacion.explorar} version={cambios.version} />
+              <div class="album-fotos">
+                <Cuadricula
+                  vista={navegacion.explorar.vista}
+                  activa={!busqueda.consulta}
+                  onSalir={() => irA("explorar")}
                 />
               </div>
             </div>
