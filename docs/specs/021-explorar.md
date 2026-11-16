@@ -1,4 +1,4 @@
-# 020 · Explorar
+# 021 · Explorar
 
 - Estado: aprobada
 - Fase: F2 (fase A) · F4 (fases B y C)
@@ -213,7 +213,7 @@ elemento:
 ## Tareas (≤1 h cada una)
 1. [x] Capturas del diseño (Explorar, colección abierta, recuerdo abierto y
        estado vacío), en claro y oscuro, aprobadas por Paulo el 16 nov
-       (`capturas/020-*.png`).
+       (`capturas/021-*.png`).
 2. [ ] Núcleo: `Collection` y `View::Collection` (videos, capturas,
        panorámicas, editadas, raw) en meses, páginas y `Scope`; lista de
        patrones de capturas en un solo sitio; pruebas.
