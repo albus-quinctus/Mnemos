@@ -12,6 +12,9 @@
 //!
 //! Spec 019, tarea 12: importar, indexar, sacar la miniatura, exportar y
 //! organizar vídeos tampoco tocan sus originales.
+//!
+//! Spec 021, tarea 8: Explorar, sus colecciones y los recuerdos solo leen la
+//! base de datos.
 
 #![cfg(test)]
 
@@ -336,4 +339,46 @@ fn los_videos_no_se_tocan() {
     }
 
     assert_eq!(estado(raiz.path()), antes, "se ha tocado un original");
+}
+
+#[test]
+fn explorar_no_toca_los_originales() {
+    let (_origen, raiz, lib, fotos) = biblioteca();
+    let antes = estado(raiz.path());
+    let ahora = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+
+    let explorar = lib.explore(ahora).unwrap();
+    // Las fotos recién importadas salen, al menos, en «Añadidas recientemente».
+    assert!(!explorar.collections.is_empty());
+
+    // Cada colección y cada recuerdo se abren como una vista más.
+    let mut vistas: Vec<View> = mnemos_core::Collection::ALL
+        .into_iter()
+        .map(View::Collection)
+        .collect();
+    vistas.extend(explorar.memories.iter().map(|m| View::Range {
+        desde: m.desde,
+        hasta: m.hasta,
+    }));
+    // Un rango que cubre todas las fotos de prueba.
+    let fechas = fotos.iter().map(|f| f.1);
+    vistas.push(View::Range {
+        desde: fechas.clone().min().unwrap(),
+        hasta: fechas.max().unwrap() + 1,
+    });
+    for vista in vistas {
+        lib.view_months(vista).unwrap();
+        lib.view_page(vista, None, 100).unwrap();
+        lib.select_all(Scope::View(vista)).unwrap();
+    }
+
+    drop(lib);
+    assert_eq!(
+        estado(raiz.path()),
+        antes,
+        "Explorar ha cambiado un original"
+    );
 }
