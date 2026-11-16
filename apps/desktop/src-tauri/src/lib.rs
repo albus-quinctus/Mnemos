@@ -6,6 +6,7 @@ mod duplicados;
 #[cfg(target_os = "linux")]
 mod entorno_linux;
 mod etiquetas;
+mod explorar;
 mod exportacion;
 mod media;
 mod organizacion;
@@ -721,7 +722,8 @@ pub fn run() {
             etiquetas::poner_etiqueta,
             etiquetas::quitar_etiqueta,
             etiquetas::etiquetas_de_foto,
-            etiquetas::uso_etiquetas
+            etiquetas::uso_etiquetas,
+            explorar::explorar
         ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar MNEMOS");
