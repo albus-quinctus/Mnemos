@@ -233,12 +233,17 @@ elemento:
        equipo) y en `biblioteca.ts`: `explorar()`, `Explorar`, `Recuerdo`,
        `TarjetaColeccion`, `Coleccion` y `Vista` con `{ coleccion }` y
        `{ rango: { desde, hasta } }`.
-6. [ ] Pantalla Explorar (`lib/explorar/`): entrada del menú, filas con
+6. [x] Pantalla Explorar (`lib/explorar/`): entrada del menú, filas con
        desplazamiento horizontal y flechas, tarjetas, estados vacíos;
-       `Seccion` gana `explorar` en `navegacion.svelte.ts`.
-7. [ ] Abrir una colección o un recuerdo: cabecera con «Explorar» para volver,
+       `Seccion` gana `explorar` en `navegacion.svelte.ts`. `Explorar.svelte`,
+       `Tira.svelte` (fila con flechas), `estado.svelte.ts` y textos en
+       `explorar.ts`.
+7. [x] Abrir una colección o un recuerdo: cabecera con «Explorar» para volver,
        cuadrícula con selección y visor, `Esc`, cabeceras «Importadas el …» en
-       Añadidas recientemente, recarga tras cambios.
+       Añadidas recientemente, recarga tras cambios. `navegacion.explorar`
+       guarda la vista y el título (`abrirEnExplorar`); `CabeceraColeccion.svelte`
+       cuenta los elementos con `vistaMeses`. Capturas de la pantalla real
+       (con datos de prueba) en `capturas/021-real-*.png`.
 8. [ ] `tests/originales_intactos.rs` y sección «Explorar» en
        `docs/arquitectura.md`.
 9. [ ] Probarlo en la app real con la biblioteca del disco (Paulo).
