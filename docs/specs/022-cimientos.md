@@ -100,10 +100,9 @@ condiciones parciales (`archived_at`, `favorite`, `trashed_at IS NULL`).
   expresión de hoy (`unixepoch(taken_at, 'unixepoch', 'localtime')`, y la
   fecha de modificación si no hay fecha de captura), con la zona del equipo
   que aplica la migración. Así, nada se mueve el primer día.
-- `mnemos index` y «Volver a indexar» (si existe en la app; si no, solo la
-  línea de órdenes) recalculan `taken_local` y `taken_offset` desde los
+- `mnemos index` (la app no tiene todavía un botón para reindexar) recalcula `taken_local` y `taken_offset` desde los
   originales y los `.json` del Takeout, leyéndolos y sin escribir en ellos.
-  Respetan la fecha a mano: solo cambian la automática de reserva.
+  Respeta la fecha a mano: solo cambia la automática de reserva.
 - La importación y «Guardar como copia» (spec 009) rellenan las columnas
   nuevas; la copia hereda las del original.
 
