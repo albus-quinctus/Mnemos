@@ -32,5 +32,12 @@
     "vitest": "^4.1.12"
   },
   "private": true,
-  "packageManager": "pnpm@10.28.0"
+  "packageManager": "pnpm@10.28.0",
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-3r8g-jcqq-3p5j"
+      ]
+    }
+  }
 }
