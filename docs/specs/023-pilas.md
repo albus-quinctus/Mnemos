@@ -66,6 +66,13 @@ Nunca se apilan solas:
   desapiló;
 - fotos archivadas con fotos sin archivar, ni fotos de la Papelera.
 
+### Guardar como copia (decidido por Paulo el 23 nov)
+- La copia que crea «Guardar como copia» (spec 009) se apila con su original,
+  con la copia de portada. Si el original no estaba en una pila, se crea una
+  de tipo «Editada»; si ya lo estaba, la copia entra en esa pila.
+- Va en la misma transacción que la copia. «Deshacer» o desapilar dejan la
+  copia suelta, como hoy.
+
 Una foto importada más tarde se une a una pila que ya existe si cumple su
 regla (por ejemplo, el RAW que se importa días después de su JPEG).
 
@@ -257,8 +264,8 @@ CREATE INDEX photos_stack ON photos (stack_id) WHERE stack_id IS NOT NULL;
   de la original; portada, la última.
 - **Fechas a mano** (spec 011) distintas dentro de una pila: la tarjeta va por
   la fecha de la portada; la vista de la pila enseña cada una con la suya.
-- **Guardar como copia** (spec 009): la copia no entra sola en ninguna pila
-  (ver «Pregunta para Paulo»).
+- **Guardar como copia** de una foto que ya es una copia o que está en una
+  pila: la copia nueva entra en esa misma pila y pasa a ser la portada.
 - **Restaurar** desde la Papelera una foto que salió de su pila: vuelve
   suelta. Deshacer justo después sí la devuelve a la pila.
 - **Pilas enormes** (una ráfaga de 200 fotos): la tira se desplaza y carga
@@ -320,12 +327,11 @@ CREATE INDEX photos_stack ON photos (stack_id) WHERE stack_id IS NOT NULL;
 - **027 (parecidas)**: su botón «Apilar» usa `stack(ids)` de esta spec.
 - **Migración**: 0018 reservada.
 
-## Pregunta para Paulo
-- **Guardar como copia** (spec 009): ¿la copia editada entra en una pila con
-  su original, como la editada de Google Fotos? Propuesta: **sí**, con la
-  copia como portada, para que la cuadrícula no tenga dos fotos casi iguales.
-  Hoy la copia sale como una foto suelta al lado del original; hasta que se
-  decida, sigue así.
+## Decisiones de Paulo (23 nov)
+1. Las acciones sobre una pila afectan a toda la pila, salvo al abrirla y
+   actuar sobre una foto.
+2. «Guardar como copia» (spec 009) apila la copia editada con su original,
+   con la copia de portada.
 
 ## Tareas (≤1 h cada una)
 1. [ ] Capturas del diseño (insignia en la cuadrícula, tira del visor, vista
@@ -346,15 +352,17 @@ CREATE INDEX photos_stack ON photos (stack_id) WHERE stack_id IS NOT NULL;
        papelera (con eliminar para siempre y vaciado), álbumes, etiquetas y
        exportar; salir de la pila al archivar o tirar una sola foto;
        deshacer; pruebas de cada fila de la tabla.
-7. [ ] Tauri: comandos nuevos, argumento `alcance`, agrupación al abrir una
+7. [ ] `mnemos-core`: «Guardar como copia» apila la copia con su original
+       (portada, la copia); pruebas con original suelto y ya apilado.
+8. [ ] Tauri: comandos nuevos, argumento `alcance`, agrupación al abrir una
        biblioteca con fotos pendientes (en segundo plano); pruebas.
-8. [ ] Interfaz: insignia en la cuadrícula, recuento «(7 fotos)» en la barra
+9. [ ] Interfaz: insignia en la cuadrícula, recuento «(7 fotos)» en la barra
        de selección, «Apilar» y «Desapilar», avisos; pruebas.
-9. [ ] Interfaz: tira del visor, `Mayús` + flechas, `S`, «Abrir pila», línea
-       en Detalles; pruebas.
-10. [ ] Interfaz: vista de la pila con alcance «foto», «Usar como portada»,
+10. [ ] Interfaz: tira del visor, `Mayús` + flechas, `S`, «Abrir pila», línea
+        en Detalles; pruebas.
+11. [ ] Interfaz: vista de la pila con alcance «foto», «Usar como portada»,
         Duplicados con la marca «En una pila»; pruebas.
-11. [ ] `tests/originales_intactos.rs` (apilar, desapilar, portada, agrupación
+12. [ ] `tests/originales_intactos.rs` (apilar, desapilar, portada, agrupación
         automática y acciones sobre pilas sin tocar originales) y sección
         «Pilas» en `docs/arquitectura.md`.
-12. [ ] Probarlo en la app real con la biblioteca del disco (Paulo).
+13. [ ] Probarlo en la app real con la biblioteca del disco (Paulo).
