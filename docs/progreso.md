@@ -37,6 +37,6 @@ Decisiones pendientes de Paulo: cuántas copias diarias de la base guardar (prop
 - Caché en disco de vistas grandes para el visor, si la precarga se queda corta (puede entrar en la 022 si la prueba de 10 000 fotos lo pide).
 - Medir las miniaturas JPEG con fotos reales del HDD (`medir_miniaturas`).
 - Probar el extractor de vistas previas con RAW reales de cada marca (ARW, PEF, SRW, ORF antiguos).
-- `pnpm audit`: 3 fallos leves de `@sveltejs/kit` y `cookie` que solo afectan al servidor; actualizar SvelteKit cuando haya versión corregida.
+- Pasar a SvelteKit 3: el aviso GHSA-3r8g-jcqq-3p5j (solo servidor, la app es estática) se omite en `pnpm audit` hasta entonces (PR #138). Quedan además fallos leves de `@sveltejs/kit` y `cookie` que solo afectan al servidor.
 - Revisar e instalar las skills de `docs/skills.md`.
 - Después de la 1.0: mapa sin conexión, panorámicas 360°, modo solo lectura, etiquetas jerárquicas, aprendizaje automático local, prueba en Android.
