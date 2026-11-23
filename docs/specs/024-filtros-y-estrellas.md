@@ -29,7 +29,7 @@ etiquetas.
   etiqueta de MNEMOS (spec 016): se crea si no existe (sin distinguir
   mayúsculas, como hoy) y se añade a la foto. Se recortan espacios, se
   descartan las vacías y las de más de 100 caracteres. Las jerárquicas
-  (`lr:hierarchicalSubject`) no se leen.
+  (`lr:hierarchicalSubject`) no se leen. Decidido por Paulo el 23 nov.
 - **Cámara y objetivo** del EXIF (marca y modelo juntos, y objetivo), con la
   misma función que ya usa el panel Detalles (`camera_info`, spec 011). De un
   vídeo, la marca y el modelo de su contenedor (spec 019).
@@ -248,12 +248,10 @@ fusionarla.
 - **Migración**: 0019 reservada; si otra spec cambia `photos` a la vez, se
   revisa el orden en `db.rs` al fusionar.
 
-## Preguntas para Paulo
-1. **Palabras clave a etiquetas automáticamente.** Propuesta: sí, al importar
-   (como los álbumes de Takeout se convierten en álbumes). La alternativa es
-   que solo sirvan para buscar, sin aparecer como etiquetas.
-2. ~~**Estrellas en las miniaturas.**~~ Decidido el 23 nov: sí, «★ 4» pequeño
-   solo en las fotos valoradas.
+## Decisiones de Paulo (23 nov)
+1. Las palabras clave del XMP se importan como etiquetas de MNEMOS, solo en la
+   base de datos y sin tocar los originales.
+2. Las miniaturas enseñan «★ N» pequeño solo en las fotos valoradas.
 
 ## Tareas (≤1 h cada una)
 1. [ ] Capturas del diseño (estrellas en el visor y en Detalles, menú «Valorar»
