@@ -79,7 +79,8 @@ etiquetas.
   «Deshacer», que devuelve a cada foto el valor que tenía.
 - Las miniaturas enseñan las estrellas solo si la foto tiene alguna: «★ 4»
   pequeño en la esquina inferior izquierda, sobre el mismo degradado que la
-  duración de los vídeos (se decide con las capturas del diseño).
+  duración de los vídeos (decidido por Paulo el 23 nov; la posición exacta se
+  ve en las capturas del diseño).
 - «Seleccionar todo» seguido de «Valorar» usa el mismo `Scope` que el resto de
   acciones por lotes (spec 006).
 
@@ -251,9 +252,8 @@ fusionarla.
 1. **Palabras clave a etiquetas automáticamente.** Propuesta: sí, al importar
    (como los álbumes de Takeout se convierten en álbumes). La alternativa es
    que solo sirvan para buscar, sin aparecer como etiquetas.
-2. **Estrellas en las miniaturas.** Propuesta: «★ 4» pequeño solo en las fotos
-   valoradas. La alternativa es no enseñarlas en la cuadrícula y verlas solo en
-   el visor.
+2. ~~**Estrellas en las miniaturas.**~~ Decidido el 23 nov: sí, «★ 4» pequeño
+   solo en las fotos valoradas.
 
 ## Tareas (≤1 h cada una)
 1. [ ] Capturas del diseño (estrellas en el visor y en Detalles, menú «Valorar»
@@ -274,7 +274,7 @@ fusionarla.
        la barra del visor y en Detalles, teclas `0` a `5`, aviso con
        «Deshacer»; pruebas de la interfaz.
 7. [ ] Barra de selección y cuadrícula: «Valorar», teclas con selección,
-       estrellas en las miniaturas (según la pregunta 2); pruebas.
+       «★ N» en las miniaturas valoradas; pruebas.
 8. [ ] `mnemos-core` (espera a la hora local de la 022): `SearchFilters` en
        `search_filter`, `filter_options`, índices si hacen falta; pruebas de
        cada filtro y de combinaciones; medida con 10 000 fotos en
