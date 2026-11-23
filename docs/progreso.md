@@ -12,15 +12,15 @@ Orden acordado el 23 nov. Los números de migración están reservados para que 
 
 | Spec | Contenido | Migración | Estado |
 |---|---|---|---|
-| 022 | Cimientos: copias de la base, restaurar, hora local de captura, comprobar biblioteca | 0016, 0017 | Escribiendo la spec |
-| 023 | Pilas (RAW+JPEG, ráfagas, «-editado») | 0018 | Espera: qué hacen las acciones sobre una pila |
-| 024 | Filtros de búsqueda y estrellas (XMP de solo lectura) | 0019 | Escribiendo la spec; los filtros por fecha esperan a la hora local de la 022 |
+| 022 | Cimientos: copias de la base, restaurar, hora local de captura, comprobar biblioteca | 0016, 0017 | Spec en PR #139, esperando aprobación |
+| 023 | Pilas (RAW+JPEG, ráfagas, «-editado») | 0018 | Spec en PR #141, esperando aprobación |
+| 024 | Filtros de búsqueda y estrellas (XMP de solo lectura) | 0019 | Spec en PR #140, esperando aprobación; los filtros por fecha esperan a la hora local de la 022 |
 | 025 | Live Photos y fotos con movimiento | 0020 | Espera la prueba de vídeos en Sway |
 | 026 | Lugares sin conexión (Explorar fase B) y cola de trabajos | — | F4, después |
 | 027 | Duplicados parecidos | — | F4, después |
 | 028 | Diapositivas, carpetas y archivos grandes | — | F4, después |
 
-Decisiones pendientes de Paulo: cuántas copias diarias de la base guardar (propuesta: 7) y si las acciones sobre una pila afectan a toda la pila o solo a la portada.
+Decisiones de Paulo (23 nov): 7 copias diarias de la base; las acciones sobre una pila afectan a toda la pila; «Guardar como copia» apila la copia con su original; las palabras clave del XMP se importan como etiquetas; estrellas en las miniaturas.
 
 ## Pruebas de Paulo pendientes (app real, HDD)
 - Vídeos en Sway (spec 019, tarea 13): PR #135 (registro del error) y #136 (abrir con el programa del sistema), en borrador. Su resultado decide si hace falta una spec de `ffmpeg` antes de la 025.
@@ -37,6 +37,6 @@ Decisiones pendientes de Paulo: cuántas copias diarias de la base guardar (prop
 - Caché en disco de vistas grandes para el visor, si la precarga se queda corta (puede entrar en la 022 si la prueba de 10 000 fotos lo pide).
 - Medir las miniaturas JPEG con fotos reales del HDD (`medir_miniaturas`).
 - Probar el extractor de vistas previas con RAW reales de cada marca (ARW, PEF, SRW, ORF antiguos).
-- Pasar a SvelteKit 3: el aviso GHSA-3r8g-jcqq-3p5j (solo servidor, la app es estática) se omite en `pnpm audit` hasta entonces (PR #138). Quedan además fallos leves de `@sveltejs/kit` y `cookie` que solo afectan al servidor.
+- Pasar a SvelteKit 3: el aviso GHSA-3r8g-jcqq-3p5j (solo servidor, la app es estática) se omite en `pnpm audit` hasta entonces (PR #138, fusionado). Quedan además fallos leves de `@sveltejs/kit` y `cookie` que solo afectan al servidor.
 - Revisar e instalar las skills de `docs/skills.md`.
 - Después de la 1.0: mapa sin conexión, panorámicas 360°, modo solo lectura, etiquetas jerárquicas, aprendizaje automático local, prueba en Android.
