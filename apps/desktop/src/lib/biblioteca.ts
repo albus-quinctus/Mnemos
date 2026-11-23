@@ -52,7 +52,18 @@ export type Vista =
   | "archivo"
   | "papelera"
   | { etiqueta: number }
-  | { album: number };
+  | { album: number }
+  | { coleccion: Coleccion }
+  | { rango: { desde: number; hasta: number } };
+
+/** Colecciones automáticas de Explorar (spec 021). */
+export type Coleccion =
+  | "videos"
+  | "capturas"
+  | "panoramicas"
+  | "editadas"
+  | "raw"
+  | "recientes";
 
 // Dónde se selecciona: una vista o los resultados de una búsqueda.
 export type Ambito = { vista: Vista } | { busqueda: string };
@@ -278,6 +289,30 @@ export function exportarVarias(
 
 export function cancelarExportacion(): Promise<void> {
   return invoke("cancelar_exportacion");
+}
+
+// Copiar, descargar y «Guardar como…» (spec 020). Copiar devuelve `false`
+// si mientras tanto se pidió otra copia, que es la que queda. Descargar y
+// guardar devuelven la ruta del archivo creado.
+export function copiarImagen(id: number): Promise<boolean> {
+  return invoke("copiar_imagen", { id });
+}
+
+export function descargar(id: number): Promise<string> {
+  return invoke("descargar", { id });
+}
+
+/** Lote de la spec 017 hacia Descargas; devuelve la carpeta. */
+export function descargarVarias(ids: number[]): Promise<string> {
+  return invoke("descargar_varias", { ids });
+}
+
+export function guardarComo(id: number, ruta: string): Promise<string> {
+  return invoke("guardar_como", { id, ruta });
+}
+
+export function mostrarEnCarpeta(ruta: string): Promise<void> {
+  return invoke("mostrar_en_carpeta", { ruta });
 }
 
 // Editor no destructivo (spec 009). La geometría es la de la receta
@@ -568,4 +603,40 @@ export function anadirAAlbum(album: number, ids: number[]): Promise<number[]> {
 /** Devuelve las fotos que estaban, para «Deshacer». */
 export function quitarDeAlbum(album: number, ids: number[]): Promise<number[]> {
   return invoke("quitar_de_album", { album, ids });
+}
+
+// Explorar (spec 021).
+
+/** Tarjeta de Recuerdos: fotos de esta semana de hace `years_ago` años. */
+export interface Recuerdo {
+  years_ago: number;
+  /** Rango `[desde, hasta)` en segundos Unix, para la vista `{ rango }`. */
+  desde: number;
+  hasta: number;
+  photos: number;
+  cover: number;
+  cover_edit_version: number | null;
+}
+
+export interface TarjetaColeccion {
+  collection: Coleccion;
+  photos: number;
+  cover: number;
+  cover_edit_version: number | null;
+  /** Duración de la portada si es un vídeo. */
+  cover_duration_ms: number | null;
+  /** Solo en «Añadidas recientemente»: segundos Unix de la última importación. */
+  last_import: number | null;
+}
+
+export interface Explorar {
+  memories: Recuerdo[];
+  collections: TarjetaColeccion[];
+  /** Las 10 etiquetas con más fotos. */
+  tags: Etiqueta[];
+  tags_total: number;
+}
+
+export function explorar(): Promise<Explorar> {
+  return invoke("explorar");
 }

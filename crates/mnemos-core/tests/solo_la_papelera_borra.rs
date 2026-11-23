@@ -54,6 +54,16 @@ const PERMITIDAS: &[(&str, &str, &str)] = &[
         "exportación fuera de la biblioteca",
     ),
     (
+        "export.rs",
+        "fs::remove_file(&part)",
+        "temporal de «Guardar como», fuera de la biblioteca",
+    ),
+    (
+        "export.rs",
+        "fs::rename(&part, &dest)",
+        "«Guardar como»: temporal al archivo elegido, fuera de la biblioteca",
+    ),
+    (
         "import.rs",
         "fs::remove_file(&part)",
         "temporal de la importación",

@@ -32,16 +32,21 @@
     alternarFavoritos,
     enviarSeleccionAPapelera,
     esTeclaPapelera,
+    mostrarAviso,
     registrarFotos,
   } from "$lib/seleccion/acciones.svelte";
   import { fechas } from "$lib/visor/fechas.svelte";
   import Visor from "$lib/visor/Visor.svelte";
+  import { copiarImagen } from "$lib/biblioteca";
+  import { copiaTexto, esTeclaCopiar, esTeclaDescargar, mayuscula } from "$lib/copiar/copiar";
+  import { descargarSeleccion } from "$lib/exportacion/exportacion.svelte";
   import BarraMeses from "./BarraMeses.svelte";
   import { cargarTitulos } from "./titulos.svelte";
   import TituloDia from "./TituloDia.svelte";
   import { diaDe, disponer, nombreDia, visibles, type Opciones } from "./disposicion";
   import { cuandoSeEliminan, enviadasEl } from "$lib/papelera/fechas";
   import { borrado, pedirEliminar, pedirVaciar } from "$lib/papelera/papelera.svelte";
+  import { coleccionDe, esVistaExplorar, importadasEl } from "$lib/explorar/explorar";
 
   // Con `texto`, la cuadrícula muestra solo los resultados de esa búsqueda.
   // `onSalir` se llama con Esc cuando el visor no está abierto.
@@ -59,11 +64,15 @@
   const pedirFotos = (despues: Cursor | null, limite: number) =>
     texto ? buscarFotos(texto, despues, limite) : vistaFotos(vista, despues, limite);
   // En la búsqueda, en Favoritos, en un álbum y en una etiqueta salen
-  // archivadas: llevan la caja.
+  // archivadas: llevan la caja. Las vistas de Explorar no las incluyen.
   const marcaArchivadas = $derived(
-    texto !== "" || vista === "favoritos" || typeof vista === "object",
+    texto !== "" ||
+      vista === "favoritos" ||
+      (typeof vista === "object" && !esVistaExplorar(vista)),
   );
   const papelera = $derived(!texto && vista === "papelera");
+  // Añadidas recientemente agrupa por el día de importación (spec 021).
+  const recientes = $derived(!texto && coleccionDe(vista) === "recientes");
 
   const PAGINA = 500;
   // Margen por encima y por debajo de la pantalla que también se pinta, para
@@ -135,6 +144,19 @@
       e.preventDefault();
       return;
     }
+    // Copiar y descargar la selección (spec 020), salvo en la Papelera.
+    if (haySeleccion() && vista !== "papelera") {
+      if (esTeclaCopiar(e) && !copiaTexto(e.target, String(window.getSelection() ?? ""))) {
+        e.preventDefault();
+        void copiarSeleccion();
+        return;
+      }
+      if (esTeclaDescargar(e)) {
+        e.preventDefault();
+        void descargarSeleccion([...seleccion.ids]);
+        return;
+      }
+    }
     // Con selección, F marca favoritos, Mayús + A archiva y Supr envía a la
     // Papelera, como en el visor.
     if (!haySeleccion() || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -143,6 +165,21 @@
     else if (esTeclaPapelera(e) && vista !== "papelera") enviarSeleccionAPapelera();
     else return;
     e.preventDefault();
+  }
+
+  // Con una sola foto seleccionada, Ctrl + C la copia (spec 020).
+  async function copiarSeleccion() {
+    const ids = [...seleccion.ids];
+    if (ids.length !== 1) {
+      mostrarAviso({ texto: "Solo se puede copiar una foto a la vez", error: true });
+      return;
+    }
+    mostrarAviso({ texto: "Copiando…" });
+    try {
+      if (await copiarImagen(ids[0])) mostrarAviso({ texto: "Imagen copiada" });
+    } catch (e) {
+      mostrarAviso({ texto: mayuscula(String(e)), error: true });
+    }
   }
 
   // Archivar desde el visor: en Fotos la foto deja de estar y el visor pasa a
@@ -401,6 +438,11 @@
         <p class="titulo">Ninguna foto tiene esta etiqueta</p>
         <p>Ve a Fotos, selecciona algunas y pulsa «Etiquetar».</p>
       </div>
+    {:else if esVistaExplorar(vista)}
+      <div class="sin-resultados">
+        <p class="titulo">Aquí ya no queda nada</p>
+        <p>Las fotos archivadas o enviadas a la papelera no salen en Explorar.</p>
+      </div>
     {:else if vista === "archivo"}
       <p class="aviso">
         No hay nada archivado. Las fotos archivadas no salen en Fotos, pero siguen en tu
@@ -442,6 +484,8 @@
               {#if papelera}
                 <span class="fecha">{enviadasEl(titulo.dia)}</span>
                 <span class="quedan">· {cuandoSeEliminan(titulo.dia)}</span>
+              {:else if recientes}
+                <span class="fecha">{importadasEl(titulo.dia)}</span>
               {:else}
                 <span class="fecha">{nombreDia(titulo.dia)}</span>
                 <TituloDia dia={titulo.dia} />

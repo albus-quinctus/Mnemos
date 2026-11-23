@@ -2,13 +2,17 @@
   // Visor a pantalla completa, estilo Cuarto oscuro (decisión 003). Muestra al
   // instante la miniatura ampliada y la cambia por la foto completa en cuanto
   // carga. La anterior y la siguiente se precargan en memoria.
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import { destino } from "$lib/exportacion/exportacion.svelte";
   import { onDestroy } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import {
     abrirConOtraAplicacion,
     camara as pedirCamara,
+    copiarImagen,
+    descargar as descargarFoto,
+    guardarComo as guardarFotoComo,
+    mostrarEnCarpeta,
     copiasIdenticas,
     datosVideo,
     detalles as pedirDetalles,
@@ -26,6 +30,16 @@
     type TamanoExportacion,
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
+  import {
+    carpetaDe,
+    copiaTexto,
+    esTeclaCopiar,
+    esTeclaDescargar,
+    esTeclaGuardarComo,
+    mayuscula,
+    nombreDe,
+    unir,
+  } from "$lib/copiar/copiar";
   import { avisarCambio } from "$lib/cambios.svelte";
   import { lineaCompartida } from "$lib/editor/compartida";
   import Editor from "$lib/editor/Editor.svelte";
@@ -412,14 +426,83 @@
     foto ? (editadasAhora.get(foto.id) ?? foto.edit_version !== null) : false,
   );
   let exportando = $state(false);
-  let mensaje = $state<{ texto: string; error: boolean } | null>(null);
+  // `ruta`: archivo recién guardado, para «Mostrar en la carpeta».
+  let mensaje = $state<{ texto: string; error: boolean; ruta?: string } | null>(null);
   let menu = $state<HTMLDivElement>();
   let temporizador: ReturnType<typeof setTimeout> | undefined;
 
-  function avisar(texto: string, error: boolean) {
+  function avisar(texto: string, error: boolean, ruta?: string) {
     clearTimeout(temporizador);
-    mensaje = { texto, error };
-    temporizador = setTimeout(() => (mensaje = null), error ? 8000 : 5000);
+    mensaje = { texto, error, ruta };
+    temporizador = setTimeout(() => (mensaje = null), error || ruta ? 8000 : 5000);
+  }
+
+  // Copiar, descargar y «Guardar como…» (spec 020), desde el menú, el clic
+  // derecho o el teclado.
+  let contextual = $state<{ x: number; y: number } | null>(null);
+
+  function cerrarMenus() {
+    menuExportar = false;
+    contextual = null;
+  }
+
+  async function copiar() {
+    cerrarMenus();
+    if (!foto || enPapelera) return;
+    if (esVideo) return avisar("Los vídeos no se pueden copiar", true);
+    clearTimeout(temporizador);
+    mensaje = { texto: "Copiando…", error: false };
+    try {
+      if (await copiarImagen(foto.id)) avisar("Imagen copiada", false);
+    } catch (e) {
+      avisar(mayuscula(String(e)), true);
+    }
+  }
+
+  async function descargar() {
+    cerrarMenus();
+    if (!foto || enPapelera || exportando) return;
+    exportando = true;
+    try {
+      const ruta = await descargarFoto(foto.id);
+      avisar(`Guardada en Descargas · ${nombreDe(ruta)}`, false, ruta);
+    } catch (e) {
+      avisar(mayuscula(String(e)), true);
+    } finally {
+      exportando = false;
+    }
+  }
+
+  async function guardarComo() {
+    cerrarMenus();
+    if (!foto || enPapelera || exportando) return;
+    const id = foto.id;
+    const elegida = await save({
+      title: "Guardar como",
+      defaultPath: unir(destino.ultima, foto.name),
+    });
+    if (typeof elegida !== "string") return;
+    destino.ultima = carpetaDe(elegida) || destino.ultima;
+    exportando = true;
+    try {
+      const ruta = await guardarFotoComo(id, elegida);
+      avisar(`Guardada en ${ruta}`, false, ruta);
+    } catch (e) {
+      avisar(mayuscula(String(e)), true);
+    } finally {
+      exportando = false;
+    }
+  }
+
+  function abrirContextual(e: MouseEvent) {
+    if (!foto || enPapelera || enEditor) return;
+    e.preventDefault();
+    menuExportar = false;
+    // Que no se salga de la ventana.
+    contextual = {
+      x: Math.min(e.clientX, window.innerWidth - 300),
+      y: Math.min(e.clientY, window.innerHeight - 160),
+    };
   }
 
   async function exportarComo(tamano: TamanoExportacion) {
@@ -447,6 +530,9 @@
 
   function alPulsarFuera(e: PointerEvent) {
     if (menuExportar && menu && !menu.contains(e.target as Node)) menuExportar = false;
+    if (contextual && !(e.target as HTMLElement | null)?.closest?.(".contextual")) {
+      contextual = null;
+    }
   }
 
   onDestroy(() => clearTimeout(temporizador));
@@ -542,9 +628,20 @@
   }
 
   function alPulsar(e: KeyboardEvent) {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
     // El editor tiene sus propias teclas.
     if (enEditor) return;
+    if (!enPapelera && esTeclaCopiar(e)) {
+      if (copiaTexto(e.target, String(window.getSelection() ?? ""))) return;
+      e.preventDefault();
+      void copiar();
+      return;
+    }
+    if (!enPapelera && esTeclaGuardarComo(e)) {
+      e.preventDefault();
+      void guardarComo();
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     // Mientras se escribe la fecha, las teclas son del formulario.
     if (editando && e.target instanceof HTMLElement && e.target.closest(".editar-fecha")) {
       if (e.key === "Escape") {
@@ -555,8 +652,9 @@
     }
     // Mientras se escribe una etiqueta, las teclas son del campo.
     if (e.target instanceof HTMLElement && e.target.closest(".etiquetas-foto input")) return;
-    if (e.key === "Escape" && menuExportar) menuExportar = false;
+    if (e.key === "Escape" && (menuExportar || contextual)) cerrarMenus();
     else if (e.key === "Escape") onCerrar();
+    else if (!enPapelera && esTeclaDescargar(e)) void descargar();
     else if (e.key === "i" || e.key === "I") panel = !panel;
     else if (enPapelera && esTeclaPapelera(e)) {
       if (foto && !borrado.enCurso) onEliminar?.(foto.id);
@@ -589,6 +687,25 @@
   let visor = $state<HTMLDivElement>();
   $effect(() => visor?.focus());
 </script>
+
+{#if contextual}
+  <div
+    class="menu contextual"
+    role="menu"
+    aria-label="Acciones de la foto"
+    style="left: {contextual.x}px; top: {contextual.y}px"
+  >
+    <button type="button" role="menuitem" disabled={esVideo} onclick={copiar}>
+      <b>Copiar imagen <kbd>Ctrl + C</kbd></b>
+    </button>
+    <button type="button" role="menuitem" onclick={descargar}>
+      <b>Descargar <kbd>Mayús + D</kbd></b>
+    </button>
+    <button type="button" role="menuitem" onclick={guardarComo}>
+      <b>Guardar como… <kbd>Ctrl + Mayús + S</kbd></b>
+    </button>
+  </div>
+{/if}
 
 <svelte:window onkeydown={alPulsar} onpointerdown={alPulsarFuera} />
 
@@ -648,17 +765,31 @@
         type="button"
         class="boton"
         class:activo={menuExportar}
-        aria-label="Exportar"
+        aria-label="Copiar, descargar o exportar"
         aria-haspopup="menu"
         aria-expanded={menuExportar}
-        title="Exportar"
+        title="Copiar, descargar o exportar"
         disabled={exportando}
         onclick={() => (menuExportar = !menuExportar)}
       >
         <Icono nombre="exportar" />
       </button>
       {#if menuExportar}
-        <div class="menu" role="menu" aria-label="Exportar">
+        <div class="menu" role="menu" aria-label="Copiar, descargar o exportar">
+          <button type="button" role="menuitem" disabled={esVideo} onclick={copiar}>
+            <b>Copiar imagen <kbd>Ctrl + C</kbd></b>
+            <span>{esVideo ? "Los vídeos no se pueden copiar" : "Para pegarla en otra aplicación"}</span>
+          </button>
+          <button type="button" role="menuitem" onclick={descargar}>
+            <b>Descargar <kbd>Mayús + D</kbd></b>
+            <span>{conEdicion ? "A Descargas, con las ediciones" : "A Descargas, el archivo tal cual"}</span>
+          </button>
+          <button type="button" role="menuitem" onclick={guardarComo}>
+            <b>Guardar como… <kbd>Ctrl + Mayús + S</kbd></b>
+            <span>Eliges carpeta y nombre</span>
+          </button>
+          <hr />
+          <p class="titulo-menu">Exportar a una carpeta</p>
           <button type="button" role="menuitem" onclick={() => exportarComo("original")}>
             Tamaño original
             <span>
@@ -731,7 +862,7 @@
     </button>
   </header>
 
-  <div class="escenario">
+  <div class="escenario" role="presentation" oncontextmenu={abrirContextual}>
     {#if foto}
       {#key foto.id}
         {#if esVideo && !noReproducible}
@@ -778,10 +909,20 @@
       {/if}
     {/if}
     {#if exportando}
-      <p class="aviso mensaje" role="status">Exportando…</p>
+      <p class="aviso mensaje" role="status">Guardando…</p>
     {:else if mensaje}
       <p class="aviso mensaje" class:error={mensaje.error} role={mensaje.error ? "alert" : "status"}>
         {mensaje.texto}
+        {#if mensaje.ruta}
+          {@const ruta = mensaje.ruta}
+          <button
+            type="button"
+            class="enlace"
+            onclick={() => mostrarEnCarpeta(ruta).catch((e) => avisar(String(e), true))}
+          >
+            Mostrar en la carpeta
+          </button>
+        {/if}
       </p>
     {/if}
 
@@ -1198,7 +1339,7 @@
     right: 0;
     z-index: 1;
     display: grid;
-    min-width: 260px;
+    min-width: 320px;
     padding: 6px;
     border-radius: var(--radio);
     background: var(--visor-superficie);
@@ -1222,6 +1363,58 @@
   .menu button:focus-visible {
     background: var(--visor-fondo);
     outline: none;
+  }
+
+  .menu b {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    white-space: nowrap;
+    font-weight: inherit;
+  }
+
+  .menu kbd {
+    color: var(--visor-texto-suave);
+    font: inherit;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .menu hr {
+    width: 100%;
+    margin: 6px 0;
+    border: 0;
+    border-top: 1px solid var(--visor-fondo);
+  }
+
+  .titulo-menu {
+    margin: 2px 12px;
+    color: var(--visor-texto-suave);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .menu button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .contextual {
+    position: fixed;
+    right: auto;
+    z-index: 20;
+    min-width: 280px;
+  }
+
+  .enlace {
+    margin-left: 12px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #7aa7f5;
+    font: inherit;
+    cursor: pointer;
   }
 
   .menu span {

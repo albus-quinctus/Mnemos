@@ -1,5 +1,6 @@
 <script lang="ts">
   // Progreso y resumen de una exportación de varias fotos (spec 017).
+  import { mostrarEnCarpeta } from "$lib/biblioteca";
   import { cancelarExportacion, cerrarExportacion, exportacion } from "./exportacion.svelte";
 
   const evento = $derived(exportacion.actual);
@@ -9,9 +10,11 @@
   const titulo = $derived.by(() => {
     if (!evento) return "";
     const { estado, total, guardadas, hechas } = evento;
-    if (estado === "en_curso") return `Exportando ${n(Math.min(hechas + 1, total))} de ${n(total)}…`;
-    if (estado === "cancelada") return "Exportación cancelada";
-    if (estado === "detenida") return "Se detuvo la exportación";
+    const accion = exportacion.descarga ? "Descargando" : "Exportando";
+    const nombre = exportacion.descarga ? "descarga" : "exportación";
+    if (estado === "en_curso") return `${accion} ${n(Math.min(hechas + 1, total))} de ${n(total)}…`;
+    if (estado === "cancelada") return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} cancelada`;
+    if (estado === "detenida") return `Se detuvo la ${nombre}`;
     if (guardadas === total) return total === 1 ? "Foto guardada" : `${n(total)} fotos guardadas`;
     return `${n(guardadas)} de ${n(total)} guardadas`;
   });
@@ -60,6 +63,15 @@
         {#if evento.saltadas.length > 0}
           <button type="button" class="secundario" aria-expanded={verSaltadas} onclick={() => (verSaltadas = !verSaltadas)}>
             {verSaltadas ? "Ocultar" : "Ver"}
+          </button>
+        {/if}
+        {#if evento.guardadas > 0}
+          <button
+            type="button"
+            class="secundario"
+            onclick={() => evento && mostrarEnCarpeta(evento.ruta ?? evento.carpeta).catch(() => {})}
+          >
+            Mostrar en la carpeta
           </button>
         {/if}
         <button type="button" onclick={cerrarExportacion}>Cerrar</button>

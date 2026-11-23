@@ -9,6 +9,7 @@ use rusqlite::params_from_iter;
 use rusqlite::types::Value;
 use serde::{Deserialize, Serialize};
 
+use crate::collections::Collection;
 use crate::error::Result;
 use crate::library::Library;
 
@@ -65,6 +66,14 @@ pub enum View {
     /// Las fotos de un álbum, archivadas o no (spec 014).
     #[serde(rename = "album")]
     Album(i64),
+    /// Una colección automática de Explorar, sin archivadas (spec 021).
+    #[serde(rename = "coleccion")]
+    Collection(Collection),
+    /// Las fotos con fecha de captura en `[desde, hasta)` (segundos Unix),
+    /// sin archivadas: un recuerdo de Explorar (spec 021). Las fotos sin
+    /// fecha de captura no salen.
+    #[serde(rename = "rango")]
+    Range { desde: i64, hasta: i64 },
 }
 
 impl View {
@@ -92,6 +101,16 @@ impl View {
                           AND id IN (SELECT photo_id FROM album_photos WHERE album_id = ?)"
                         .to_owned(),
                     params: vec![Value::from(album)],
+                    order: DATE,
+                };
+            }
+            View::Collection(collection) => return collection.filter(),
+            View::Range { desde, hasta } => {
+                return Filter {
+                    sql: " AND archived_at IS NULL AND trashed_at IS NULL \
+                          AND taken_at >= ? AND taken_at < ?"
+                        .to_owned(),
+                    params: vec![Value::from(desde), Value::from(hasta)],
                     order: DATE,
                 };
             }

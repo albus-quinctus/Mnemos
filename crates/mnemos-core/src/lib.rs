@@ -4,12 +4,14 @@
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
 pub mod albums;
+pub mod collections;
 mod copies;
 pub mod day_titles;
 pub mod db;
 pub mod duplicates;
 pub mod edits;
 pub mod error;
+pub mod explore;
 pub mod export;
 pub mod export_many;
 mod files;
@@ -28,12 +30,14 @@ pub mod timeline;
 pub mod trash;
 
 pub use albums::{Album, MAX_ALBUM_NAME};
+pub use collections::Collection;
 pub use day_titles::{DayTitle, MAX_DAY_TITLE};
 pub use duplicates::{
     DuplicateCopy, DuplicateCursor, DuplicateGroup, DuplicatePage, DuplicateSummary,
 };
 pub use edits::{EditSummary, EditVersion, StoredRecipe};
 pub use error::{Error, Result};
+pub use explore::{CollectionCard, Explore, Memory};
 pub use export::ExportSize;
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
