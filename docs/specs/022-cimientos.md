@@ -136,16 +136,18 @@ donde se migra.
   se avisa (no se guarda una copia mala).
 - Fechas en el día del equipo; el nombre solo sirve para ordenar y leer.
 
-#### Cuántas se guardan · PENDIENTE DE PAULO
-> **Pregunta abierta:** cuántas copias diarias guardar. Propuesta: las
-> **7 diarias** más recientes, las **3 últimas de antes de migrar** y las
-> **3 últimas de antes de restaurar**. Con 10 000 fotos la base ocupa unos
-> 10–20 MB, así que 13 copias son unos 250 MB como mucho.
->
-> Hasta que Paulo conteste **no se implementa el borrado de copias**: las
-> tareas guardan todas. La tarea de retención (tarea 7) queda en espera.
+#### Cuántas se guardan
+Decidido por Paulo el 2026-11-23:
+- Las **7 copias diarias** más recientes.
+- Las **3 últimas de antes de migrar**.
+- Las **3 últimas de antes de restaurar**.
 
-Cuando se implemente, la limpieza solo borra archivos de `.mnemos/copias/`
+Con 10 000 fotos la base ocupa unos 10–20 MB, así que 13 copias son unos
+250 MB como mucho. Cada tipo se cuenta por separado: una copia de antes de
+migrar nunca desplaza a una diaria. La limpieza se hace justo después de
+guardar una copia nueva y buena, nunca antes.
+
+La limpieza solo borra archivos de `.mnemos/copias/`
 con los nombres de arriba; nunca otros archivos ni nada fuera de esa carpeta.
 
 #### Comprobación al abrir
@@ -311,7 +313,8 @@ las colecciones (spec 021).
 - [ ] Ajustes enseña copias y comprobación según el diseño aprobado.
 - [ ] Los originales no se modifican (prueba automática ampliada a copias,
       restauración y comprobación).
-- [ ] Retención de copias: según lo que decida Paulo (pendiente).
+- [ ] Se guardan las 7 diarias, las 3 de antes de migrar y las 3 de antes de
+      restaurar más recientes; la limpieza no toca ningún otro archivo.
 
 ## Fuera de alcance
 - Copias de los originales o de las miniaturas a otro disco (una spec de
@@ -339,10 +342,11 @@ Hora local
 
 Copias
 5. [ ] Núcleo: copia diaria al abrir y copia antes de migrar (escritura en
-       `tmp/`, `quick_check` de la copia, nombres), sin borrar ninguna.
+       `tmp/`, `quick_check` de la copia, nombres).
 6. [ ] Núcleo: `quick_check` al abrir y error claro de base dañada; pantalla de
        base dañada en la app.
-7. [ ] *(En espera de Paulo)* Retención de copias.
+7. [ ] Retención de copias (7 diarias, 3 antes de migrar, 3 antes de
+       restaurar).
 8. [ ] Núcleo y línea de órdenes: listar copias y restaurar (`mnemos copias`,
        `mnemos restaurar … --confirmar`).
 
