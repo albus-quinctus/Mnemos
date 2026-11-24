@@ -4,16 +4,6 @@ import type { CopiaDuplicada, GrupoDuplicado, ResumenDuplicados } from "$lib/bib
 import { nombreDia } from "$lib/cuadricula/disposicion";
 import { tamano } from "$lib/visor/formato";
 
-function dosCifras(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** Segundos Unix → "2024-08-17" en hora local, como agrupa la cuadrícula. */
-export function diaLocal(segundos: number): string {
-  const d = new Date(segundos * 1000);
-  return `${d.getFullYear()}-${dosCifras(d.getMonth() + 1)}-${dosCifras(d.getDate())}`;
-}
-
 /** "Originales/2024/08/IMG.jpg" → carpeta "Originales/2024/08/" y nombre "IMG.jpg". */
 export function separarRuta(ruta: string): { carpeta: string; nombre: string } {
   const corte = ruta.lastIndexOf("/") + 1;
@@ -29,17 +19,17 @@ export function textoResumen(r: ResumenDuplicados): string {
 
 /** Fecha de una copia: "Sáb, 17 ago 2024". */
 export function fechaCopia(c: CopiaDuplicada, hoy = new Date()): string {
-  return nombreDia(diaLocal(c.date), hoy);
+  return nombreDia(c.day, hoy);
 }
 
 /** Las copias de un grupo como fotos para el visor. */
 export function fotosDelGrupo(g: GrupoDuplicado): FotoCuadricula[] {
   return g.copies.map((c) => {
-    const dia = diaLocal(c.date);
     return {
       id: c.id,
       name: separarRuta(c.rel_path).nombre,
-      month: dia.slice(0, 7),
+      month: c.day.slice(0, 7),
+      day: c.day,
       date: c.date,
       width: null,
       height: null,

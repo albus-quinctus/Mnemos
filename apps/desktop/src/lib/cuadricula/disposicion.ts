@@ -63,12 +63,12 @@ export function proporcion(foto: Pick<FotoCuadricula, "width" | "height">): numb
   return Math.min(PROPORCION_MAX, Math.max(PROPORCION_MIN, width / height));
 }
 
-/** Día local de una foto: "2026-10-20". */
-export function diaDe(foto: Pick<FotoCuadricula, "date">): string {
-  const d = new Date(foto.date * 1000);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
+/**
+ * Día en que va una foto: "2026-10-20". Lo calcula el núcleo con la hora local
+ * de captura (spec 022), no con la zona de este equipo.
+ */
+export function diaDe(foto: Pick<FotoCuadricula, "day">): string {
+  return foto.day;
 }
 
 interface FilaDia {

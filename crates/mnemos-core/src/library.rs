@@ -236,8 +236,9 @@ impl Library {
     }
 
     /// Pone a mano la fecha de captura de la foto `id` (spec 011). `local` es
-    /// la hora local `AAAA-MM-DD hh:mm[:ss]`, que se pasa a UTC con la zona del
-    /// equipo, como el EXIF sin desfase. La fecha automática que tenía se
+    /// la hora local `AAAA-MM-DD hh:mm[:ss]`: es la hora local de captura
+    /// (spec 022) y se pasa a UTC con la zona del equipo, como el EXIF sin
+    /// desfase. La fecha automática que tenía se
     /// guarda para poder volver a ella. Solo cambia la base de datos.
     /// Devuelve `false` si la foto no existe.
     pub fn set_manual_taken(&self, id: i64, local: &str) -> Result<bool> {
@@ -251,8 +252,14 @@ impl Library {
                                          ELSE taken_at END,
                     taken_auto_source = CASE WHEN taken_source = '{m}' THEN taken_auto_source
                                              ELSE taken_source END,
+                    taken_auto_local = CASE WHEN taken_source = '{m}' THEN taken_auto_local
+                                            ELSE taken_local END,
+                    taken_auto_offset = CASE WHEN taken_source = '{m}' THEN taken_auto_offset
+                                             ELSE taken_offset END,
                     taken_at = unixepoch(?2, 'utc'),
-                    taken_source = '{m}'
+                    taken_source = '{m}',
+                    taken_local = unixepoch(?2),
+                    taken_offset = NULL
                  WHERE id = ?1",
                 m = taken::MANUAL
             ),
@@ -268,7 +275,11 @@ impl Library {
             &format!(
                 "UPDATE photos SET
                     taken_at = taken_auto_at, taken_source = taken_auto_source,
-                    taken_auto_at = NULL, taken_auto_source = NULL
+                    taken_local = coalesce(taken_auto_local,
+                        unixepoch(coalesce(taken_auto_at, modified_at), 'unixepoch', 'localtime')),
+                    taken_offset = taken_auto_offset,
+                    taken_auto_at = NULL, taken_auto_source = NULL,
+                    taken_auto_local = NULL, taken_auto_offset = NULL
                  WHERE id = ?1 AND taken_source = '{}'",
                 taken::MANUAL
             ),
