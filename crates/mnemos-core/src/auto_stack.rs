@@ -1,13 +1,15 @@
-//! Agrupación automática de pilas (spec 023): reglas 1 (RAW + JPEG) y 2
-//! (editada de Google Fotos).
+//! Agrupación automática de pilas (spec 023): RAW + JPEG, editada de Google
+//! Fotos, ráfaga por el nombre y ráfaga por la cámara, en ese orden.
 //!
 //! Cada foto se examina una sola vez (`stack_auto_at`). Las reglas buscan
 //! pareja también entre las fotos ya examinadas de la misma carpeta, pero un
 //! grupo solo se apila si alguna de sus fotos está pendiente. Así, lo que el
-//! usuario desapila no vuelve a apilarse solo. Solo se mira la base de datos:
-//! los originales no se tocan.
+//! usuario desapila no vuelve a apilarse solo. Se mira la base de datos y,
+//! para la regla 4, la cámara del EXIF de las candidatas: los originales solo
+//! se leen.
 
 use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 use std::time::SystemTime;
 
 use rusqlite::{Connection, params};
@@ -23,10 +25,15 @@ const EDITED_SUFFIXES: &[&str] = &["-editada", "-editado", "-edited"];
 /// Diferencia máxima, sin llegar, entre las fechas de un RAW y su JPEG.
 const RAW_JPEG_MAX_SECS: i64 = 2;
 
+/// Diferencia máxima entre dos fotos seguidas de una ráfaga por la cámara.
+const BURST_MAX_SECS: i64 = 1;
+
 /// Lo que las reglas necesitan saber de cada foto.
 #[derive(Debug)]
 struct Row {
     id: i64,
+    /// Ruta relativa a la raíz, para leer la cámara.
+    rel: String,
     /// Nombre sin extensión, en minúsculas.
     stem: String,
     raw: bool,
@@ -43,14 +50,22 @@ impl Library {
     /// examinado y las marca como examinadas, todo en una transacción.
     /// Devuelve cuántas pilas se han creado o ampliado.
     pub fn auto_stack_pending(&mut self) -> Result<usize> {
+        let root = self.root.clone();
         let tx = self.conn.transaction()?;
-        let changed = auto_stack(&tx)?;
+        let changed = auto_stack(&tx, &mut |rel| camera_of(&root, rel))?;
         tx.commit()?;
         Ok(changed)
     }
 }
 
-fn auto_stack(conn: &Connection) -> Result<usize> {
+/// Marca y modelo del EXIF del original, o `None` si no se pueden leer.
+fn camera_of(root: &Path, rel: &str) -> Option<String> {
+    mnemos_imaging::camera_info(&root.join(rel))?.camera
+}
+
+/// La agrupación sobre una conexión ya en transacción. `camera` da la cámara
+/// de una foto por su ruta relativa.
+fn auto_stack(conn: &Connection, camera: &mut dyn FnMut(&str) -> Option<String>) -> Result<usize> {
     let pending: bool = conn.query_row(
         "SELECT EXISTS (SELECT 1 FROM photos WHERE stack_auto_at IS NULL)",
         [],
@@ -65,6 +80,8 @@ fn auto_stack(conn: &Connection) -> Result<usize> {
         if rows.iter().any(|r| r.pending) {
             changed += raw_jpeg(conn, rows, now)?;
             changed += edited(conn, rows, now)?;
+            changed += burst_by_name(conn, rows, now)?;
+            changed += burst_by_camera(conn, rows, now, camera)?;
         }
     }
     conn.execute(
@@ -93,6 +110,7 @@ fn folders(conn: &Connection) -> Result<BTreeMap<String, Vec<Row>>> {
         let ext = ext.to_lowercase();
         let row = Row {
             id: r.get(0)?,
+            rel: rel.clone(),
             stem: stem.to_lowercase(),
             raw: mnemos_imaging::RAW_EXTENSIONS.contains(&ext.as_str()),
             taken: r.get(2)?,
@@ -217,6 +235,153 @@ fn edited(conn: &Connection, rows: &mut [Row], now: i64) -> Result<usize> {
         changed += 1;
     }
     Ok(changed)
+}
+
+/// Regla 3: fotos con el mismo trozo `BURST` en el nombre. En los Pixel y
+/// otros Android, `…_BURST20190312123456789…`: la marca de tiempo tras `BURST`
+/// es la misma y lo de delante cambia. En los Samsung, `20161016_141543_Burst01`:
+/// lo de delante es lo mismo y tras `Burst` va el número de la foto. Portada:
+/// la que lleva `_COVER`; si ninguna, la primera por nombre.
+fn burst_by_name(conn: &Connection, rows: &mut [Row], now: i64) -> Result<usize> {
+    let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, row) in rows.iter().enumerate() {
+        if row.stack.is_none()
+            && let Some(key) = burst_key(&row.stem)
+        {
+            groups.entry(key).or_default().push(i);
+        }
+    }
+    let mut changed = 0;
+    for members in groups.into_values() {
+        if members.len() < 2 || !stackable(rows, &members) {
+            continue;
+        }
+        let cover = members
+            .iter()
+            .copied()
+            .find(|&i| rows[i].stem.contains("_cover"))
+            .unwrap_or(members[0]);
+        burst(conn, rows, &members, cover, now)?;
+        changed += 1;
+    }
+    Ok(changed)
+}
+
+/// Lo que comparten los nombres de una ráfaga, o `None` si no es de ráfaga.
+fn burst_key(stem: &str) -> Option<String> {
+    let at = stem.find("burst")?;
+    let digits = stem[at + 5..]
+        .bytes()
+        .take_while(u8::is_ascii_digit)
+        .count();
+    match digits {
+        0 => None,
+        // Marca de tiempo compartida (Pixel).
+        8.. => Some(stem[at..at + 5 + digits].to_owned()),
+        // Número de la foto (Samsung): cuenta lo de delante.
+        _ => Some(stem[..at + 5].to_owned()),
+    }
+}
+
+/// Regla 4: fotos de la misma cámara con números de archivo seguidos
+/// (`IMG_4501`, `IMG_4502`) y 0 o 1 s entre cada una y la siguiente. Hacen
+/// falta al menos 2 y fecha de captura. La cámara solo se lee de las fotos
+/// que ya cumplen el nombre y la fecha. Portada: la primera.
+fn burst_by_camera(
+    conn: &Connection,
+    rows: &mut [Row],
+    now: i64,
+    camera: &mut dyn FnMut(&str) -> Option<String>,
+) -> Result<usize> {
+    // Por prefijo y ancho del número, las fotos sueltas con fecha.
+    let mut series: BTreeMap<(String, usize), Vec<(u64, usize)>> = BTreeMap::new();
+    for (i, row) in rows.iter().enumerate() {
+        if row.stack.is_some() || row.taken.is_none() {
+            continue;
+        }
+        if let Some((prefix, width, number)) = file_number(&row.stem) {
+            series
+                .entry((prefix.to_owned(), width))
+                .or_default()
+                .push((number, i));
+        }
+    }
+    let mut cameras: HashMap<usize, Option<String>> = HashMap::new();
+    let mut changed = 0;
+    for mut serie in series.into_values() {
+        serie.sort_unstable();
+        let mut run: Vec<usize> = Vec::new();
+        for k in 0..serie.len() {
+            let (number, i) = serie[k];
+            let linked = k > 0 && {
+                let (prev_number, prev) = serie[k - 1];
+                let gap = rows[i].taken.unwrap_or(0) - rows[prev].taken.unwrap_or(0);
+                number == prev_number + 1
+                    && (0..=BURST_MAX_SECS).contains(&gap)
+                    && rows[i].archived == rows[prev].archived
+                    && {
+                        let a = cameras
+                            .entry(prev)
+                            .or_insert_with(|| camera(&rows[prev].rel))
+                            .clone();
+                        let b = cameras
+                            .entry(i)
+                            .or_insert_with(|| camera(&rows[i].rel))
+                            .clone();
+                        a.is_some() && a == b
+                    }
+            };
+            if !linked {
+                changed += close_run(conn, rows, &run, now)?;
+                run.clear();
+            }
+            run.push(i);
+        }
+        changed += close_run(conn, rows, &run, now)?;
+    }
+    Ok(changed)
+}
+
+/// Apila una serie de la regla 4 si tiene al menos 2 fotos y alguna pendiente.
+fn close_run(conn: &Connection, rows: &mut [Row], run: &[usize], now: i64) -> Result<usize> {
+    if run.len() < 2 || !run.iter().any(|&i| rows[i].pending) {
+        return Ok(0);
+    }
+    burst(conn, rows, run, run[0], now)?;
+    Ok(1)
+}
+
+/// `img_4501` → (`img_`, 4, 4501). `None` si el nombre no acaba en cifras.
+fn file_number(stem: &str) -> Option<(&str, usize, u64)> {
+    let width = stem.bytes().rev().take_while(u8::is_ascii_digit).count();
+    if width == 0 || width > 18 {
+        return None;
+    }
+    let (prefix, digits) = stem.split_at(stem.len() - width);
+    Some((prefix, width, digits.parse().ok()?))
+}
+
+/// Alguna pendiente y todas en el mismo sitio (archivadas o no).
+fn stackable(rows: &[Row], members: &[usize]) -> bool {
+    let archived = rows[members[0]].archived;
+    members.iter().any(|&i| rows[i].pending)
+        && members.iter().all(|&i| rows[i].archived == archived)
+}
+
+/// Crea una pila de ráfaga y la apunta en `rows`.
+fn burst(
+    conn: &Connection,
+    rows: &mut [Row],
+    members: &[usize],
+    cover: usize,
+    now: i64,
+) -> Result<()> {
+    let ids: Vec<i64> = members.iter().map(|&i| rows[i].id).collect();
+    let stack = create(conn, StackKind::Burst, rows[cover].id, &ids, now)?;
+    for &i in members {
+        rows[i].stack = Some(stack);
+    }
+    Ok(())
 }
 
 /// Crea una pila automática con esas fotos y esa portada.
@@ -453,6 +618,146 @@ mod tests {
             .unwrap();
         assert_eq!(agrupar(&mut lib), 0);
         assert_eq!(pendientes(&lib), 0);
+    }
+
+    /// Agrupa con estas cámaras por nombre de archivo, sin leer el disco.
+    fn agrupar_con(lib: &mut Library, camaras: &[(&str, &str)]) -> usize {
+        let camaras: HashMap<String, String> = camaras
+            .iter()
+            .map(|(f, c)| (format!("Originales/2026/10/{f}"), (*c).to_owned()))
+            .collect();
+        let tx = lib.conn.transaction().unwrap();
+        let n = auto_stack(&tx, &mut |rel| camaras.get(rel).cloned()).unwrap();
+        tx.commit().unwrap();
+        let problemas = invariant_violations(&lib.conn);
+        assert!(problemas.is_empty(), "{problemas:?}");
+        n
+    }
+
+    fn a(path: &str, segundos: i64) -> Foto<'_> {
+        Foto {
+            path,
+            taken: Some(BASE + segundos),
+        }
+    }
+
+    #[test]
+    fn rafaga_de_pixel_con_la_portada_marcada() {
+        let (_dir, mut lib) = library(&[
+            foto("00000IMG_00000_BURST20190312123456789.jpg"),
+            foto("00001IMG_00001_BURST20190312123456789_COVER.jpg"),
+            foto("00002IMG_00002_BURST20190312123456789.jpg"),
+            // Otra ráfaga, sin portada marcada: la primera por nombre.
+            foto("00000IMG_00000_BURST20190312999999999.jpg"),
+            foto("00001IMG_00001_BURST20190312999999999.jpg"),
+        ]);
+        assert_eq!(agrupar(&mut lib), 2);
+        assert_eq!(
+            pilas(&lib),
+            vec![
+                ("rafaga".into(), 2, vec![1, 2, 3]),
+                ("rafaga".into(), 4, vec![4, 5]),
+            ]
+        );
+    }
+
+    #[test]
+    fn rafaga_de_samsung_por_el_nombre() {
+        let (_dir, mut lib) = library(&[
+            foto("20161016_141543_Burst01.jpg"),
+            foto("20161016_141543_Burst02.jpg"),
+            foto("20161016_141543_Burst03.jpg"),
+            foto("20161016_141600_Burst01.jpg"),
+        ]);
+        assert_eq!(agrupar(&mut lib), 1);
+        assert_eq!(pilas(&lib), vec![("rafaga".into(), 1, vec![1, 2, 3])]);
+    }
+
+    #[test]
+    fn rafaga_de_iphone_por_la_camara_el_numero_y_el_segundo() {
+        let iphone = "Apple iPhone 12";
+        let (_dir, mut lib) = library(&[
+            a("IMG_4501.HEIC", 0),
+            a("IMG_4502.HEIC", 0),
+            a("IMG_4503.HEIC", 1),
+            // Dos segundos después: ya no es la misma ráfaga.
+            a("IMG_4504.HEIC", 3),
+            a("IMG_4505.HEIC", 3),
+            // Número saltado.
+            a("IMG_4507.HEIC", 3),
+        ]);
+        let camaras: Vec<(&str, &str)> = [
+            "IMG_4501.HEIC",
+            "IMG_4502.HEIC",
+            "IMG_4503.HEIC",
+            "IMG_4504.HEIC",
+            "IMG_4505.HEIC",
+            "IMG_4507.HEIC",
+        ]
+        .into_iter()
+        .map(|f| (f, iphone))
+        .collect();
+        assert_eq!(agrupar_con(&mut lib, &camaras), 2);
+        assert_eq!(
+            pilas(&lib),
+            vec![
+                ("rafaga".into(), 1, vec![1, 2, 3]),
+                ("rafaga".into(), 4, vec![4, 5]),
+            ]
+        );
+    }
+
+    #[test]
+    fn rafaga_por_la_camara_pide_la_misma_camara_y_fecha() {
+        let (_dir, mut lib) = library(&[
+            a("DSC01234.JPG", 0),
+            a("DSC01235.JPG", 1),
+            // Sin cámara conocida.
+            a("P1000001.JPG", 0),
+            a("P1000002.JPG", 0),
+            // Sin fecha.
+            Foto {
+                path: "IMG_0001.JPG",
+                taken: None,
+            },
+            Foto {
+                path: "IMG_0002.JPG",
+                taken: None,
+            },
+        ]);
+        let camaras = [
+            ("DSC01234.JPG", "SONY ILCE-7M3"),
+            ("DSC01235.JPG", "Canon EOS 80D"),
+            ("IMG_0001.JPG", "Canon EOS 80D"),
+            ("IMG_0002.JPG", "Canon EOS 80D"),
+        ];
+        assert_eq!(agrupar_con(&mut lib, &camaras), 0);
+        assert!(pilas(&lib).is_empty());
+    }
+
+    #[test]
+    fn la_rafaga_por_la_camara_no_toca_las_pilas_raw_jpeg() {
+        let canon = "Canon EOS 80D";
+        let (_dir, mut lib) = library(&[
+            a("IMG_0001.CR2", 0),
+            a("IMG_0001.JPG", 0),
+            a("IMG_0002.CR2", 1),
+            a("IMG_0002.JPG", 1),
+        ]);
+        let camaras = [
+            ("IMG_0001.CR2", canon),
+            ("IMG_0001.JPG", canon),
+            ("IMG_0002.CR2", canon),
+            ("IMG_0002.JPG", canon),
+        ];
+        assert_eq!(agrupar_con(&mut lib, &camaras), 2);
+        assert_eq!(
+            pilas(&lib),
+            vec![
+                ("raw_jpeg".into(), 2, vec![1, 2]),
+                ("raw_jpeg".into(), 4, vec![3, 4]),
+            ]
+        );
     }
 
     #[test]
