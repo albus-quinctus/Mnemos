@@ -18,11 +18,17 @@ ALTER TABLE photos ADD COLUMN taken_offset INTEGER;
 ALTER TABLE photos ADD COLUMN taken_auto_local INTEGER;
 ALTER TABLE photos ADD COLUMN taken_auto_offset INTEGER;
 
+-- 1 mientras la hora local sea la de reserva que pone esta migración y falte
+-- leer del original la hora de la cámara y su desfase. `mnemos index` la
+-- afina y la pone a 0; las fotos nuevas ya entran con la buena.
+ALTER TABLE photos ADD COLUMN taken_local_pending INTEGER NOT NULL DEFAULT 0;
+
 -- Relleno con lo que se veía hasta ahora (la zona del equipo que migra): el
--- primer día no se mueve nada. `mnemos index` afina con el desfase del EXIF.
+-- primer día no se mueve nada.
 UPDATE photos SET
     taken_local = unixepoch(coalesce(taken_at, modified_at), 'unixepoch', 'localtime'),
-    taken_auto_local = unixepoch(taken_auto_at, 'unixepoch', 'localtime');
+    taken_auto_local = unixepoch(taken_auto_at, 'unixepoch', 'localtime'),
+    taken_local_pending = 1;
 
 -- Quien escriba `taken_at` o `modified_at` sin dar la hora local (una fila
 -- nueva sin ella, o un UPDATE que no la toca) recibe la de reserva: la del
