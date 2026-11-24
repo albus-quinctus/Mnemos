@@ -28,6 +28,11 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0014_papelera.sql"),
     // Vídeos (spec 019).
     include_str!("migrations/0015_videos.sql"),
+    // Hora local de captura (spec 022).
+    include_str!("migrations/0016_hora_local.sql"),
+    // Valoración, cámara y objetivo (spec 024). Va después de la 0016, que se
+    // fusionó antes.
+    include_str!("migrations/0019_valoracion_y_camara.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -600,5 +605,64 @@ mod tests {
 
         assert!(es_danada(open(&path)));
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn la_migracion_de_hora_local_rellena_lo_que_ya_se_veia() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        let antes = MIGRATIONS
+            .iter()
+            .position(|m| m.contains("Hora local de captura (spec 022)"))
+            .unwrap();
+        {
+            let mut conn = Connection::open(&path).unwrap();
+            for (i, sql) in MIGRATIONS[..antes].iter().enumerate() {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", i as u32 + 1)
+                    .unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute_batch(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at, taken_at)
+                 VALUES ('con.jpg', 1, 5, 1, 1721014200);
+                 INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at)
+                 VALUES ('sin.jpg', 1, 1700000000, 1);
+                 INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at, taken_at,
+                                     taken_source, taken_auto_at, taken_auto_source)
+                 VALUES ('mano.jpg', 1, 5, 1, 1600000000, 'manual', 1721014200, 'exif');",
+            )
+            .unwrap();
+        }
+        let conn = open(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), SCHEMA_VERSION);
+        let local = |secs: i64| -> i64 {
+            conn.query_row(
+                "SELECT unixepoch(?1, 'unixepoch', 'localtime')",
+                [secs],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        let fila = |rel: &str| -> (Option<i64>, Option<i64>, Option<i64>) {
+            let (local, offset, auto, pending): (_, _, _, i64) = conn
+                .query_row(
+                    "SELECT taken_local, taken_offset, taken_auto_local, taken_local_pending
+                     FROM photos WHERE rel_path = ?1",
+                    [rel],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                )
+                .unwrap();
+            // Queda pendiente de afinar con `mnemos index`.
+            assert_eq!(pending, 1, "{rel}");
+            (local, offset, auto)
+        };
+        assert_eq!(fila("con.jpg"), (Some(local(1_721_014_200)), None, None));
+        assert_eq!(fila("sin.jpg"), (Some(local(1_700_000_000)), None, None));
+        assert_eq!(
+            fila("mano.jpg"),
+            (Some(local(1_600_000_000)), None, Some(local(1_721_014_200)))
+        );
     }
 }

@@ -143,3 +143,15 @@ Imagen del visor (lado mayor de 2560 px) y miniatura de una foto sintética de 2
 |---|---|
 | Resumen y primera página de 50 grupos | 4,5 ms |
 | Recorrer los 1000 grupos de 50 en 50 | 49 ms en total |
+
+### Hora local de captura en el núcleo, 10 000 fotos (2026-11-24)
+Spec 022, tareas 1 y 2: la línea de tiempo ordena y agrupa por `taken_local`
+(migración 0016), sin `'localtime'` en cada fila.
+
+| Paso | Antes | Ahora |
+|---|---|---|
+| Meses de la barra lateral | 7 ms | 2,5 ms |
+| Recorrer toda la cuadrícula en páginas de 500 | 20 ms; página más lenta, 1,6 ms | 13 ms; página más lenta, 0,7 ms |
+| Favoritos: meses y primera página | 13 ms | 3,0 ms |
+| Papelera: meses y primera página | 4,7 ms | 3,9 ms |
+

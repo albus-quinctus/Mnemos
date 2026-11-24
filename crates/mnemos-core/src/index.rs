@@ -12,7 +12,7 @@ use crate::error::Result;
 use crate::files::{hash_file, is_hidden, unix_secs};
 use crate::library::{Library, ORIGINALS_DIR};
 use crate::paths::RelPath;
-use crate::taken::{Taken, set_taken, taken_at_sql};
+use crate::taken::{Taken, set_taken, taken_at_sql, taken_local_sql};
 
 /// Resultado de indexar la biblioteca.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
@@ -90,6 +90,9 @@ impl Library {
         // guarda qué versión se ve, y se recalcula aquí (spec 009).
         Library::sync_edit_versions(&tx, &self.root)?;
         tx.commit()?;
+        // Valoración, palabras clave y cámara de las fotos que aún no se han
+        // leído, también las importadas antes de la spec 024.
+        self.read_pending_metadata()?;
 
         report.missing = known.keys().filter(|k| !seen.contains(*k)).count() as u64;
         Ok(report)
@@ -262,8 +265,8 @@ pub(crate) struct NewPhoto<'a> {
     pub taken: Taken,
 }
 
-/// Registra una foto nueva y la añade al índice de búsqueda.
-pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -> Result<()> {
+/// Registra una foto nueva y la añade al índice de búsqueda. Devuelve su id.
+pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -> Result<i64> {
     let NewPhoto {
         size,
         modified,
@@ -271,14 +274,16 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
         props,
         ref taken,
     } = *photo;
-    let (exact, local) = taken.sql_params();
+    let p = taken.sql_params();
+    let at = taken_at_sql(8, 9);
     conn.execute(
         &format!(
             "INSERT INTO photos
                  (rel_path, size_bytes, modified_at, content_hash, width, height, orientation,
-                  imported_at, taken_at, taken_source, media_kind, duration_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {}, ?10, ?11, ?12)",
-            taken_at_sql(8, 9)
+                  imported_at, taken_at, taken_source, media_kind, duration_ms,
+                  taken_local, taken_offset)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {at}, ?10, ?11, ?12, {local}, ?14)",
+            local = taken_local_sql(13, &at, "?3")
         ),
         params![
             rel.as_str(),
@@ -288,11 +293,13 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
             props.dims.map(|d| d.0),
             props.dims.map(|d| d.1),
             props.orientation,
-            exact,
-            local,
+            p.exact,
+            p.local,
             taken.source.as_str(),
             props.kind(),
-            props.duration_ms.and_then(|d| i64::try_from(d).ok())
+            props.duration_ms.and_then(|d| i64::try_from(d).ok()),
+            p.wall,
+            p.offset
         ],
     )?;
     let id = conn.last_insert_rowid();
@@ -300,7 +307,7 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
         "INSERT INTO photo_search (rowid, rel_path, tags) VALUES (?1, ?2, '')",
         params![id, rel.as_str()],
     )?;
-    Ok(())
+    Ok(id)
 }
 
 /// Indica si ya hay una foto con esta huella.
