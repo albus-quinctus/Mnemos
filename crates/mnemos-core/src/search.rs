@@ -180,10 +180,10 @@ impl Library {
                 (format!("{year}-{month:02}-{day:02}"), "+1 day")
             }
         };
-        // El periodo va en hora local; 'utc' lo pasa a segundos UTC, que es
-        // como se guardan las fechas. Así la consulta usa el índice por fecha.
+        // El periodo va en hora local de captura, como `DATE` (spec 022):
+        // segundos de pared sin zona. Así la consulta usa el índice por fecha.
         let (from, to): (i64, i64) = self.conn.query_row(
-            "SELECT unixepoch(?1, 'utc'), unixepoch(?1, ?2, 'utc')",
+            "SELECT unixepoch(?1), unixepoch(?1, ?2)",
             params![start, span],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )?;
@@ -205,8 +205,8 @@ impl Library {
         .chain(filter.params.iter().cloned());
         let year = self.conn.query_row(
             &format!(
-                "SELECT max(strftime('%Y', {DATE}, 'unixepoch', 'localtime')) FROM photos
-                 WHERE strftime(?, {DATE}, 'unixepoch', 'localtime') = ? {}",
+                "SELECT max(strftime('%Y', {DATE}, 'unixepoch')) FROM photos
+                 WHERE strftime(?, {DATE}, 'unixepoch') = ? {}",
                 filter.sql
             ),
             params_from_iter(params),

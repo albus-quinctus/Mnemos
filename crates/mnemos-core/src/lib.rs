@@ -18,6 +18,7 @@ mod files;
 pub mod import;
 pub mod index;
 pub mod library;
+mod metadata;
 mod organize;
 pub mod paths;
 pub mod search;
