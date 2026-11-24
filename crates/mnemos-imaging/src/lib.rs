@@ -4,7 +4,8 @@
 //! genera miniaturas. Lee del EXIF la fecha de captura y los datos de cámara
 //! para el panel de información, y define las recetas de edición no
 //! destructiva (spec 009). De los vídeos lee lo que dice su contenedor
-//! (spec 019).
+//! (spec 019). Lee la valoración, la descripción y las palabras clave del
+//! XMP y del EXIF sin escribir nunca en los archivos (spec 024).
 
 mod camera;
 mod capture;
@@ -13,6 +14,7 @@ mod raw;
 pub mod recipe;
 mod thumbnail;
 mod video;
+mod xmp;
 
 pub use camera::{CameraInfo, camera_info};
 pub use capture::{CaptureTime, capture_time};
@@ -30,6 +32,7 @@ pub use thumbnail::{
     thumbnail_edited, thumbnail_size,
 };
 pub use video::{VIDEO_EXTENSIONS, VideoInfo, is_video, video_info};
+pub use xmp::{XMP_MAX_BYTES, XmpData, exif_rating, parse_xmp, read_xmp, read_xmp_sidecar};
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
