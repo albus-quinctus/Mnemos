@@ -28,6 +28,8 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0014_papelera.sql"),
     // Vídeos (spec 019).
     include_str!("migrations/0015_videos.sql"),
+    // Valoración, cámara y objetivo (spec 024).
+    include_str!("migrations/0019_valoracion_y_camara.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.

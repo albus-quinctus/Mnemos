@@ -17,6 +17,7 @@ use crate::error::{Error, Result};
 use crate::files::{hash_file, is_hidden, unix_secs, year_month};
 use crate::index::{FileError, MediaProps, NewPhoto, hash_exists, insert_photo, is_media};
 use crate::library::{DATA_DIR, Library, ORIGINALS_DIR, TMP_DIR};
+use crate::metadata::{self, FileMeta};
 use crate::paths::RelPath;
 use crate::taken::{Taken, improve_taken};
 use crate::takeout::{self, Sidecars};
@@ -230,10 +231,13 @@ fn import_file(
         props,
         taken,
     };
-    insert_photo(&tx, &rel, &photo)?;
+    let id = insert_photo(&tx, &rel, &photo)?;
     if takeout::apply(&tx, &hash, takeout_meta.as_ref(), album.as_deref(), false)? {
         seen.takeout_applied.insert(hash.clone());
     }
+    // Después de Takeout: la descripción del XMP solo entra si Takeout no
+    // trae ninguna (spec 024).
+    metadata::apply(&tx, id, &FileMeta::of_file(&dest))?;
     tx.commit()?;
     seen.imported.insert(hash);
     Ok(Outcome::Copied(props.video))

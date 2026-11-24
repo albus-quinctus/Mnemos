@@ -90,6 +90,9 @@ impl Library {
         // guarda qué versión se ve, y se recalcula aquí (spec 009).
         Library::sync_edit_versions(&tx, &self.root)?;
         tx.commit()?;
+        // Valoración, palabras clave y cámara de las fotos que aún no se han
+        // leído, también las importadas antes de la spec 024.
+        self.read_pending_metadata()?;
 
         report.missing = known.keys().filter(|k| !seen.contains(*k)).count() as u64;
         Ok(report)
@@ -262,8 +265,8 @@ pub(crate) struct NewPhoto<'a> {
     pub taken: Taken,
 }
 
-/// Registra una foto nueva y la añade al índice de búsqueda.
-pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -> Result<()> {
+/// Registra una foto nueva y la añade al índice de búsqueda. Devuelve su id.
+pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -> Result<i64> {
     let NewPhoto {
         size,
         modified,
@@ -300,7 +303,7 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
         "INSERT INTO photo_search (rowid, rel_path, tags) VALUES (?1, ?2, '')",
         params![id, rel.as_str()],
     )?;
-    Ok(())
+    Ok(id)
 }
 
 /// Indica si ya hay una foto con esta huella.
