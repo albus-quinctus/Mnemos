@@ -51,6 +51,14 @@ fn main() -> ExitCode {
         Ok(true) => ExitCode::SUCCESS,
         // La operación terminó, pero algunos archivos no se pudieron procesar.
         Ok(false) => ExitCode::FAILURE,
+        Err(err @ mnemos_core::Error::DatabaseDamaged(_)) => {
+            eprintln!("Error: {err}.");
+            eprintln!(
+                "Hay copias de la base en la carpeta .mnemos/copias/ de la biblioteca. \
+                 MNEMOS no ha tocado la base dañada."
+            );
+            ExitCode::from(3)
+        }
         Err(err) => {
             eprintln!("Error: {err}");
             ExitCode::FAILURE
