@@ -272,9 +272,12 @@ fusionarla.
        app llamará en segundo plano al abrir una biblioteca antigua (tarea 6).
        La importación ya lee el XMP incrustado, después de aplicar Takeout.
        Índice parcial `photos_metadata_pending` para encontrar las pendientes.
-4. [ ] `mnemos-core`: la importación busca `foto.ext.xmp` y `foto.xmp` en la
+4. [x] `mnemos-core`: la importación busca `foto.ext.xmp` y `foto.xmp` en la
        carpeta de origen y le da prioridad; pruebas con Takeout a la vez,
-       RAW+JPEG y fotos repetidas.
+       RAW+JPEG y fotos repetidas. `metadata::sidecar_of` (también `.XMP` en
+       mayúsculas) y `FileMeta::with_sidecar`; el `.xmp` no se copia a la
+       biblioteca. Takeout y repetidas ya quedan cubiertas por la tarea 3 (la
+       descripción de Takeout se aplica antes y los metadatos se leen una vez).
 5. [ ] `mnemos-core`: `set_rating` por `Scope` y deshacer; `rating` en
        `GridPhoto` y en la información del visor; pruebas.
 6. [ ] Tauri y visor: `read_pending_metadata` en segundo plano al abrir la
