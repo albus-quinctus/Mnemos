@@ -1,6 +1,6 @@
 # 023 · Pilas
 
-- Estado: borrador
+- Estado: en curso (spec aprobada el 24 nov; capturas del diseño esperando aprobación)
 - Fase: F2 (0.5 beta)
 
 ## Qué y por qué
@@ -338,7 +338,7 @@ CREATE INDEX photos_stack ON photos (stack_id) WHERE stack_id IS NOT NULL;
        de la pila, «Apilar»/«Desapilar»/«Usar como portada», avisos, Papelera
        con una pila), en claro y oscuro (`capturas/023-*.png`), para que Paulo
        las apruebe.
-2. [ ] `mnemos-core`: migración 0018, `stacks.rs` con `stack`, `unstack`,
+2. [x] `mnemos-core`: migración 0018, `stacks.rs` con `stack`, `unstack`,
        `set_cover`, `stack_members`, deshacer y las invariantes; pruebas.
 3. [ ] `mnemos-core`: reglas 1 y 2 (RAW + JPEG y editada) en
        `auto_stack_pending`, llamado desde la importación e `index()`;
