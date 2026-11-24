@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { crearGenerador, medidasMiniatura, momentoFotograma } from "./generador";
+import {
+  crearGenerador,
+  describirErrorVideo,
+  medidasMiniatura,
+  momentoFotograma,
+} from "./generador";
 
 describe("medidasMiniatura", () => {
   it("deja 360 px de alto y respeta la proporción", () => {
@@ -83,5 +88,18 @@ describe("crearGenerador", () => {
     b.gen.parar();
     await b.gen.arrancar();
     expect(b.guardadas).toEqual([]);
+  });
+});
+
+describe("describirErrorVideo", () => {
+  it("nombra el código y añade el mensaje del motor web", () => {
+    expect(describirErrorVideo({ code: 4, message: "Unsupported source" })).toBe(
+      "MEDIA_ERR_SRC_NOT_SUPPORTED: Unsupported source",
+    );
+    expect(describirErrorVideo({ code: 3, message: "" })).toBe("MEDIA_ERR_DECODE");
+  });
+  it("un código desconocido o sin error", () => {
+    expect(describirErrorVideo({ code: 9, message: "" })).toBe("código 9");
+    expect(describirErrorVideo(null)).toBe("el motor web no puede leer este vídeo");
   });
 });

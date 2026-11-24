@@ -26,7 +26,8 @@ use crate::taken::Taken;
 /// Datos del original que pasan a la copia, además de la fecha de
 /// modificación del archivo. No pasan los álbumes ni el archivado.
 const COPIED_COLUMNS: &str = "taken_at, taken_source, taken_auto_at, taken_auto_source,
-     description, latitude, longitude, altitude, favorite";
+     description, latitude, longitude, altitude, favorite,
+     taken_local, taken_offset, taken_auto_local, taken_auto_offset";
 
 impl Library {
     /// Guarda la foto `id` con `geometry` aplicada como una foto nueva en la
