@@ -165,6 +165,10 @@ export interface Detalles {
   taken_source: string | null; // "exif", "nombre", "takeout", "nombre_dia", "manual", "ninguna" o null
   taken_auto_at: number | null; // con fecha a mano, la automática (spec 011)
   taken_auto_source: string | null;
+  taken_local: number | null; // hora que marcaba la cámara, en segundos leídos como UTC (spec 022)
+  taken_offset: number | null; // su desfase en minutos, si se sabe
+  taken_auto_local: number | null; // lo mismo para la fecha automática
+  taken_auto_offset: number | null;
   format: string; // "JPEG", "PNG", "DNG"…
   media_kind: "foto" | "video"; // spec 019
   duration_ms: number | null;

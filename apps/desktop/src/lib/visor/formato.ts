@@ -21,6 +21,8 @@ export function dimensiones(ancho: number | null, alto: number | null): string {
   return `${ancho} × ${alto} · ${megapixeles} MP`;
 }
 
+const dos = (n: number) => String(n).padStart(2, "0");
+
 /** Fecha y hora locales: "26 oct 2026, 14:03". */
 export function fecha(segundos: number): string {
   return new Date(segundos * 1000)
@@ -52,19 +54,31 @@ export function duracion(ms: number): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
-/** Fecha de captura y de dónde sale, o "Sin fecha de captura". */
+/** Desfase en minutos → "UTC−04:00", "UTC+05:45", "UTC". */
+export function desfase(minutos: number): string {
+  if (minutos === 0) return "UTC";
+  const m = Math.abs(minutos);
+  return `UTC${minutos < 0 ? "−" : "+"}${dos(Math.floor(m / 60))}:${dos(m % 60)}`;
+}
+
+/**
+ * Fecha de captura y de dónde sale, o "Sin fecha de captura". `local` es la
+ * hora que marcaba la cámara en segundos leídos como UTC (spec 022): se
+ * muestra tal cual, sin la zona de este equipo, con el desfase si se sabe.
+ */
 export function fechaCaptura(
-  segundos: number | null,
+  local: number | null,
   fuente: string | null,
+  minutos: number | null = null,
 ): { texto: string; origen: string | null } {
-  if (segundos === null) return { texto: "Sin fecha de captura", origen: null };
-  const texto =
-    fuente === "nombre_dia"
-      ? new Date(segundos * 1000)
-          .toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })
-          .replace(/\./g, "")
-      : fecha(segundos);
-  return { texto, origen: (fuente && ORIGENES[fuente]) ?? null };
+  if (local === null || fuente === null || fuente === "ninguna")
+    return { texto: "Sin fecha de captura", origen: null };
+  const opciones: Intl.DateTimeFormatOptions = { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" };
+  const soloDia = fuente === "nombre_dia";
+  if (!soloDia) Object.assign(opciones, { hour: "2-digit", minute: "2-digit" });
+  let texto = new Date(local * 1000).toLocaleString("es", opciones).replace(/\./g, "");
+  if (!soloDia && minutos !== null) texto += ` (${desfase(minutos)})`;
+  return { texto, origen: ORIGENES[fuente] ?? null };
 }
 
 // Sección Cámara del panel (spec 011).
@@ -101,14 +115,12 @@ export function coordenadas([lat, lon]: [number, number]): string {
 
 // Formulario de fecha a mano.
 
-const dos = (n: number) => String(n).padStart(2, "0");
-
-/** Segundos Unix → día y hora locales para los campos del formulario. */
-export function camposFecha(segundos: number): { dia: string; hora: string } {
-  const d = new Date(segundos * 1000);
+/** Hora local de captura (segundos leídos como UTC) → campos del formulario. */
+export function camposFecha(local: number): { dia: string; hora: string } {
+  const d = new Date(local * 1000);
   return {
-    dia: `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`,
-    hora: `${dos(d.getHours())}:${dos(d.getMinutes())}:${dos(d.getSeconds())}`,
+    dia: `${d.getUTCFullYear()}-${dos(d.getUTCMonth() + 1)}-${dos(d.getUTCDate())}`,
+    hora: `${dos(d.getUTCHours())}:${dos(d.getUTCMinutes())}:${dos(d.getUTCSeconds())}`,
   };
 }
 

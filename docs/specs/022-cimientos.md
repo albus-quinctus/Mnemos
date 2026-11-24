@@ -339,7 +339,7 @@ Hora local
        mano y «Guardar como copia».
 2. [x] Consultas de la línea de tiempo, meses, selección por día y búsqueda por
        fecha con `taken_local`; medidas con 10 000 fotos.
-3. [ ] Recuerdos, rangos y panel Detalles (hora local y desfase) con
+3. [x] Recuerdos, rangos y panel Detalles (hora local y desfase) con
        `taken_local`; pruebas con varias `TZ`.
 4. [ ] `mnemos index` recalcula hora local y desfase en bibliotecas ya
        importadas; prueba de originales intactos.

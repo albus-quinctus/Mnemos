@@ -297,10 +297,12 @@
   let copiasInfo = $state(0);
   // Sube al guardar una fecha, para volver a pedir los detalles.
   let recarga = $state(0);
-  const captura = $derived(info ? fechaCaptura(info.taken_at, info.taken_source) : null);
+  const captura = $derived(
+    info ? fechaCaptura(info.taken_local, info.taken_source, info.taken_offset) : null,
+  );
   const automatica = $derived(
     info?.taken_source === "manual"
-      ? fechaCaptura(info.taken_auto_at, info.taken_auto_source)
+      ? fechaCaptura(info.taken_auto_local, info.taken_auto_source, info.taken_auto_offset)
       : null,
   );
   $effect(() => {
@@ -367,7 +369,8 @@
 
   function empezarEdicion() {
     if (!info) return;
-    ({ dia, hora } = camposFecha(info.taken_at ?? info.modified_at));
+    // Sin fecha de captura, `taken_local` trae la de modificación (spec 022).
+    ({ dia, hora } = camposFecha(info.taken_local ?? info.modified_at));
     errorFecha = "";
     editando = true;
   }

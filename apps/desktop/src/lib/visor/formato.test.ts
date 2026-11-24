@@ -6,6 +6,7 @@ import {
   camposFecha,
   coordenadas,
   cuandoVersion,
+  desfase,
   dimensiones,
   exposicion,
   fecha,
@@ -34,17 +35,23 @@ describe("formato", () => {
     expect(fecha(segundos)).toMatch(/^26 oct 2026,? 14:03$/);
   });
 
-  it("fecha de captura con su origen", () => {
-    const segundos = new Date(2019, 4, 12, 14, 30).getTime() / 1000;
-    expect(fechaCaptura(segundos, "exif").texto).toMatch(/^12 may 2019,? 14:30$/);
+  it("fecha de captura con su origen, en la hora que marcaba la cámara", () => {
+    // Hora local de captura: segundos leídos como UTC (spec 022).
+    const segundos = Date.UTC(2019, 4, 12, 23, 30) / 1000;
+    expect(fechaCaptura(segundos, "exif").texto).toMatch(/^12 may 2019,? 23:30$/);
+    expect(fechaCaptura(segundos, "exif", -240).texto).toMatch(/^12 may 2019,? 23:30 \(UTC−04:00\)$/);
+    expect(fechaCaptura(segundos, "exif", 345).texto).toMatch(/\(UTC\+05:45\)$/);
     expect(fechaCaptura(segundos, "exif").origen).toBe("Según la cámara (EXIF)");
-    expect(fechaCaptura(segundos, "nombre_dia").texto).toBe("12 may 2019");
+    expect(fechaCaptura(segundos, "nombre_dia", 120).texto).toBe("12 may 2019");
     expect(fechaCaptura(null, "ninguna")).toEqual({ texto: "Sin fecha de captura", origen: null });
-    expect(fechaCaptura(segundos, null).origen).toBeNull();
+    // Sin fecha de captura, `taken_local` trae la de modificación: no se enseña.
+    expect(fechaCaptura(segundos, "ninguna").texto).toBe("Sin fecha de captura");
+    expect(fechaCaptura(segundos, null).texto).toBe("Sin fecha de captura");
+    expect(desfase(0)).toBe("UTC");
   });
 
   it("fecha puesta a mano", () => {
-    const segundos = new Date(2019, 4, 12, 14, 30).getTime() / 1000;
+    const segundos = Date.UTC(2019, 4, 12, 14, 30) / 1000;
     expect(fechaCaptura(segundos, "manual").origen).toBe("Puesta a mano");
   });
 
@@ -65,7 +72,7 @@ describe("formato", () => {
   });
 
   it("campos del formulario de fecha", () => {
-    const segundos = new Date(2019, 4, 2, 9, 5, 7).getTime() / 1000;
+    const segundos = Date.UTC(2019, 4, 2, 9, 5, 7) / 1000;
     expect(camposFecha(segundos)).toEqual({ dia: "2019-05-02", hora: "09:05:07" });
     expect(fechaManual("2019-05-02", "09:05")).toBe("2019-05-02 09:05:00");
     expect(fechaManual("2019-05-02", "09:05:07")).toBe("2019-05-02 09:05:07");
