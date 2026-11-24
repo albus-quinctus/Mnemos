@@ -114,6 +114,8 @@ impl Library {
                 &report,
             );
         }
+        // Lo copiado se apila solo, si toca (spec 023).
+        self.auto_stack_pending()?;
         Ok(report)
     }
 }

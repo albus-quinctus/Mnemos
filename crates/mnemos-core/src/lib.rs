@@ -4,6 +4,7 @@
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
 pub mod albums;
+pub mod auto_stack;
 pub mod collections;
 mod copies;
 pub mod day_titles;

@@ -90,6 +90,7 @@ impl Library {
         // guarda qué versión se ve, y se recalcula aquí (spec 009).
         Library::sync_edit_versions(&tx, &self.root)?;
         tx.commit()?;
+        self.auto_stack_pending()?;
 
         report.missing = known.keys().filter(|k| !seen.contains(*k)).count() as u64;
         Ok(report)
