@@ -2083,8 +2083,10 @@ dependencies = [
  "imagesize",
  "jpeg-decoder",
  "kamadak-exif",
+ "quick-xml 0.42.0",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
 ]
 
