@@ -118,7 +118,7 @@ impl Library {
              LEFT JOIN thumbnail_failures f ON f.content_hash = p.content_hash
              WHERE p.content_hash IS NOT NULL AND f.content_hash IS NULL
                    AND p.media_kind = 'foto' AND {filter}
-             ORDER BY coalesce(p.taken_at, p.modified_at) DESC, p.id DESC"
+             ORDER BY p.taken_local DESC, p.id DESC"
         ))?;
         let rows = stmt.query_map(rusqlite::params_from_iter(params), |r| {
             Ok((
@@ -254,7 +254,7 @@ impl Library {
         let mut stmt = self.conn.prepare(
             "SELECT id, content_hash FROM photos
              WHERE media_kind = 'video' AND content_hash IS NOT NULL
-             ORDER BY coalesce(taken_at, modified_at) DESC, id DESC",
+             ORDER BY taken_local DESC, id DESC",
         )?;
         let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
         let mut seen = HashSet::new();
