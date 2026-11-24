@@ -569,13 +569,17 @@ mod tests {
             .unwrap()
         };
         let fila = |rel: &str| -> (Option<i64>, Option<i64>, Option<i64>) {
-            conn.query_row(
-                "SELECT taken_local, taken_offset, taken_auto_local FROM photos
-                 WHERE rel_path = ?1",
-                [rel],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .unwrap()
+            let (local, offset, auto, pending): (_, _, _, i64) = conn
+                .query_row(
+                    "SELECT taken_local, taken_offset, taken_auto_local, taken_local_pending
+                     FROM photos WHERE rel_path = ?1",
+                    [rel],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                )
+                .unwrap();
+            // Queda pendiente de afinar con `mnemos index`.
+            assert_eq!(pending, 1, "{rel}");
+            (local, offset, auto)
         };
         assert_eq!(fila("con.jpg"), (Some(local(1_721_014_200)), None, None));
         assert_eq!(fila("sin.jpg"), (Some(local(1_700_000_000)), None, None));
