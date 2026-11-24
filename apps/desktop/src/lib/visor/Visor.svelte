@@ -44,7 +44,9 @@
   import { lineaCompartida } from "$lib/editor/compartida";
   import Editor from "$lib/editor/Editor.svelte";
   import EtiquetasFoto from "$lib/etiquetas/EtiquetasFoto.svelte";
-  import { abrirEtiqueta } from "$lib/navegacion.svelte";
+  import { abrirEtiqueta, abrirPila } from "$lib/navegacion.svelte";
+  import { fotosDePila } from "$lib/biblioteca";
+  import { nombreTipo } from "$lib/pilas/pilas.svelte";
   import { fotoUrl, miniaturaUrl, videoUrl } from "$lib/media";
   import { accionVideo, aplicarAccion, sonido } from "./reproductor";
   import {
@@ -161,7 +163,27 @@
     return "No se puede mostrar esta foto";
   }
 
-  const foto = $derived(fotos[indice]);
+  const tarjeta = $derived(fotos[indice]);
+
+  // Pila (spec 023): la tarjeta es su portada; la tira de la pila deja ver
+  // las demás fotos sin salir del visor. Las acciones de la barra afectan a
+  // toda la pila; para una sola foto hay que abrirla.
+  let fotosPila = $state<FotoCuadricula[]>([]);
+  let enPila = $state<number | null>(null);
+  let tiraPila = $state(true);
+  $effect(() => {
+    const pila = tarjeta?.stack;
+    enPila = null;
+    fotosPila = [];
+    if (pila) {
+      fotosDePila(pila.id)
+        .then((f) => {
+          if (tarjeta?.stack?.id === pila.id) fotosPila = f.photos;
+        })
+        .catch(() => (fotosPila = []));
+    }
+  });
+  const foto = $derived(enPila !== null ? (fotosPila[enPila] ?? tarjeta) : tarjeta);
   // Vídeos (spec 019).
   const esVideo = $derived(foto?.media_kind === "video");
   let reproductor = $state<HTMLVideoElement | null>(null);
@@ -657,10 +679,20 @@
     else if ((e.key === "f" || e.key === "F") && !e.shiftKey) alternarFavorita();
     else if ((e.key === "a" || e.key === "A") && e.shiftKey) alternarArchivada();
     else if (esTeclaPapelera(e) && onEnviadaPapelera) aPapelera();
+    else if (fotosPila.length > 0 && e.shiftKey && e.key === "ArrowRight") moverEnPila(1);
+    else if (fotosPila.length > 0 && e.shiftKey && e.key === "ArrowLeft") moverEnPila(-1);
+    else if (fotosPila.length > 0 && (e.key === "s" || e.key === "S") && !e.shiftKey)
+      tiraPila = !tiraPila;
     else if (e.key === "ArrowRight") ir(1);
     else if (e.key === "ArrowLeft") ir(-1);
     else return;
     e.preventDefault();
+  }
+
+  /** Recorre la tira de la pila (spec 023) sin salir de la tarjeta. */
+  function moverEnPila(paso: number) {
+    const n = Math.min(fotosPila.length - 1, Math.max(0, (enPila ?? 0) + paso));
+    enPila = n === 0 ? null : n;
   }
 
   // Tira de miniaturas: unas pocas a cada lado de la actual.
@@ -841,6 +873,21 @@
       </button>
     {/if}
     {/if}
+    {#if tarjeta?.stack}
+      {@const pila = tarjeta.stack}
+      <button
+        type="button"
+        class="boton texto-pila"
+        title="Abrir la pila para actuar sobre una sola foto"
+        onclick={() => {
+          onCerrar();
+          abrirPila(pila.id);
+        }}
+      >
+        <Icono nombre="pila" />
+        <span>Abrir pila</span>
+      </button>
+    {/if}
     <button
       type="button"
       class="boton info"
@@ -917,6 +964,39 @@
       </p>
     {/if}
 
+    {#if tarjeta?.stack && fotosPila.length > 0}
+      {@const pila = tarjeta.stack}
+      <div class="tira-pila" class:plegada={!tiraPila} role="group" aria-label="Fotos de la pila">
+        <button
+          type="button"
+          class="titulo-pila"
+          title={tiraPila ? "Ocultar la pila (S)" : "Ver la pila (S)"}
+          onclick={() => (tiraPila = !tiraPila)}
+        >
+          <Icono nombre="pila" tamano={16} />
+          <span>{nombreTipo(pila.kind)} · {pila.photos}</span>
+        </button>
+        {#if tiraPila}
+          {#each fotosPila as f, n (f.id)}
+            <button
+              type="button"
+              class="miembro"
+              class:actual={(enPila ?? 0) === n}
+              aria-current={(enPila ?? 0) === n ? "true" : undefined}
+              title={n === 0 ? `${f.name} (portada)` : f.name}
+              onclick={(e) => {
+                enPila = n === 0 ? null : n;
+                e.currentTarget.blur();
+              }}
+            >
+              <img src={miniaturaUrl(f.id)} alt={f.name} draggable="false" />
+              {#if n === 0}<span class="marca-portada">Portada</span>{/if}
+            </button>
+          {/each}
+        {/if}
+      </div>
+    {/if}
+
     {#if indice > 0}
       <button type="button" class="boton flecha izquierda" aria-label="Anterior" onclick={() => ir(-1)}>
         <Icono nombre="anterior" tamano={28} />
@@ -948,6 +1028,21 @@
       <h2>Detalles</h2>
       {#if info}
         <dl>
+          {#if tarjeta?.stack}
+            {@const pila = tarjeta.stack}
+            <dt>Pila</dt>
+            <dd>
+              En una pila de {pila.photos} ({nombreTipo(pila.kind)}).
+              <button
+                type="button"
+                class="texto"
+                onclick={() => {
+                  onCerrar();
+                  abrirPila(pila.id);
+                }}>Abrir pila</button
+              >
+            </dd>
+          {/if}
           <dt>Ruta</dt>
           <dd class="mono">{info.rel_path}</dd>
           <dt>Dimensiones</dt>
@@ -1568,6 +1663,107 @@
 
   .derecha {
     right: 8px;
+  }
+
+  /* Pila (spec 023): sobre la foto, abajo en el centro. */
+  .tira-pila {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 200px);
+    padding: 6px;
+    border-radius: 12px;
+    background: rgba(20, 20, 22, 0.82);
+    transform: translateX(-50%);
+    overflow-x: auto;
+    scrollbar-width: none;
+    backdrop-filter: blur(6px);
+  }
+
+  .titulo-pila {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 56px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .plegada .titulo-pila {
+    height: 32px;
+  }
+
+  .titulo-pila:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .miembro {
+    position: relative;
+    flex: none;
+    width: 76px;
+    height: 56px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    background: #222;
+    opacity: 0.65;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .miembro:hover,
+  .miembro.actual {
+    opacity: 1;
+  }
+
+  .miembro.actual {
+    border-color: #fff;
+  }
+
+  .escenario .miembro img {
+    position: static;
+    display: block;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .marca-portada {
+    position: absolute;
+    left: 3px;
+    bottom: 3px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 14px;
+  }
+
+  .boton.texto-pila {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    padding: 0 14px;
+    border-radius: 999px;
+    font: inherit;
+    font-weight: 500;
+    white-space: nowrap;
   }
 
   .tira {

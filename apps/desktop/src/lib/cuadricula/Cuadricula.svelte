@@ -16,6 +16,8 @@
     type Vista,
   } from "$lib/biblioteca";
   import Icono from "$lib/componentes/Icono.svelte";
+  import { nombreTipo } from "$lib/pilas/pilas.svelte";
+  import { abrirPila } from "$lib/navegacion.svelte";
   import { miniaturaUrl } from "$lib/media";
   import {
     alternarDia,
@@ -71,6 +73,8 @@
       (typeof vista === "object" && !esVistaExplorar(vista)),
   );
   const papelera = $derived(!texto && vista === "papelera");
+  // Dentro de una pila abierta (spec 023) la primera foto es la portada.
+  const enPila = $derived(!texto && typeof vista === "object" && "pila" in vista);
   // Añadidas recientemente agrupa por el día de importación (spec 021).
   const recientes = $derived(!texto && coleccionDe(vista) === "recientes");
 
@@ -127,6 +131,11 @@
   });
 
   function alPulsarFoto(e: MouseEvent, indice: number) {
+    const pila = (e.target as Element).closest?.("[data-pila]");
+    if (pila && !haySeleccion()) {
+      abrirPila(Number(pila.getAttribute("data-pila")));
+      return;
+    }
     const mods = { ctrl: e.ctrlKey || e.metaKey, mayus: e.shiftKey };
     if (!clicEnFoto(fotos[indice], mods)) abierta = indice;
   }
@@ -533,6 +542,20 @@
                   {#if foto.duration_ms}{duracion(foto.duration_ms)}{/if}
                 </span>
               {/if}
+              {#if enPila && celda.indice === 0}
+                <span class="pila portada" title="Portada de la pila">Portada</span>
+              {/if}
+              {#if foto.stack}
+                <!-- Pila (spec 023): pulsar el número abre la pila. -->
+                <span
+                  class="pila"
+                  title="Pila de {foto.stack.photos} fotos ({nombreTipo(foto.stack.kind)}). Pulsa para abrirla"
+                  data-pila={foto.stack.id}
+                >
+                  <Icono nombre="pila" tamano={14} grosor={2.2} />
+                  {foto.stack.photos}
+                </span>
+              {/if}
               {#if foto.favorite}
                 <span class="insignia favorita" title="En Favoritos">
                   <Icono nombre="estrella" tamano={18} relleno />
@@ -791,6 +814,34 @@
     display: flex;
     color: #fff;
     pointer-events: none;
+  }
+
+  /* Pila (spec 023): arriba a la derecha, lejos de la casilla de selección. */
+  .pila {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px 2px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+    cursor: pointer;
+  }
+
+  .pila.portada {
+    padding: 2px 8px;
+    cursor: default;
+  }
+
+  .pila:hover {
+    background: rgba(0, 0, 0, 0.8);
   }
 
   /* Duración de un vídeo (spec 019): sobre una pastilla para que se lea en

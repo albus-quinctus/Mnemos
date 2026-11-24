@@ -72,6 +72,29 @@ export function todasFavoritas(): boolean {
   return true;
 }
 
+/** Fotos de verdad que hay tras la selección: cada pila cuenta todas las suyas (spec 023). */
+export function fotosSeleccionadas(): number {
+  let n = 0;
+  for (const id of seleccion.ids) n += conocida(id)?.stack?.photos ?? 1;
+  return n;
+}
+
+/** Ids de las pilas que hay en la selección (spec 023). */
+export function pilasSeleccionadas(): number[] {
+  const pilas: number[] = [];
+  for (const id of seleccion.ids) {
+    const pila = conocida(id)?.stack;
+    if (pila) pilas.push(pila.id);
+  }
+  return pilas;
+}
+
+/** Dentro de una pila abierta, las acciones son de una sola foto (spec 023). */
+export function pilaAbierta(): number | null {
+  const a = seleccion.ambito;
+  return "vista" in a && typeof a.vista === "object" && "pila" in a.vista ? a.vista.pila : null;
+}
+
 /** En Archivo la acción es desarchivar; en el resto, archivar. */
 export function enArchivo(): boolean {
   return "vista" in seleccion.ambito && seleccion.ambito.vista === "archivo";

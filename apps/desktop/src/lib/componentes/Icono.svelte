@@ -42,6 +42,10 @@
     panoramica: "M3 7c6-2 12-2 18 0v10c-6-2-12-2-18 0z",
     raw: "M4 6h16v12H4zM8 10v4M8 10h2a1 1 0 0 1 0 2H8m2 0 1 2M14 10l1.5 4 1.5-4",
     reciente: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l3 2",
+    // Pilas (spec 023).
+    pila: "M4 10h16v10H4zM6 6.5h12M8.5 3h7",
+    desapilar: "M3 3h8v8H3zM13 13h8v8h-8zM15 6h3v3M9 18H6v-3",
+    portada: "M5 4h14v16H5zM5 16l4-4 3 3 2-2 5 5M15 8.5h.01",
   } as const;
 
   export type NombreIcono = keyof typeof trazos;

@@ -17,11 +17,19 @@
     enArchivo,
     enPapelera,
     enviarSeleccionAPapelera,
+    fotosSeleccionadas,
+    pilaAbierta,
+    pilasSeleccionadas,
     quitarSeleccionDeAlbum,
     restaurarSeleccion,
     todasFavoritas,
   } from "./acciones.svelte";
   import { borrado, pedirEliminar } from "$lib/papelera/papelera.svelte";
+  import {
+    apilarSeleccion,
+    desapilarSeleccion,
+    usarSeleccionComoPortada,
+  } from "$lib/pilas/acciones.svelte";
   import type { TamanoExportacion } from "$lib/biblioteca";
   import {
     descargarSeleccion,
@@ -30,6 +38,10 @@
   } from "$lib/exportacion/exportacion.svelte";
 
   const cuantas = $derived(seleccion.ids.size);
+  // Pilas (spec 023): cuántas fotos hay de verdad tras las tarjetas elegidas.
+  const totalFotos = $derived(fotosSeleccionadas());
+  const pilas = $derived(pilasSeleccionadas());
+  const dentroDePila = $derived(pilaAbierta() !== null);
   const quitar = $derived(todasFavoritas());
   const desarchivar = $derived(enArchivo());
   const papelera = $derived(enPapelera());
@@ -64,7 +76,11 @@
 
 <svelte:window onpointerdown={alPulsarFuera} onkeydowncapture={alPulsarTecla} />
 
-<header class:en-album={enAlbum || enEtiqueta}>
+<!-- Con los botones de pilas (spec 023) también hay botones de más. -->
+<header
+  class:en-album={enAlbum || enEtiqueta || cuantas >= 2 || pilas.length > 0}
+  class:muchos={(enAlbum || enEtiqueta) && (cuantas >= 2 || pilas.length > 0)}
+>
   <button
     type="button"
     class="boton solo"
@@ -77,6 +93,9 @@
   <span class="cuenta" aria-live="polite">
     {cuantas.toLocaleString("es")}
     {cuantas === 1 ? "seleccionada" : "seleccionadas"}
+    {#if totalFotos !== cuantas}
+      <span class="total">({totalFotos.toLocaleString("es")} fotos)</span>
+    {/if}
   </span>
   {#if papelera}
     <!-- En la Papelera (spec 015): restaurar o borrar del disco. -->
@@ -99,6 +118,45 @@
       <span>Eliminar para siempre</span>
     </button>
   {:else}
+    <!-- Pilas (spec 023). Dentro de una pila abierta, la portada; fuera,
+         apilar varias tarjetas o deshacer las pilas elegidas. -->
+    {#if dentroDePila}
+      <button
+        type="button"
+        class="boton"
+        title="Usar como portada de la pila"
+        disabled={avisos.ocupado || cuantas !== 1}
+        onclick={usarSeleccionComoPortada}
+      >
+        <Icono nombre="portada" />
+        <span>Usar como portada</span>
+      </button>
+    {:else}
+      {#if cuantas >= 2}
+        <button
+          type="button"
+          class="boton"
+          title="Apilar: una sola tarjeta para todas"
+          disabled={avisos.ocupado}
+          onclick={apilarSeleccion}
+        >
+          <Icono nombre="pila" />
+          <span>Apilar</span>
+        </button>
+      {/if}
+      {#if pilas.length > 0}
+        <button
+          type="button"
+          class="boton"
+          title="Desapilar: las fotos vuelven a ir sueltas"
+          disabled={avisos.ocupado}
+          onclick={desapilarSeleccion}
+        >
+          <Icono nombre="desapilar" />
+          <span>Desapilar</span>
+        </button>
+      {/if}
+    {/if}
     <!-- Álbumes (spec 014) y etiquetas (spec 016). -->
     <MenuAnadirAlbum />
     <MenuEtiquetar />
@@ -205,6 +263,12 @@
     color: var(--texto);
   }
 
+  .total {
+    margin-left: 0.25rem;
+    color: var(--texto-suave);
+    font-weight: 500;
+  }
+
   .cuenta {
     margin-right: auto;
     white-space: nowrap;
@@ -257,6 +321,21 @@
     }
 
     header.en-album :global(.boton) {
+      width: var(--objetivo);
+      padding: 0;
+    }
+  }
+
+  /* Álbum o etiqueta y además los botones de pilas. */
+  @container (max-width: 1500px) {
+    header.muchos :global(.boton > span) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    header.muchos :global(.boton) {
       width: var(--objetivo);
       padding: 0;
     }

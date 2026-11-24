@@ -21,6 +21,8 @@ export const navegacion = $state({
   album: null as number | null,
   etiqueta: null as number | null,
   explorar: null as AbiertoEnExplorar | null,
+  // La pila abierta (spec 023), encima de cualquier sección; `null` si no hay.
+  pila: null as number | null,
 });
 
 /** Lo abierto desde Explorar: su vista y el título de su cabecera. */
@@ -39,6 +41,19 @@ export function irA(seccion: Seccion) {
   navegacion.album = null;
   navegacion.etiqueta = null;
   navegacion.explorar = null;
+  navegacion.pila = null;
+}
+
+/** Abre una pila encima de lo que se ve (spec 023). La selección se pierde. */
+export function abrirPila(id: number) {
+  limpiarSeleccion();
+  navegacion.pila = id;
+}
+
+/** Vuelve de la pila a donde se estaba. */
+export function cerrarPila() {
+  limpiarSeleccion();
+  navegacion.pila = null;
 }
 
 /** Abre una colección o un recuerdo dentro de la sección Explorar. */

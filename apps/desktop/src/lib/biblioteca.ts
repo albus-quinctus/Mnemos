@@ -20,6 +20,17 @@ export interface FotoCuadricula {
   edit_version: number | null; // versión editada que se ve (spec 009); con ella, width y height son los de la editada
   media_kind: "foto" | "video"; // spec 019
   duration_ms: number | null; // duración de un vídeo, si se conoce
+  stack: Pila | null; // pila de la que es portada (spec 023); null si va suelta
+}
+
+/** De dónde salió una pila (spec 023). */
+export type TipoPila = "raw_jpeg" | "editada" | "rafaga" | "manual";
+
+/** La pila de una tarjeta de la cuadrícula (spec 023). */
+export interface Pila {
+  id: number;
+  photos: number; // fotos de la pila, portada incluida
+  kind: TipoPila;
 }
 
 export interface Cursor {
@@ -54,7 +65,8 @@ export type Vista =
   | { etiqueta: number }
   | { album: number }
   | { coleccion: Coleccion }
-  | { rango: { desde: number; hasta: number } };
+  | { rango: { desde: number; hasta: number } }
+  | { pila: number };
 
 /** Colecciones automáticas de Explorar (spec 021). */
 export type Coleccion =
@@ -639,4 +651,40 @@ export interface Explorar {
 
 export function explorar(): Promise<Explorar> {
   return invoke("explorar");
+}
+
+// Pilas (spec 023). Reflejan `mnemos_core::stacks`.
+
+/** Una pila abierta: su origen y sus fotos, la portada primero y luego por fecha. */
+export interface FotosDePila {
+  id: number;
+  kind: TipoPila;
+  photos: FotoCuadricula[];
+}
+
+export function fotosDePila(id: number): Promise<FotosDePila> {
+  return invoke("pila", { id });
+}
+
+/** Lo que hace falta para deshacer un cambio de pilas; solo lo entiende el núcleo. */
+export type DeshacerPila = unknown;
+
+/** Junta las tarjetas dadas (fotos sueltas y pilas) en una sola pila. */
+export function apilar(ids: number[]): Promise<DeshacerPila> {
+  return invoke("apilar", { ids });
+}
+
+/** Deshace las pilas dadas: sus fotos vuelven a ir sueltas. */
+export function desapilar(pilas: number[]): Promise<DeshacerPila> {
+  return invoke("desapilar", { pilas });
+}
+
+/** Pone la foto dada como portada de su pila. */
+export function usarComoPortada(id: number): Promise<DeshacerPila> {
+  return invoke("usar_como_portada", { id });
+}
+
+/** Devuelve las pilas a como estaban antes de un cambio. */
+export function deshacerPila(deshacer: DeshacerPila): Promise<void> {
+  return invoke("deshacer_pila", { deshacer });
 }

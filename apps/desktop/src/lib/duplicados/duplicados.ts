@@ -49,6 +49,8 @@ export function fotosDelGrupo(g: GrupoDuplicado): FotoCuadricula[] {
       edit_version: null,
       media_kind: c.media_kind,
       duration_ms: c.duration_ms,
+      // Duplicados compara foto a foto aunque estén en pilas (spec 023).
+      stack: null,
     };
   });
 }

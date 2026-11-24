@@ -13,7 +13,8 @@
   import Etiquetas from "$lib/etiquetas/Etiquetas.svelte";
   import CabeceraColeccion from "$lib/explorar/CabeceraColeccion.svelte";
   import Explorar from "$lib/explorar/Explorar.svelte";
-  import { irA, navegacion } from "$lib/navegacion.svelte";
+  import CabeceraPila from "$lib/pilas/CabeceraPila.svelte";
+  import { cerrarPila, irA, navegacion } from "$lib/navegacion.svelte";
   import { cambiarAmbito } from "$lib/seleccion/seleccion.svelte";
   import { importacion } from "$lib/importacion/importacion.svelte";
   import { cambios } from "$lib/cambios.svelte";
@@ -66,7 +67,9 @@
   }
 
   // Fotos queda debajo, sin desmontarse, mientras se ve otra cosa encima.
-  const tapada = $derived(busqueda.consulta !== "" || navegacion.seccion !== "fotos");
+  const tapada = $derived(
+    busqueda.consulta !== "" || navegacion.seccion !== "fotos" || navegacion.pila !== null,
+  );
 
   // La selección es de la vista o de la búsqueda que se ve: al cambiar de
   // sección, buscar o salir de la búsqueda, se pierde (spec 006).
@@ -76,8 +79,10 @@
     const etiqueta = navegacion.etiqueta;
     const abiertoEnExplorar = navegacion.explorar;
     const consulta = busqueda.consulta;
+    const pila = navegacion.pila;
     untrack(() => {
-      if (consulta) cambiarAmbito({ busqueda: consulta });
+      if (pila !== null) cambiarAmbito({ vista: { pila } });
+      else if (consulta) cambiarAmbito({ busqueda: consulta });
       else if (seccion === "albumes")
         cambiarAmbito({ vista: album === null ? "fotos" : { album } });
       else if (seccion === "etiquetas")
@@ -198,6 +203,19 @@
       {#key `${busqueda.consulta}#${importacion.version}`}
         <div class="capa resultados">
           <Cuadricula texto={busqueda.consulta} onSalir={limpiarBusqueda} />
+        </div>
+      {/key}
+    {/if}
+    <!-- Una pila abierta (spec 023), encima de lo que se estuviera viendo. -->
+    {#if navegacion.pila !== null}
+      {#key `${info.root}#${importacion.version}#${navegacion.pila}`}
+        <div class="capa encima">
+          <div class="album">
+            <CabeceraPila id={navegacion.pila} version={cambios.version} />
+            <div class="album-fotos">
+              <Cuadricula vista={{ pila: navegacion.pila }} onSalir={cerrarPila} />
+            </div>
+          </div>
         </div>
       {/key}
     {/if}
