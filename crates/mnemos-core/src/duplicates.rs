@@ -35,8 +35,11 @@ pub struct DuplicateCopy {
     pub id: i64,
     pub rel_path: String,
     pub size_bytes: u64,
-    /// La fecha de la cuadrícula: captura o, si falta, modificación.
+    /// La fecha de la cuadrícula: hora local de captura o, si falta, de
+    /// modificación, en segundos leídos como UTC (`timeline::DATE`).
     pub date: i64,
+    /// Su día, `"2024-08-17"`, para mostrarlo sin la zona del equipo.
+    pub day: String,
     pub favorite: bool,
     pub archived: bool,
     /// `false` si el archivo ya no está en el disco (foto desaparecida).
@@ -130,7 +133,7 @@ impl Library {
 
         let mut copies_stmt = self.conn.prepare(&format!(
             "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL,
-                    media_kind, duration_ms
+                    media_kind, duration_ms, strftime('%Y-%m-%d', {DATE}, 'unixepoch')
              FROM photos WHERE content_hash = ?1 AND trashed_at IS NULL
              ORDER BY imported_at, id"
         ))?;
@@ -143,6 +146,7 @@ impl Library {
                         rel_path: r.get(1)?,
                         size_bytes: r.get(2)?,
                         date: r.get(3)?,
+                        day: r.get(8)?,
                         favorite: r.get(4)?,
                         archived: r.get(5)?,
                         exists: false,
@@ -191,7 +195,7 @@ impl Library {
         };
         let mut stmt = self.conn.prepare(&format!(
             "SELECT id, rel_path, size_bytes, {DATE}, favorite, archived_at IS NOT NULL,
-                    media_kind, duration_ms
+                    media_kind, duration_ms, strftime('%Y-%m-%d', {DATE}, 'unixepoch')
              FROM photos WHERE content_hash = ?1 AND id <> ?2
              ORDER BY imported_at, id"
         ))?;
@@ -202,6 +206,7 @@ impl Library {
                     rel_path: r.get(1)?,
                     size_bytes: r.get(2)?,
                     date: r.get(3)?,
+                    day: r.get(8)?,
                     favorite: r.get(4)?,
                     archived: r.get(5)?,
                     exists: false,

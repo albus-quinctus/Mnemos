@@ -16,8 +16,21 @@ use crate::library::Library;
 /// Fotos por página como máximo, pida lo que pida la interfaz.
 pub const MAX_PAGE: u32 = 1000;
 
-/// Fecha por la que se ordena: la de captura o, si falta, la de modificación.
-pub(crate) const DATE: &str = "coalesce(taken_at, modified_at)";
+/// Fecha por la que se ordena: la hora local de captura o, si falta, la de
+/// modificación (spec 022). Son segundos de pared leídos como UTC: su día y
+/// su mes salen sin 'localtime' (ver [`wall_sql`]).
+pub(crate) const DATE: &str = "taken_local";
+
+/// Expresión SQL con la hora de pared (segundos leídos como UTC) de la fecha
+/// por la que ordena una vista: [`DATE`] ya lo es; un instante como
+/// `trashed_at` se pasa a hora local con la zona del equipo.
+pub(crate) fn wall_sql(order: &str) -> String {
+    if order == DATE {
+        DATE.to_owned()
+    } else {
+        format!("unixepoch({order}, 'unixepoch', 'localtime')")
+    }
+}
 
 /// Condición extra sobre `photos` para una vista o la búsqueda: un trozo de
 /// SQL que empieza por `AND`, con parámetros anónimos (`?`), sus valores y la
@@ -138,6 +151,14 @@ pub struct GridPhoto {
     /// Nombre del archivo, sin carpetas, para el marcador "Sin vista previa".
     pub name: String,
     pub month: String,
+    /// Día en que la agrupa la cuadrícula, `"2024-07-14"`: el de la hora local
+    /// de captura (spec 022) o, en la Papelera, el del envío en la zona del
+    /// equipo.
+    pub day: String,
+    /// Valor por el que se ordena la vista, para el cursor y los rangos de la
+    /// selección: la hora local de captura en segundos leídos como UTC
+    /// ([`DATE`]) o, en la Papelera, el instante del envío. No es un instante
+    /// que se pueda mostrar con la zona del equipo: para eso está `day`.
     pub date: i64,
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -202,9 +223,10 @@ impl Library {
     pub(crate) fn months_where(&self, filter: &Filter) -> Result<Vec<Month>> {
         let order = filter.order;
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT strftime('%Y-%m', {order}, 'unixepoch', 'localtime') AS month, count(*)
+            "SELECT strftime('%Y-%m', {wall}, 'unixepoch') AS month, count(*)
              FROM photos WHERE 1 {} GROUP BY month ORDER BY month DESC",
-            filter.sql
+            filter.sql,
+            wall = wall_sql(order)
         ))?;
         let months = stmt
             .query_map(params_from_iter(&filter.params), |r| {
@@ -228,16 +250,17 @@ impl Library {
         let order = filter.order;
         // Se pide una de más para saber si hay página siguiente.
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, {order}, strftime('%Y-%m', {order}, 'unixepoch', 'localtime'),
+            "SELECT id, {order}, strftime('%Y-%m', {wall}, 'unixepoch'),
                     width, height, coalesce(orientation, 1),
                     content_hash IN (SELECT content_hash FROM thumbnail_failures),
                     rel_path, favorite, archived_at IS NOT NULL, edit_version, content_hash,
-                    media_kind, duration_ms
+                    media_kind, duration_ms, strftime('%Y-%m-%d', {wall}, 'unixepoch')
              FROM photos
              WHERE ({order}, id) < (?, ?) {}
              ORDER BY {order} DESC, id DESC
              LIMIT ?",
-            filter.sql
+            filter.sql,
+            wall = wall_sql(order)
         ))?;
         let params = [Value::from(date), Value::from(id)]
             .into_iter()
@@ -260,6 +283,7 @@ impl Library {
                     name: rel_path.rsplit('/').next().unwrap_or_default().to_owned(),
                     date: r.get(1)?,
                     month: r.get(2)?,
+                    day: r.get(14)?,
                     width,
                     height,
                     thumbnail_failed: r.get(6)?,
@@ -599,5 +623,60 @@ mod tests {
         let plan = plan.join(" ");
         assert!(plan.contains("photos_timeline"), "{plan}");
         assert!(!plan.contains("TEMP B-TREE"), "{plan}");
+    }
+
+    #[test]
+    fn agrupa_por_la_hora_local_de_captura_y_no_por_la_zona_del_equipo() {
+        let (_dir, lib) = library(&[("Originales/noche.jpg", 1, Some(1), 1)]);
+        // 23:30 del 14 de julio en Nueva York (UTC−4): en UTC ya es día 15.
+        lib.conn
+            .execute(
+                "UPDATE photos SET taken_at = 1721014200, taken_local = 1720999800,
+                     taken_offset = -240",
+                [],
+            )
+            .unwrap();
+        let page = lib.timeline_page(None, 10).unwrap();
+        let foto = &page.photos[0];
+        assert_eq!(
+            (foto.day.as_str(), foto.month.as_str()),
+            ("2024-07-14", "2024-07")
+        );
+        assert_eq!(foto.date, 1_720_999_800);
+        assert_eq!(
+            lib.timeline_months().unwrap(),
+            [Month {
+                month: "2024-07".to_owned(),
+                photos: 1
+            }]
+        );
+        let scope = crate::selection::Scope::View(View::Photos);
+        assert_eq!(lib.select_day(scope, "2024-07-14").unwrap(), [foto.id]);
+        assert!(lib.select_day(scope, "2024-07-15").unwrap().is_empty());
+        let julio = crate::search::SearchQuery::parse("2024-07-14");
+        assert_eq!(lib.search_page(&julio, None, 10).unwrap().photos.len(), 1);
+        let otro = crate::search::SearchQuery::parse("2024-07-15");
+        assert!(lib.search_page(&otro, None, 10).unwrap().photos.is_empty());
+        let dia = crate::search::SearchQuery::parse("14/07");
+        assert_eq!(lib.search_page(&dia, None, 10).unwrap().photos.len(), 1);
+    }
+
+    #[test]
+    fn la_papelera_agrupa_por_el_dia_del_envio_en_la_zona_del_equipo() {
+        let (_dir, lib) = library(&[("Originales/a.jpg", 1, Some(1), 1)]);
+        lib.conn
+            .execute("UPDATE photos SET trashed_at = 1721014200", [])
+            .unwrap();
+        let dia: String = lib
+            .conn
+            .query_row(
+                "SELECT strftime('%Y-%m-%d', 1721014200, 'unixepoch', 'localtime')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let page = lib.view_page(View::Trash, None, 10).unwrap();
+        assert_eq!(page.photos[0].day, dia);
+        assert_eq!(page.photos[0].date, 1_721_014_200);
     }
 }
