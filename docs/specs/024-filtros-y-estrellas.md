@@ -264,15 +264,21 @@ fusionarla.
        funciones opcionales (ya estaba en el árbol por Tauri). Las pruebas
        usan paquetes como los de Lightroom y darktable dentro de archivos
        mínimos generados en la prueba.
-3. [ ] `mnemos-core`: migración 0019; el indexado lee una vez XMP incrustado,
+3. [x] `mnemos-core`: migración 0019; el indexado lee una vez XMP incrustado,
        valoración EXIF y cámara (`metadata_at`), crea las etiquetas y rellena la
-       descripción vacía; pruebas de reindexado y de valor manual.
+       descripción vacía; pruebas de reindexado y de valor manual. En
+       `crates/mnemos-core/src/metadata.rs`: `FileMeta::of_file`, `apply` y
+       `Library::read_pending_metadata`, que `index` llama al final y que la
+       app llamará en segundo plano al abrir una biblioteca antigua (tarea 6).
+       La importación ya lee el XMP incrustado, después de aplicar Takeout.
+       Índice parcial `photos_metadata_pending` para encontrar las pendientes.
 4. [ ] `mnemos-core`: la importación busca `foto.ext.xmp` y `foto.xmp` en la
        carpeta de origen y le da prioridad; pruebas con Takeout a la vez,
        RAW+JPEG y fotos repetidas.
 5. [ ] `mnemos-core`: `set_rating` por `Scope` y deshacer; `rating` en
        `GridPhoto` y en la información del visor; pruebas.
-6. [ ] Tauri y visor: comandos `valorar` y `deshacer_valoracion`, estrellas en
+6. [ ] Tauri y visor: `read_pending_metadata` en segundo plano al abrir la
+       biblioteca; comandos `valorar` y `deshacer_valoracion`, estrellas en
        la barra del visor y en Detalles, teclas `0` a `5`, aviso con
        «Deshacer»; pruebas de la interfaz.
 7. [ ] Barra de selección y cuadrícula: «Valorar», teclas con selección,

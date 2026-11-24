@@ -285,7 +285,7 @@ pub(crate) fn copy_tags(tx: &Transaction<'_>, original: i64, copy: i64) -> Resul
     refresh_search(tx, &[copy])
 }
 
-fn find_by_name(conn: &Connection, name: &str) -> Result<Option<i64>> {
+pub(crate) fn find_by_name(conn: &Connection, name: &str) -> Result<Option<i64>> {
     // Lo normal es que coincida tal cual o en ASCII sin mayúsculas: lo
     // resuelve el índice único. Si no, se comparan todos los nombres en
     // minúsculas (son pocos).
@@ -327,7 +327,7 @@ fn photos_of(conn: &Connection, tag: i64) -> Result<Vec<i64>> {
 }
 
 /// Rehace la columna `tags` del índice de búsqueda de las fotos `ids`.
-pub(crate) fn refresh_search(tx: &Transaction<'_>, ids: &[i64]) -> Result<()> {
+pub(crate) fn refresh_search(tx: &Connection, ids: &[i64]) -> Result<()> {
     let mut stmt = tx.prepare(
         "UPDATE photo_search
             SET tags = coalesce((SELECT group_concat(t.name, ' ')
