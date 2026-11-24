@@ -74,12 +74,39 @@ pub(crate) enum When {
 pub(crate) struct Taken {
     pub when: Option<When>,
     pub source: Source,
+    /// Hora de pared que marcaba la cámara (segundos leídos como UTC) y su
+    /// desfase en minutos, si la fuente la da (spec 022). Sin ella, la hora
+    /// local se saca de `when` con la zona del equipo.
+    pub wall: Option<(i64, Option<i16>)>,
+}
+
+/// Parámetros de una fecha para [`taken_at_sql`] y [`taken_local_sql`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TakenParams {
+    /// Segundos Unix exactos.
+    pub exact: Option<i64>,
+    /// Hora local sin zona (`AAAA-MM-DD hh:mm:ss`), que se pasa a UTC con la
+    /// zona del equipo.
+    pub local: Option<String>,
+    /// Hora de pared para `taken_local`.
+    pub wall: Option<i64>,
+    /// Desfase para `taken_offset`.
+    pub offset: Option<i16>,
 }
 
 /// Expresión SQL del valor de `taken_at` a partir de dos parámetros: segundos
 /// exactos y hora local (ver [`Taken::sql_params`]).
 pub(crate) fn taken_at_sql(exact: usize, local: usize) -> String {
     format!("coalesce(?{exact}, unixepoch(?{local}, 'utc'))")
+}
+
+/// Expresión SQL del valor de `taken_local` (spec 022): la hora de pared del
+/// parámetro `wall` o, si no la hay, el instante `at` (o `fallback` si `at`
+/// es NULL) pasado a hora local con la zona del equipo. `fallback` es una
+/// expresión SQL: `modified_at` en un UPDATE, el parámetro de la fecha de
+/// modificación en un INSERT o `NULL` para la fecha automática de reserva.
+pub(crate) fn taken_local_sql(wall: usize, at: &str, fallback: &str) -> String {
+    format!("coalesce(?{wall}, unixepoch(coalesce({at}, {fallback}), 'unixepoch', 'localtime'))")
 }
 
 /// `taken_source` de una fecha puesta a mano (spec 011). No es una [`Source`]:
@@ -89,22 +116,33 @@ pub(crate) const MANUAL: &str = "manual";
 /// Guarda la fecha de captura de la foto `rel_path`. Si tiene una fecha a mano
 /// (spec 011), la deja y guarda esta como la automática de reserva.
 pub(crate) fn set_taken(conn: &Connection, rel_path: &str, taken: &Taken) -> Result<()> {
-    let (exact, local) = taken.sql_params();
+    let p = taken.sql_params();
+    let args = params![
+        rel_path,
+        p.exact,
+        p.local,
+        taken.source.as_str(),
+        p.wall,
+        p.offset
+    ];
+    let at = taken_at_sql(2, 3);
     conn.execute(
         &format!(
-            "UPDATE photos SET taken_at = {at}, taken_source = ?4
+            "UPDATE photos SET taken_at = {at}, taken_source = ?4,
+                 taken_local = {local}, taken_offset = ?6
              WHERE rel_path = ?1 AND taken_source IS NOT '{MANUAL}'",
-            at = taken_at_sql(2, 3)
+            local = taken_local_sql(5, &at, "modified_at")
         ),
-        params![rel_path, exact, local, taken.source.as_str()],
+        args,
     )?;
     conn.execute(
         &format!(
-            "UPDATE photos SET taken_auto_at = {at}, taken_auto_source = ?4
+            "UPDATE photos SET taken_auto_at = {at}, taken_auto_source = ?4,
+                 taken_auto_local = {local}, taken_auto_offset = ?6
              WHERE rel_path = ?1 AND taken_source = '{MANUAL}'",
-            at = taken_at_sql(2, 3)
+            local = taken_local_sql(5, &at, "NULL")
         ),
-        params![rel_path, exact, local, taken.source.as_str()],
+        args,
     )?;
     Ok(())
 }
@@ -113,28 +151,33 @@ pub(crate) fn set_taken(conn: &Connection, rel_path: &str, taken: &Taken) -> Res
 /// más fiable que la que tienen. En las que tienen fecha a mano mejora la
 /// automática de reserva. Devuelve cuántas cambió.
 pub(crate) fn improve_taken(conn: &Connection, hash: &str, taken: &Taken) -> Result<usize> {
-    let (exact, local) = taken.sql_params();
+    let p = taken.sql_params();
     let args = params![
         hash,
-        exact,
-        local,
+        p.exact,
+        p.local,
         taken.source.as_str(),
-        taken.source.rank()
+        taken.source.rank(),
+        p.wall,
+        p.offset
     ];
+    let at = taken_at_sql(2, 3);
     let mut changed = conn.execute(
         &format!(
-            "UPDATE photos SET taken_at = {at}, taken_source = ?4
+            "UPDATE photos SET taken_at = {at}, taken_source = ?4,
+                 taken_local = {local}, taken_offset = ?7
              WHERE content_hash = ?1 AND {rank} < ?5",
-            at = taken_at_sql(2, 3),
+            local = taken_local_sql(6, &at, "modified_at"),
             rank = Source::rank_sql("taken_source")
         ),
         args,
     )?;
     changed += conn.execute(
         &format!(
-            "UPDATE photos SET taken_auto_at = {at}, taken_auto_source = ?4
+            "UPDATE photos SET taken_auto_at = {at}, taken_auto_source = ?4,
+                 taken_auto_local = {local}, taken_auto_offset = ?7
              WHERE content_hash = ?1 AND taken_source = '{MANUAL}' AND {rank} < ?5",
-            at = taken_at_sql(2, 3),
+            local = taken_local_sql(6, &at, "NULL"),
             rank = Source::rank_sql("taken_auto_source")
         ),
         args,
@@ -183,19 +226,33 @@ impl Taken {
     pub(crate) const NONE: Taken = Taken {
         when: None,
         source: Source::None,
+        wall: None,
     };
 
     fn new(when: When, source: Source) -> Self {
-        let when = match when {
-            When::Local(t) => match t.offset_minutes {
-                Some(offset) => When::Unix(local_secs(&t) - i64::from(offset) * 60),
-                None => When::Local(t),
-            },
-            unix => unix,
+        let (when, wall) = match when {
+            When::Local(t) => {
+                let wall = local_secs(&t);
+                match t.offset_minutes {
+                    // `creation_time` de un vídeo es UTC (desfase 0), no la
+                    // hora de la cámara: se trata como un instante y la hora
+                    // local sale de la zona del equipo, como en el Takeout.
+                    Some(0) if source == Source::Video => (When::Unix(wall), None),
+                    // Los desfases reales van de −12:00 a +14:00.
+                    Some(offset) if (-14 * 60..=14 * 60).contains(&offset) => (
+                        When::Unix(wall - i64::from(offset) * 60),
+                        Some((wall, Some(offset))),
+                    ),
+                    Some(offset) => (When::Unix(wall - i64::from(offset) * 60), None),
+                    None => (When::Local(t), Some((wall, None))),
+                }
+            }
+            unix => (unix, None),
         };
         Taken {
             when: Some(when),
             source,
+            wall,
         }
     }
 
@@ -232,10 +289,9 @@ impl Taken {
         }
     }
 
-    /// Valores de `taken_at` para [`taken_at_sql`]: segundos exactos y hora
-    /// local (`AAAA-MM-DD hh:mm:ss`).
-    pub(crate) fn sql_params(&self) -> (Option<i64>, Option<String>) {
-        match self.when {
+    /// Parámetros para [`taken_at_sql`] y [`taken_local_sql`].
+    pub(crate) fn sql_params(&self) -> TakenParams {
+        let (exact, local) = match self.when {
             Some(When::Unix(secs)) => (Some(secs), None),
             Some(When::Local(t)) => (
                 None,
@@ -245,6 +301,12 @@ impl Taken {
                 )),
             ),
             None => (None, None),
+        };
+        TakenParams {
+            exact,
+            local,
+            wall: self.wall.map(|(wall, _)| wall),
+            offset: self.wall.and_then(|(_, offset)| offset),
         }
     }
 
@@ -567,5 +629,166 @@ mod tests {
         ] {
             assert_eq!(parse_manual(mala), None, "{mala}");
         }
+    }
+
+    fn exif(hour: u8, offset: Option<i16>) -> CaptureTime {
+        CaptureTime {
+            year: 2024,
+            month: 7,
+            day: 14,
+            hour,
+            minute: 30,
+            second: 0,
+            offset_minutes: offset,
+        }
+    }
+
+    /// `2024-07-14 23:30:00` leído como UTC.
+    const PARED: i64 = 1_720_999_800;
+
+    #[test]
+    fn la_hora_de_pared_sale_del_exif_con_o_sin_desfase() {
+        let con = Taken::new(When::Local(exif(23, Some(-240))), Source::Exif);
+        assert_eq!(con.wall, Some((PARED, Some(-240))));
+        // 23:30 en UTC−4 son las 03:30 UTC del día siguiente.
+        assert_eq!(con.when, Some(When::Unix(PARED + 4 * 3600)));
+
+        let sin = Taken::new(When::Local(exif(23, None)), Source::Name);
+        assert_eq!(sin.wall, Some((PARED, None)));
+        assert_eq!(sin.when, Some(When::Local(exif(23, None))));
+        let p = sin.sql_params();
+        assert_eq!((p.wall, p.offset), (Some(PARED), None));
+        assert_eq!(p.local.as_deref(), Some("2024-07-14 23:30:00"));
+    }
+
+    #[test]
+    fn los_instantes_sin_hora_de_camara_no_traen_hora_de_pared() {
+        // `creation_time` de un vídeo: UTC, no la hora de la cámara.
+        let video = Taken::new(When::Local(exif(23, Some(0))), Source::Video);
+        assert_eq!(video.wall, None);
+        assert_eq!(video.when, Some(When::Unix(PARED)));
+        // La fecha de los vídeos de Apple sí trae su desfase.
+        let apple = Taken::new(When::Local(exif(23, Some(120))), Source::Video);
+        assert_eq!(apple.wall, Some((PARED, Some(120))));
+        // Takeout y marcas de tiempo en el nombre.
+        assert_eq!(Taken::new(When::Unix(PARED), Source::Takeout).wall, None);
+        // Un desfase imposible no se guarda como desfase.
+        let raro = Taken::new(When::Local(exif(23, Some(15 * 60))), Source::Exif);
+        assert_eq!(raro.wall, None);
+    }
+
+    fn biblioteca() -> (tempfile::TempDir, crate::Library, i64) {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = crate::Library::create(dir.path()).unwrap();
+        lib.connection()
+            .execute(
+                "INSERT INTO photos (rel_path, size_bytes, modified_at, imported_at)
+                 VALUES ('Originales/a.jpg', 1, 1000, 0)",
+                [],
+            )
+            .unwrap();
+        let id = lib.connection().last_insert_rowid();
+        (dir, lib, id)
+    }
+
+    fn hora_local(lib: &crate::Library, id: i64) -> (Option<i64>, Option<i64>, Option<i64>) {
+        lib.connection()
+            .query_row(
+                "SELECT taken_local, taken_offset, taken_at FROM photos WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn guarda_la_hora_local_y_el_desfase_en_cualquier_zona() {
+        let (_dir, lib, id) = biblioteca();
+        let conn = lib.connection();
+        let con = Taken::new(When::Local(exif(23, Some(-240))), Source::Exif);
+        set_taken(conn, "Originales/a.jpg", &con).unwrap();
+        assert_eq!(
+            hora_local(&lib, id),
+            (Some(PARED), Some(-240), Some(PARED + 4 * 3600))
+        );
+
+        // Sin hora de pared, la de reserva sale del instante con la zona del
+        // equipo, y el desfase se borra.
+        let takeout = Taken::new(When::Unix(PARED), Source::Takeout);
+        set_taken(conn, "Originales/a.jpg", &takeout).unwrap();
+        let esperada: i64 = conn
+            .query_row(
+                "SELECT unixepoch(?1, 'unixepoch', 'localtime')",
+                [PARED],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hora_local(&lib, id), (Some(esperada), None, Some(PARED)));
+
+        // Sin fecha de captura, la de modificación.
+        set_taken(conn, "Originales/a.jpg", &Taken::NONE).unwrap();
+        let reserva: i64 = conn
+            .query_row(
+                "SELECT unixepoch(1000, 'unixepoch', 'localtime')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hora_local(&lib, id), (Some(reserva), None, None));
+    }
+
+    #[test]
+    fn la_fecha_a_mano_guarda_y_devuelve_la_hora_local_automatica() {
+        let (_dir, lib, id) = biblioteca();
+        let con = Taken::new(When::Local(exif(23, Some(-240))), Source::Exif);
+        set_taken(lib.connection(), "Originales/a.jpg", &con).unwrap();
+
+        assert!(lib.set_manual_taken(id, "2020-01-02 10:00").unwrap());
+        let (local, offset, _) = hora_local(&lib, id);
+        assert_eq!((local, offset), (Some(1_577_959_200), None));
+        // Mientras hay fecha a mano, reindexar mejora la automática.
+        set_taken(lib.connection(), "Originales/a.jpg", &con).unwrap();
+        let auto: (Option<i64>, Option<i64>) = lib
+            .connection()
+            .query_row(
+                "SELECT taken_auto_local, taken_auto_offset FROM photos WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(auto, (Some(PARED), Some(-240)));
+
+        assert!(lib.clear_manual_taken(id).unwrap());
+        assert_eq!(
+            hora_local(&lib, id),
+            (Some(PARED), Some(-240), Some(PARED + 4 * 3600))
+        );
+    }
+
+    #[test]
+    fn otras_escrituras_reciben_la_hora_local_de_reserva() {
+        let (_dir, lib, id) = biblioteca();
+        let conn = lib.connection();
+        let local = |secs: i64| -> i64 {
+            conn.query_row(
+                "SELECT unixepoch(?1, 'unixepoch', 'localtime')",
+                [secs],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        // Una fila sin hora local la recibe de la fecha de modificación…
+        assert_eq!(hora_local(&lib, id).0, Some(local(1000)));
+        // …y de `taken_at` cuando alguien la cambia sin dar la hora local.
+        conn.execute("UPDATE photos SET taken_at = ?1 WHERE id = ?2", [PARED, id])
+            .unwrap();
+        assert_eq!(
+            hora_local(&lib, id),
+            (Some(local(PARED)), None, Some(PARED))
+        );
+        // Cambiar la fecha de modificación no la toca si hay fecha de captura.
+        conn.execute("UPDATE photos SET modified_at = 5 WHERE id = ?1", [id])
+            .unwrap();
+        assert_eq!(hora_local(&lib, id).0, Some(local(PARED)));
     }
 }

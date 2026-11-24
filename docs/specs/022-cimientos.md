@@ -1,6 +1,6 @@
 # 022 · Cimientos de conservación
 
-- Estado: borrador
+- Estado: en curso (aprobada por Paulo el 2026-11-24)
 - Fase: F2
 
 ## Qué y por qué
@@ -87,6 +87,10 @@ Todo lo que hoy usa `'localtime'` sobre la fecha de captura pasa a usar
   línea de tiempo.
 - El panel Detalles enseña la hora local y, si se sabe, el desfase:
   «14 jul 2024, 23:30 (UTC−04:00)».
+
+El núcleo da a la interfaz el día ya calculado (`GridPhoto::day`, también en
+las copias de Duplicados), y `date` queda como valor de orden para el cursor y
+la selección: la interfaz no vuelve a pasar fechas por la zona del equipo.
 
 La Papelera agrupa por fecha de envío (`trashed_at`), que es un instante del
 propio equipo: no cambia.
@@ -329,11 +333,11 @@ las colecciones (spec 021).
 
 ## Tareas (≤1 h cada una)
 Hora local
-1. [ ] Migración 0016 (`taken_local`, `taken_offset`, `taken_auto_local`,
+1. [x] Migración 0016 (`taken_local`, `taken_offset`, `taken_auto_local`,
        `taken_auto_offset`, relleno inicial e índices de la línea de tiempo
        rehechos) y escritura de las columnas en importar, indexar, fecha a
        mano y «Guardar como copia».
-2. [ ] Consultas de la línea de tiempo, meses, selección por día y búsqueda por
+2. [x] Consultas de la línea de tiempo, meses, selección por día y búsqueda por
        fecha con `taken_local`; medidas con 10 000 fotos.
 3. [ ] Recuerdos, rangos y panel Detalles (hora local y desfase) con
        `taken_local`; pruebas con varias `TZ`.

@@ -12,7 +12,7 @@ use crate::error::Result;
 use crate::files::{hash_file, is_hidden, unix_secs};
 use crate::library::{Library, ORIGINALS_DIR};
 use crate::paths::RelPath;
-use crate::taken::{Taken, set_taken, taken_at_sql};
+use crate::taken::{Taken, set_taken, taken_at_sql, taken_local_sql};
 
 /// Resultado de indexar la biblioteca.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
@@ -271,14 +271,16 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
         props,
         ref taken,
     } = *photo;
-    let (exact, local) = taken.sql_params();
+    let p = taken.sql_params();
+    let at = taken_at_sql(8, 9);
     conn.execute(
         &format!(
             "INSERT INTO photos
                  (rel_path, size_bytes, modified_at, content_hash, width, height, orientation,
-                  imported_at, taken_at, taken_source, media_kind, duration_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {}, ?10, ?11, ?12)",
-            taken_at_sql(8, 9)
+                  imported_at, taken_at, taken_source, media_kind, duration_ms,
+                  taken_local, taken_offset)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, unixepoch(), {at}, ?10, ?11, ?12, {local}, ?14)",
+            local = taken_local_sql(13, &at, "?3")
         ),
         params![
             rel.as_str(),
@@ -288,11 +290,13 @@ pub(crate) fn insert_photo(conn: &Connection, rel: &RelPath, photo: &NewPhoto) -
             props.dims.map(|d| d.0),
             props.dims.map(|d| d.1),
             props.orientation,
-            exact,
-            local,
+            p.exact,
+            p.local,
             taken.source.as_str(),
             props.kind(),
-            props.duration_ms.and_then(|d| i64::try_from(d).ok())
+            props.duration_ms.and_then(|d| i64::try_from(d).ok()),
+            p.wall,
+            p.offset
         ],
     )?;
     let id = conn.last_insert_rowid();

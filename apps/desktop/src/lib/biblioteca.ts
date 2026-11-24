@@ -11,7 +11,8 @@ export interface FotoCuadricula {
   id: number;
   name: string; // nombre del archivo, sin carpetas
   month: string;
-  date: number; // segundos desde la época Unix
+  day: string; // "2024-07-14": día de la hora local de captura (spec 022), o del envío en la Papelera
+  date: number; // valor por el que ordena la vista (cursor y rangos): no se muestra
   width: number | null; // ya girada según la orientación
   height: number | null;
   thumbnail_failed: boolean; // sin miniatura posible: se muestra el marcador
@@ -394,7 +395,8 @@ export interface CopiaDuplicada {
   id: number;
   rel_path: string;
   size_bytes: number;
-  date: number; // captura o, si falta, modificación
+  date: number; // valor por el que se ordena (hora local de captura o de modificación): no se muestra
+  day: string; // "2024-08-17": su día (spec 022)
   favorite: boolean;
   archived: boolean;
   exists: boolean; // false: foto desaparecida del disco

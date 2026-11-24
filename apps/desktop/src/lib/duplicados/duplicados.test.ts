@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GrupoDuplicado } from "$lib/biblioteca";
-import { diaLocal, fechaCopia, fotosDelGrupo, separarRuta, textoResumen } from "./duplicados";
+import { fechaCopia, fotosDelGrupo, separarRuta, textoResumen } from "./duplicados";
 
 const mediodia = (a: number, m: number, d: number) => new Date(a, m - 1, d, 12).getTime() / 1000;
 
@@ -22,13 +22,13 @@ describe("duplicados", () => {
     );
   });
 
-  it("da el día en hora local", () => {
-    expect(diaLocal(mediodia(2024, 8, 17))).toBe("2024-08-17");
+  it("da el día de la hora local de captura", () => {
     const copia = {
       id: 1,
       rel_path: "a.jpg",
       size_bytes: 1,
       date: mediodia(2024, 8, 17),
+      day: "2024-08-17",
       favorite: false,
       archived: false,
       exists: true,
@@ -48,6 +48,7 @@ describe("duplicados", () => {
           rel_path: "Originales/x/IMG.jpg",
           size_bytes: 10,
           date: mediodia(2024, 8, 17),
+          day: "2024-08-17",
           favorite: true,
           archived: false,
           exists: false,
@@ -61,6 +62,7 @@ describe("duplicados", () => {
         id: 7,
         name: "IMG.jpg",
         month: "2024-08",
+        day: "2024-08-17",
         date: grupo.date,
         width: null,
         height: null,

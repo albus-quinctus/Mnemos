@@ -21,7 +21,7 @@ function fecha(dia: string): number {
 }
 
 function foto(id: number, dia: string, width: number | null = 3000, height: number | null = 2000): FotoCuadricula {
-  return { id, name: `${id}.jpg`, month: dia.slice(0, 7), date: fecha(dia), width, height, thumbnail_failed: false, favorite: false, archived: false, edit_version: null, media_kind: "foto", duration_ms: null };
+  return { id, name: `${id}.jpg`, month: dia.slice(0, 7), day: dia, date: fecha(dia), width, height, thumbnail_failed: false, favorite: false, archived: false, edit_version: null, media_kind: "foto", duration_ms: null };
 }
 
 function mesesDe(fotos: FotoCuadricula[]): Mes[] {
@@ -170,7 +170,7 @@ describe("nombres", () => {
   });
 
   it("el día va en hora local", () => {
-    expect(diaDe({ date: fecha("2026-10-20") })).toBe("2026-10-20");
+    expect(diaDe({ day: "2026-10-20" })).toBe("2026-10-20");
   });
 });
 
