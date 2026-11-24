@@ -26,6 +26,21 @@ export function medidasMiniatura(ancho: number, alto: number): { ancho: number; 
   };
 }
 
+/** Nombres de los códigos de `MediaError` del estándar HTML. */
+const CODIGOS_ERROR_VIDEO: Record<number, string> = {
+  1: "MEDIA_ERR_ABORTED",
+  2: "MEDIA_ERR_NETWORK",
+  3: "MEDIA_ERR_DECODE",
+  4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+};
+
+/** Por qué el motor web no puede leer un vídeo, con el código y su mensaje. */
+export function describirErrorVideo(error: Pick<MediaError, "code" | "message"> | null): string {
+  if (!error) return "el motor web no puede leer este vídeo";
+  const codigo = CODIGOS_ERROR_VIDEO[error.code] ?? `código ${error.code}`;
+  return error.message ? `${codigo}: ${error.message}` : codigo;
+}
+
 /** Segundo del fotograma: el 1, o la mitad si dura menos de 2 s. */
 export function momentoFotograma(duracion: number): number {
   if (!Number.isFinite(duracion) || duracion <= 0) return 0;
@@ -45,7 +60,7 @@ function esperar(video: HTMLVideoElement, evento: string): Promise<void> {
     };
     const mal = () => {
       limpiar();
-      reject(new Error(video.error?.message || "el motor web no puede leer este vídeo"));
+      reject(new Error(describirErrorVideo(video.error)));
     };
     const reloj = setTimeout(() => {
       limpiar();
