@@ -33,10 +33,21 @@ const MIGRATIONS: &[&str] = &[
 /// Versión de esquema que entiende esta versión de MNEMOS.
 pub const SCHEMA_VERSION: u32 = MIGRATIONS.len() as u32;
 
+/// Primera migración, para las pruebas que montan bases antiguas.
+#[cfg(test)]
+pub(crate) const FIRST_MIGRATION: &str = MIGRATIONS[0];
+
 /// Abre (o crea) la base de datos y la lleva a la última versión del esquema.
+/// Antes de migrar una base que ya tenía datos guarda una copia en
+/// `.mnemos/copias/` (spec 022); si no puede, no migra.
 pub fn open(path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(path)?;
     configure(&conn)?;
+    let current = schema_version(&conn)?;
+    if current > 0 && current < SCHEMA_VERSION {
+        crate::backups::backup_before_migration(&conn, path, current)
+            .map_err(|e| Error::BackupBeforeMigration(Box::new(e)))?;
+    }
     migrate(&mut conn)?;
     Ok(conn)
 }
