@@ -28,6 +28,8 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0014_papelera.sql"),
     // Vídeos (spec 019).
     include_str!("migrations/0015_videos.sql"),
+    // Pilas (spec 023).
+    include_str!("migrations/0018_pilas.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -95,6 +97,7 @@ mod tests {
             "photo_tags",
             "photo_search",
             "day_titles",
+            "stacks",
         ] {
             let n: i64 = conn
                 .query_row(
