@@ -1,6 +1,6 @@
 # 024 · Filtros de búsqueda y estrellas
 
-- Estado: borrador
+- Estado: en curso
 - Fase: F2 (0.5 beta)
 
 ## Qué y por qué
@@ -257,9 +257,13 @@ fusionarla.
 1. [ ] Capturas del diseño (estrellas en el visor y en Detalles, menú «Valorar»
        de la barra de selección, panel de filtros, pastillas, sin resultados),
        en claro y oscuro (`capturas/024-*.png`), para que Paulo las apruebe.
-2. [ ] `mnemos-imaging`: `xmp.rs` con `quick-xml` (JPEG, PNG, WebP, TIFF/RAW y
+2. [x] `mnemos-imaging`: `xmp.rs` con `quick-xml` (JPEG, PNG, WebP, TIFF/RAW y
        `.xmp` suelto), valoración EXIF; pruebas con muestras reales y con XMP
-       mal formado, enorme y con entidades; `cargo deny`.
+       mal formado, enorme y con entidades; `cargo deny`. `read_xmp`,
+       `read_xmp_sidecar`, `parse_xmp` y `exif_rating`; `quick-xml` 0.42 sin
+       funciones opcionales (ya estaba en el árbol por Tauri). Las pruebas
+       usan paquetes como los de Lightroom y darktable dentro de archivos
+       mínimos generados en la prueba.
 3. [ ] `mnemos-core`: migración 0019; el indexado lee una vez XMP incrustado,
        valoración EXIF y cámara (`metadata_at`), crea las etiquetas y rellena la
        descripción vacía; pruebas de reindexado y de valor manual.
