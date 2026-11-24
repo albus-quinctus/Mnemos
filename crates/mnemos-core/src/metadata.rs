@@ -49,6 +49,39 @@ impl FileMeta {
             lens: camera.lens,
         }
     }
+
+    /// Lo del `.xmp` junto al archivo de origen gana a lo del archivo, campo
+    /// a campo, como en Lightroom o darktable. Las palabras clave se suman,
+    /// primero las del `.xmp`.
+    pub(crate) fn with_sidecar(mut self, sidecar: XmpData) -> Self {
+        self.rating = sidecar.rating.or(self.rating);
+        self.description = sidecar.description.or(self.description);
+        let mut keywords = sidecar.keywords;
+        for k in self.keywords {
+            if !keywords
+                .iter()
+                .any(|o| o.to_lowercase() == k.to_lowercase())
+            {
+                keywords.push(k);
+            }
+        }
+        self.keywords = keywords;
+        self
+    }
+}
+
+/// `.xmp` junto a `src`: `foto.CR2.xmp` (darktable, digiKam) y, si no existe,
+/// `foto.xmp` (Lightroom, Bridge), con la extensión en minúsculas o
+/// mayúsculas. Solo lee.
+pub(crate) fn sidecar_of(src: &Path) -> Option<XmpData> {
+    let dir = src.parent()?;
+    let name = src.file_name()?.to_str()?;
+    let stem = src.file_stem()?.to_str()?;
+    [name, stem]
+        .iter()
+        .flat_map(|base| ["xmp", "XMP"].map(|ext| dir.join(format!("{base}.{ext}"))))
+        .find(|p| p.is_file())
+        .and_then(|p| mnemos_imaging::read_xmp_sidecar(&p))
 }
 
 /// Guarda `meta` en la foto `id` si todavía no se leyó (`metadata_at` es
@@ -371,5 +404,69 @@ pub(crate) mod tests {
         assert_eq!(pending(&lib.conn).unwrap().len(), 1);
         fs::rename(&saved, &path).unwrap();
         assert_eq!(lib.read_pending_metadata().unwrap(), 1);
+    }
+
+    #[test]
+    fn el_xmp_suelto_gana() {
+        let file = meta(Some(2), &["Playa"]);
+        let sidecar = XmpData {
+            rating: Some(5),
+            description: None,
+            keywords: vec!["playa".into(), "Verano".into()],
+        };
+        let merged = file.with_sidecar(sidecar);
+        assert_eq!(merged.rating, Some(5));
+        assert_eq!(merged.description.as_deref(), Some("Del XMP"));
+        assert_eq!(merged.keywords, ["playa", "Verano"]);
+    }
+
+    fn rating_of(lib: &Library, name: &str) -> i64 {
+        ratings(lib)
+            .into_iter()
+            .find(|r| r.0.ends_with(name))
+            .unwrap_or_else(|| panic!("falta {name}"))
+            .1
+    }
+
+    #[test]
+    fn importar_usa_el_xmp_junto_al_origen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lib = Library::create(&dir.path().join("Biblioteca")).unwrap();
+        let src = dir.path().join("Camara");
+        // Incrustado 2, al lado 5: gana el de al lado.
+        write_png_with_xmp(&src.join("a.png"), b"a", &xmp(2, "", &["Dentro"]));
+        fs::write(src.join("a.png.xmp"), xmp(5, "", &["Fuera"])).unwrap();
+        // foto.xmp de Lightroom para el RAW y el JPEG, salvo el que tiene el suyo.
+        crate::index::tests::write_png(&src.join("b.png"), 4, 3, b"b");
+        crate::index::tests::write_png(&src.join("b.webp"), 4, 3, b"c");
+        fs::write(src.join("b.xmp"), xmp(3, "", &[])).unwrap();
+        crate::index::tests::write_png(&src.join("c.png"), 4, 3, b"d");
+        fs::write(src.join("c.xmp"), xmp(1, "", &[])).unwrap();
+        fs::write(src.join("c.png.XMP"), xmp(4, "", &[])).unwrap();
+        // Un .xmp mal formado se ignora.
+        write_png_with_xmp(&src.join("d.png"), b"e", &xmp(2, "", &[]));
+        fs::write(src.join("d.png.xmp"), "<x:xmpmeta><rdf:RDF>").unwrap();
+        let report = lib.import_from(&src).unwrap();
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+
+        assert_eq!(rating_of(&lib, "a.png"), 5);
+        assert_eq!(rating_of(&lib, "/b.png"), 3);
+        assert_eq!(rating_of(&lib, "/b.webp"), 3);
+        assert_eq!(rating_of(&lib, "c.png"), 4);
+        assert_eq!(rating_of(&lib, "d.png"), 2);
+        let mut names: Vec<String> = lib.tags().unwrap().into_iter().map(|t| t.name).collect();
+        names.sort();
+        assert_eq!(names, ["Dentro", "Fuera"]);
+        // Los .xmp no se copian a la biblioteca.
+        let copied: Vec<_> = walkdir::WalkDir::new(lib.root.join(crate::library::ORIGINALS_DIR))
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .is_some_and(|x| x.eq_ignore_ascii_case("xmp"))
+            })
+            .collect();
+        assert!(copied.is_empty());
     }
 }

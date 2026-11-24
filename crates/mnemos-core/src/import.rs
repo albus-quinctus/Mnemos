@@ -236,8 +236,13 @@ fn import_file(
         seen.takeout_applied.insert(hash.clone());
     }
     // Después de Takeout: la descripción del XMP solo entra si Takeout no
-    // trae ninguna (spec 024).
-    metadata::apply(&tx, id, &FileMeta::of_file(&dest))?;
+    // trae ninguna. Un `.xmp` junto al archivo de origen gana al XMP
+    // incrustado; no se copia a la biblioteca (spec 024).
+    let mut file_meta = FileMeta::of_file(&dest);
+    if let Some(sidecar) = metadata::sidecar_of(src) {
+        file_meta = file_meta.with_sidecar(sidecar);
+    }
+    metadata::apply(&tx, id, &file_meta)?;
     tx.commit()?;
     seen.imported.insert(hash);
     Ok(Outcome::Copied(props.video))
