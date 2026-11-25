@@ -82,9 +82,10 @@ pub enum View {
     /// Una colección automática de Explorar, sin archivadas (spec 021).
     #[serde(rename = "coleccion")]
     Collection(Collection),
-    /// Las fotos con fecha de captura en `[desde, hasta)` (segundos Unix),
-    /// sin archivadas: un recuerdo de Explorar (spec 021). Las fotos sin
-    /// fecha de captura no salen.
+    /// Las fotos con fecha de captura en `[desde, hasta)`, sin archivadas: un
+    /// recuerdo de Explorar (spec 021). `desde` y `hasta` son instantes (las
+    /// medianoches del equipo) y se comparan con la hora local de captura
+    /// (spec 022). Las fotos sin fecha de captura no salen.
     #[serde(rename = "rango")]
     Range { desde: i64, hasta: i64 },
 }
@@ -120,9 +121,11 @@ impl View {
             View::Collection(collection) => return collection.filter(),
             View::Range { desde, hasta } => {
                 return Filter {
-                    sql: " AND archived_at IS NULL AND trashed_at IS NULL \
-                          AND taken_at >= ? AND taken_at < ?"
-                        .to_owned(),
+                    sql:
+                        " AND archived_at IS NULL AND trashed_at IS NULL AND taken_at IS NOT NULL \
+                          AND taken_local >= unixepoch(?, 'unixepoch', 'localtime') \
+                          AND taken_local < unixepoch(?, 'unixepoch', 'localtime')"
+                            .to_owned(),
                     params: vec![Value::from(desde), Value::from(hasta)],
                     order: DATE,
                 };
