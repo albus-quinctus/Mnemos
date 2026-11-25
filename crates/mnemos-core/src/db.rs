@@ -30,6 +30,9 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0015_videos.sql"),
     // Hora local de captura (spec 022).
     include_str!("migrations/0016_hora_local.sql"),
+    // Valoración, cámara y objetivo (spec 024). Va después de la 0016, que se
+    // fusionó antes.
+    include_str!("migrations/0019_valoracion_y_camara.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.

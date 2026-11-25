@@ -179,6 +179,8 @@ pub struct GridPhoto {
     pub media_kind: String,
     /// Duración de un vídeo en milisegundos, si se conoce.
     pub duration_ms: Option<u64>,
+    /// Estrellas de 0 a 5 (spec 024).
+    pub rating: u8,
 }
 
 /// Dónde sigue la página siguiente: justo después de esta foto.
@@ -257,7 +259,8 @@ impl Library {
                     width, height, coalesce(orientation, 1),
                     content_hash IN (SELECT content_hash FROM thumbnail_failures),
                     rel_path, favorite, archived_at IS NOT NULL, edit_version, content_hash,
-                    media_kind, duration_ms, strftime('%Y-%m-%d', {wall}, 'unixepoch')
+                    media_kind, duration_ms, strftime('%Y-%m-%d', {wall}, 'unixepoch'),
+                    rating
              FROM photos
              WHERE ({order}, id) < (?, ?) {}
              ORDER BY {order} DESC, id DESC
@@ -295,6 +298,7 @@ impl Library {
                     edit_version,
                     media_kind: r.get(12)?,
                     duration_ms: r.get(13)?,
+                    rating: r.get(15)?,
                 };
                 Ok((photo, hash.filter(|_| edit_version.is_some())))
             })?
