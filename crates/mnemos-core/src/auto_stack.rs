@@ -4,9 +4,10 @@
 //! Cada foto se examina una sola vez (`stack_auto_at`). Las reglas buscan
 //! pareja también entre las fotos ya examinadas de la misma carpeta, pero un
 //! grupo solo se apila si alguna de sus fotos está pendiente. Así, lo que el
-//! usuario desapila no vuelve a apilarse solo. Se mira la base de datos y,
-//! para la regla 4, la cámara del EXIF de las candidatas: los originales solo
-//! se leen.
+//! usuario desapila no vuelve a apilarse solo. Se mira la base de datos (la
+//! cámara, de la columna `camera` de la spec 024) y, si una candidata de la
+//! regla 4 aún no tiene sus metadatos leídos, su EXIF: los originales solo se
+//! leen.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -43,6 +44,8 @@ struct Row {
     stack: Option<i64>,
     /// Su pila es de tipo RAW + JPEG.
     in_raw_jpeg: bool,
+    /// Cámara de la columna `camera`, si ya se leyeron sus metadatos.
+    camera: Option<Option<String>>,
 }
 
 impl Library {
@@ -96,7 +99,8 @@ fn auto_stack(conn: &Connection, camera: &mut dyn FnMut(&str) -> Option<String>)
 fn folders(conn: &Connection) -> Result<BTreeMap<String, Vec<Row>>> {
     let mut stmt = conn.prepare(
         "SELECT p.id, p.rel_path, p.taken_at, p.archived_at IS NOT NULL,
-                p.stack_auto_at IS NULL, p.stack_id, s.kind
+                p.stack_auto_at IS NULL, p.stack_id, s.kind,
+                p.metadata_at IS NOT NULL, p.camera
          FROM photos p LEFT JOIN stacks s ON s.id = p.stack_id
          WHERE p.media_kind = 'foto' AND p.trashed_at IS NULL AND p.stack_manual = 0
          ORDER BY p.rel_path",
@@ -119,6 +123,7 @@ fn folders(conn: &Connection) -> Result<BTreeMap<String, Vec<Row>>> {
             stack: r.get(5)?,
             in_raw_jpeg: r.get::<_, Option<String>>(6)?.as_deref()
                 == Some(StackKind::RawJpeg.as_sql()),
+            camera: if r.get(7)? { Some(r.get(8)?) } else { None },
         };
         out.entry(dir.to_owned()).or_default().push(row);
     }
@@ -285,8 +290,9 @@ fn burst_key(stem: &str) -> Option<String> {
 
 /// Regla 4: fotos de la misma cámara con números de archivo seguidos
 /// (`IMG_4501`, `IMG_4502`) y 0 o 1 s entre cada una y la siguiente. Hacen
-/// falta al menos 2 y fecha de captura. La cámara solo se lee de las fotos
-/// que ya cumplen el nombre y la fecha. Portada: la primera.
+/// falta al menos 2 y fecha de captura. La cámara sale de la columna
+/// `camera`; si una foto que ya cumple el nombre y la fecha aún no tiene sus
+/// metadatos leídos, de su EXIF. Portada: la primera.
 fn burst_by_camera(
     conn: &Connection,
     rows: &mut [Row],
@@ -322,11 +328,11 @@ fn burst_by_camera(
                     && {
                         let a = cameras
                             .entry(prev)
-                            .or_insert_with(|| camera(&rows[prev].rel))
+                            .or_insert_with(|| camera_or_read(&rows[prev], camera))
                             .clone();
                         let b = cameras
                             .entry(i)
-                            .or_insert_with(|| camera(&rows[i].rel))
+                            .or_insert_with(|| camera_or_read(&rows[i], camera))
                             .clone();
                         a.is_some() && a == b
                     }
@@ -340,6 +346,15 @@ fn burst_by_camera(
         changed += close_run(conn, rows, &run, now)?;
     }
     Ok(changed)
+}
+
+/// La cámara guardada de la foto o, si aún no se leyeron sus metadatos, la
+/// que da `camera`.
+fn camera_or_read(row: &Row, camera: &mut dyn FnMut(&str) -> Option<String>) -> Option<String> {
+    match &row.camera {
+        Some(saved) => saved.clone(),
+        None => camera(&row.rel),
+    }
 }
 
 /// Apila una serie de la regla 4 si tiene al menos 2 fotos y alguna pendiente.
@@ -758,6 +773,30 @@ mod tests {
                 ("raw_jpeg".into(), 4, vec![3, 4]),
             ]
         );
+    }
+
+    #[test]
+    fn rafaga_por_la_camara_usa_la_camara_guardada() {
+        let (_dir, mut lib) = library(&[
+            a("IMG_4501.HEIC", 0),
+            a("IMG_4502.HEIC", 1),
+            a("IMG_4601.HEIC", 0),
+            a("IMG_4602.HEIC", 0),
+        ]);
+        lib.conn
+            .execute_batch(
+                "UPDATE photos SET metadata_at = 1, camera = 'Apple iPhone 12' WHERE id <= 2;
+                 UPDATE photos SET metadata_at = 1, camera = NULL WHERE id > 2;",
+            )
+            .unwrap();
+        // El EXIF no se mira: lo guardado manda, también cuando no hay cámara.
+        let otra = [
+            ("IMG_4501.HEIC", "Canon"),
+            ("IMG_4601.HEIC", "Canon"),
+            ("IMG_4602.HEIC", "Canon"),
+        ];
+        assert_eq!(agrupar_con(&mut lib, &otra), 1);
+        assert_eq!(pilas(&lib), vec![("rafaga".into(), 1, vec![1, 2])]);
     }
 
     #[test]
