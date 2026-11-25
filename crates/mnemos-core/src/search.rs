@@ -13,6 +13,7 @@ use rusqlite::types::Value;
 use rusqlite::{params, params_from_iter};
 
 use crate::error::Result;
+use crate::filters::SearchFilters;
 use crate::library::Library;
 use crate::timeline::{DATE, Filter, Month, TimelineCursor, TimelinePage};
 
@@ -44,6 +45,8 @@ pub struct SearchQuery {
     /// Palabras normalizadas, en el orden en que se escribieron.
     pub words: Vec<String>,
     pub date: Option<DateFilter>,
+    /// Filtros del panel (spec 024); `parse` los deja vacíos.
+    pub filters: SearchFilters,
 }
 
 const MONTHS: [&str; 12] = [
@@ -98,7 +101,7 @@ impl SearchQuery {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.words.is_empty() && self.date.is_none()
+        self.words.is_empty() && self.date.is_none() && self.filters.is_empty()
     }
 
     /// Expresión para `photo_search MATCH`, o nada si no hay palabras. Cada
@@ -156,6 +159,7 @@ impl Library {
                 .push_str(" AND id IN (SELECT rowid FROM photo_search WHERE photo_search MATCH ?)");
             filter.params.push(Value::Text(expr));
         }
+        self.push_filters(&mut filter, &query.filters)?;
         let Some(date) = query.date else {
             return Ok(Some(filter));
         };

@@ -102,14 +102,7 @@ impl Collection {
                  AND max(width, height) >= 2 * min(width, height)"
                 .to_owned(),
             Collection::Edited => "media_kind = 'foto' AND edit_version IS NOT NULL".to_owned(),
-            Collection::Raw => {
-                let any = mnemos_imaging::RAW_EXTENSIONS
-                    .iter()
-                    .map(|ext| format!("lower(rel_path) LIKE '%.{ext}'"))
-                    .collect::<Vec<_>>()
-                    .join(" OR ");
-                format!("({any})")
-            }
+            Collection::Raw => raw_condition(),
         };
         Filter {
             sql: format!("{BASE} AND {condition}"),
@@ -117,6 +110,17 @@ impl Collection {
             order: DATE,
         }
     }
+}
+
+/// Condición SQL de las fotos RAW o DNG, por la extensión. La usan la
+/// colección RAW y el filtro «RAW» de la búsqueda (spec 024).
+pub(crate) fn raw_condition() -> String {
+    let any = mnemos_imaging::RAW_EXTENSIONS
+        .iter()
+        .map(|ext| format!("lower(rel_path) LIKE '%.{ext}'"))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    format!("({any})")
 }
 
 #[cfg(test)]

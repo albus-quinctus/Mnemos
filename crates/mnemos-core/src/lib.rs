@@ -15,6 +15,7 @@ pub mod explore;
 pub mod export;
 pub mod export_many;
 mod files;
+pub mod filters;
 pub mod import;
 pub mod index;
 pub mod library;
@@ -40,6 +41,9 @@ pub use edits::{EditSummary, EditVersion, StoredRecipe};
 pub use error::{Error, Result};
 pub use explore::{CollectionCard, Explore, Memory};
 pub use export::ExportSize;
+pub use filters::{
+    CameraOption, FilterOptions, GroupOption, KindFilter, LensOption, SearchFilters,
+};
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, MediaEdit, PhotoDetails, PhotoMedia};

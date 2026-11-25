@@ -165,8 +165,10 @@ fusionarla.
   - `set_rating(ids, n) -> Vec<PreviousRating>` y `restore_ratings(..)` para
     deshacer; `set_rating` pone `rating_source = 'manual'`.
   - `SearchFilters { kind, camera, lens, from, to, min_rating, favorites,
-    album, tag }` (serializado en español para la interfaz). `search_months` y
-    `search_page` reciben consulta y filtros; cada filtro es una condición más
+    album, tag }` (serializado en español para la interfaz). Va dentro de
+    `SearchQuery` (campo `filters`), así que `search_months`, `search_page` y
+    «Seleccionar todo» de la búsqueda reciben consulta y filtros juntos; un
+    día mal escrito da `InvalidDay`. Cada filtro es una condición más
     en el `Filter` de `search_filter`, con parámetros, nunca texto pegado en el
     SQL.
   - `filter_options() -> FilterOptions` con cámaras y objetivos (con su
@@ -290,10 +292,11 @@ fusionarla.
        «Deshacer»; pruebas de la interfaz.
 7. [ ] Barra de selección y cuadrícula: «Valorar», teclas con selección,
        «★ N» en las miniaturas valoradas; pruebas.
-8. [ ] `mnemos-core` (espera a la hora local de la 022): `SearchFilters` en
+8. [x] `mnemos-core` (espera a la hora local de la 022): `SearchFilters` en
        `search_filter`, `filter_options`, índices si hacen falta; pruebas de
        cada filtro y de combinaciones; medida con 10 000 fotos en
-       `docs/rendimiento.md`.
+       `docs/rendimiento.md`. Hecho: módulo `filters.rs`; sin índices nuevos
+       (lo más lento, el tipo RAW, 14 ms).
 9. [ ] Tauri e interfaz: argumento `filtros` en la búsqueda, comando
        `opciones_filtros`, botón y panel de filtros, pastillas, `Esc`, sin
        resultados; pruebas de la interfaz.
