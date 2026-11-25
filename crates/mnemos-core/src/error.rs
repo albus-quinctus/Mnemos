@@ -78,6 +78,9 @@ pub enum Error {
     #[error("no hay ninguna etiqueta con el id {0}")]
     TagNotFound(i64),
 
+    #[error("{0} no vale como valoración: debe ir de 0 a 5 estrellas")]
+    InvalidRating(u8),
+
     #[error("ya existe una etiqueta llamada «{name}»")]
     TagNameTaken { name: String, existing: i64 },
 

@@ -44,6 +44,7 @@ pub use export::ExportSize;
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, MediaEdit, PhotoDetails, PhotoMedia};
+pub use metadata::PreviousRating;
 pub use paths::RelPath;
 pub use search::{DateFilter, SearchQuery};
 pub use selection::Scope;
