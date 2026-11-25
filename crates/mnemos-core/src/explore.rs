@@ -90,7 +90,7 @@ impl Library {
         let oldest: Option<i64> = self.conn.query_row(
             &format!(
                 "SELECT CAST(strftime('%Y', ?1, 'unixepoch', 'localtime') AS INTEGER)
-                      - CAST(strftime('%Y', min(taken_at), 'unixepoch', 'localtime') AS INTEGER)
+                      - CAST(strftime('%Y', min(taken_local), 'unixepoch') AS INTEGER)
                    FROM photos WHERE {MEMORY_BASE}"
             ),
             [hoy],
@@ -107,14 +107,17 @@ impl Library {
                     unixepoch(?1, 'unixepoch', 'localtime', 'start of day',
                               printf('-%d years', ?2), '+4 days', 'utc')",
         )?;
+        // Las fotos se comparan por su día local de captura (spec 022): los
+        // límites del rango, medianoches del equipo, se pasan a hora de pared.
+        let in_range = "taken_local >= unixepoch(?1, 'unixepoch', 'localtime')
+                    AND taken_local < unixepoch(?2, 'unixepoch', 'localtime')";
         let mut count = self.conn.prepare(&format!(
-            "SELECT count(*) FROM photos
-              WHERE {MEMORY_BASE} AND taken_at >= ?1 AND taken_at < ?2"
+            "SELECT count(*) FROM photos WHERE {MEMORY_BASE} AND {in_range}"
         ))?;
         let mut cover = self.conn.prepare(&format!(
             "SELECT id, edit_version FROM photos
-              WHERE {MEMORY_BASE} AND taken_at >= ?1 AND taken_at < ?2
-              ORDER BY favorite DESC, taken_at DESC, id DESC LIMIT 1"
+              WHERE {MEMORY_BASE} AND {in_range}
+              ORDER BY favorite DESC, taken_local DESC, id DESC LIMIT 1"
         ))?;
 
         let mut memories = Vec::new();
@@ -443,5 +446,41 @@ mod tests {
             ]
         );
         assert_eq!(e.tags_total, 13);
+    }
+
+    #[test]
+    fn recuerdos_por_el_dia_local_de_captura() {
+        let (_dir, lib) = biblioteca();
+        // 23:30 del 14 de julio de 2023 en Nueva York (UTC−4): en UTC ya es
+        // día 15, pero la foto es del 14.
+        let id = insertar(
+            &lib,
+            Foto {
+                rel: "Originales/noche.jpg",
+                taken: Some(1_689_391_800),
+                ..Foto::default()
+            },
+        );
+        lib.conn
+            .execute(
+                "UPDATE photos SET taken_local = 1689377400, taken_offset = -240 WHERE id = ?1",
+                [id],
+            )
+            .unwrap();
+        // Semana del 15 al 21 de julio: el 14 se queda fuera.
+        let hoy = local(&lib, "2026-07-18 12:00:00");
+        assert!(lib.explore(hoy).unwrap().memories.is_empty());
+        // Semana del 14 al 20: entra, y el recuerdo abre la foto.
+        let hoy = local(&lib, "2026-07-17 12:00:00");
+        let memories = lib.explore(hoy).unwrap().memories;
+        assert_eq!(memories.len(), 1);
+        assert_eq!((memories[0].years_ago, memories[0].cover), (3, id));
+        let vista = View::Range {
+            desde: memories[0].desde,
+            hasta: memories[0].hasta,
+        };
+        let page = lib.view_page(vista, None, 10).unwrap();
+        assert_eq!(page.photos.len(), 1);
+        assert_eq!(page.photos[0].day, "2023-07-14");
     }
 }

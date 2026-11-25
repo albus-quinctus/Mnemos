@@ -71,6 +71,14 @@ pub struct PhotoDetails {
     /// Con fecha a mano, la automática a la que se puede volver y su fuente.
     pub taken_auto_at: Option<i64>,
     pub taken_auto_source: Option<String>,
+    /// Hora local de captura (spec 022) en segundos leídos como UTC: lo que
+    /// enseña el panel, sin la zona del equipo. Sin fecha de captura, la de
+    /// modificación en hora local. Y su desfase en minutos, si se sabe.
+    pub taken_local: Option<i64>,
+    pub taken_offset: Option<i16>,
+    /// Lo mismo para la fecha automática de reserva.
+    pub taken_auto_local: Option<i64>,
+    pub taken_auto_offset: Option<i16>,
     /// Formato según la extensión, en mayúsculas: "JPEG", "PNG", "DNG"…
     pub format: String,
     /// `"foto"` o `"video"` (spec 019).
@@ -173,7 +181,8 @@ impl Library {
             .query_row(
                 "SELECT rel_path, width, height, size_bytes, modified_at, coalesce(orientation, 1),
                         taken_at, taken_source, taken_auto_at, taken_auto_source, media_kind,
-                        duration_ms, rating
+                        duration_ms, rating, taken_local, taken_offset, taken_auto_local,
+                        taken_auto_offset
                  FROM photos WHERE id = ?1",
                 [id],
                 |r| {
@@ -191,6 +200,12 @@ impl Library {
                         r.get::<_, String>(10)?,
                         r.get::<_, Option<u64>>(11)?,
                         r.get::<_, u8>(12)?,
+                        (
+                            r.get::<_, Option<i64>>(13)?,
+                            r.get::<_, Option<i16>>(14)?,
+                            r.get::<_, Option<i64>>(15)?,
+                            r.get::<_, Option<i16>>(16)?,
+                        ),
                     ))
                 },
             )
@@ -210,6 +225,7 @@ impl Library {
                 media_kind,
                 duration_ms,
                 rating,
+                (taken_local, taken_offset, taken_auto_local, taken_auto_offset),
             )| {
                 let (width, height) = if mnemos_imaging::swaps_dimensions(orientation) {
                     (h, w)
@@ -227,6 +243,10 @@ impl Library {
                     taken_source,
                     taken_auto_at,
                     taken_auto_source,
+                    taken_local,
+                    taken_offset,
+                    taken_auto_local,
+                    taken_auto_offset,
                     media_kind,
                     duration_ms,
                     rating,
@@ -361,9 +381,10 @@ mod tests {
         lib.connection()
             .execute(
                 "INSERT INTO photos (rel_path, size_bytes, modified_at, width, height, orientation,
-                                     imported_at, taken_at, taken_source)
+                                     imported_at, taken_at, taken_source, taken_local,
+                                     taken_offset)
                  VALUES ('Originales/2026/10/IMG_1.JPG', 4200000, 1791892800, 4000, 3000, 6, 0,
-                         1557664200, 'exif')",
+                         1557664200, 'exif', 1557671400, 120)",
                 [],
             )
             .unwrap();
@@ -382,6 +403,10 @@ mod tests {
                 taken_source: Some("exif".to_owned()),
                 taken_auto_at: None,
                 taken_auto_source: None,
+                taken_local: Some(1_557_671_400),
+                taken_offset: Some(120),
+                taken_auto_local: None,
+                taken_auto_offset: None,
                 format: "JPEG".to_owned(),
                 media_kind: "foto".to_owned(),
                 duration_ms: None,

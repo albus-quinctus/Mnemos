@@ -29,8 +29,10 @@ pub struct Album {
     /// Versión de la edición que se ve de la portada (spec 009), para pedir
     /// su miniatura editada.
     pub cover_edit_version: Option<u32>,
-    /// Fecha (segundos Unix) de la foto más antigua y de la más reciente,
-    /// para el rango de la cabecera. `None` si está vacío.
+    /// Fecha de la foto más antigua y de la más reciente, para el rango de la
+    /// cabecera. Son la hora local de captura (spec 022) pasada a un instante
+    /// con la zona del equipo, para que la interfaz la muestre con la hora que
+    /// marcaba la cámara. `None` si está vacío.
     pub first: Option<i64>,
     pub last: Option<i64>,
     /// Última vez que se creó, renombró o cambió (segundos Unix).
@@ -44,15 +46,15 @@ const SELECT: &str = "
            (SELECT p2.id FROM album_photos ap2
                 JOIN photos p2 ON p2.id = ap2.photo_id
             WHERE ap2.album_id = a.id AND p2.trashed_at IS NULL
-            ORDER BY coalesce(p2.taken_at, p2.modified_at) DESC, p2.id DESC
+            ORDER BY p2.taken_local DESC, p2.id DESC
             LIMIT 1),
-           min(coalesce(p.taken_at, p.modified_at)),
-           max(coalesce(p.taken_at, p.modified_at)),
+           unixepoch(min(p.taken_local), 'unixepoch', 'utc'),
+           unixepoch(max(p.taken_local), 'unixepoch', 'utc'),
            a.updated_at,
            (SELECT p2.edit_version FROM album_photos ap2
                 JOIN photos p2 ON p2.id = ap2.photo_id
             WHERE ap2.album_id = a.id AND p2.trashed_at IS NULL
-            ORDER BY coalesce(p2.taken_at, p2.modified_at) DESC, p2.id DESC
+            ORDER BY p2.taken_local DESC, p2.id DESC
             LIMIT 1)
     FROM albums a
          LEFT JOIN album_photos ap ON ap.album_id = a.id

@@ -147,6 +147,32 @@ pub(crate) fn set_taken(conn: &Connection, rel_path: &str, taken: &Taken) -> Res
     Ok(())
 }
 
+/// Afina la hora local de una foto ya registrada (spec 022) con lo que dice
+/// su original: si `taken` sale de la misma fuente que la fecha guardada y
+/// trae la hora de la cámara, guarda esa hora y su desfase. No cambia la
+/// fecha (`taken_at`) ni su fuente; con fecha a mano, afina la automática de
+/// reserva. Una fecha del Takeout o del `creation_time` de un vídeo no trae
+/// hora de la cámara: se queda con la de reserva.
+pub(crate) fn refine_local(conn: &Connection, rel_path: &str, taken: &Taken) -> Result<()> {
+    let Some((wall, offset)) = taken.wall else {
+        return Ok(());
+    };
+    let source = taken.source.as_str();
+    conn.execute(
+        "UPDATE photos SET taken_local = ?2, taken_offset = ?3
+         WHERE rel_path = ?1 AND taken_source = ?4",
+        params![rel_path, wall, offset, source],
+    )?;
+    conn.execute(
+        &format!(
+            "UPDATE photos SET taken_auto_local = ?2, taken_auto_offset = ?3
+             WHERE rel_path = ?1 AND taken_source = '{MANUAL}' AND taken_auto_source = ?4"
+        ),
+        params![rel_path, wall, offset, source],
+    )?;
+    Ok(())
+}
+
 /// Mejora la fecha de las fotos con esta huella si `taken` sale de una fuente
 /// más fiable que la que tienen. En las que tienen fecha a mano mejora la
 /// automática de reserva. Devuelve cuántas cambió.

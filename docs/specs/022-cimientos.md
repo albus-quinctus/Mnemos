@@ -104,8 +104,11 @@ condiciones parciales (`archived_at`, `favorite`, `trashed_at IS NULL`).
   expresión de hoy (`unixepoch(taken_at, 'unixepoch', 'localtime')`, y la
   fecha de modificación si no hay fecha de captura), con la zona del equipo
   que aplica la migración. Así, nada se mueve el primer día.
-- `mnemos index` (la app no tiene todavía un botón para reindexar) recalcula `taken_local` y `taken_offset` desde los
-  originales y los `.json` del Takeout, leyéndolos y sin escribir en ellos.
+- La migración marca esas filas con `taken_local_pending = 1`. `mnemos index`
+  (la app no tiene todavía un botón para reindexar) recalcula `taken_local` y
+  `taken_offset` desde los originales, leyéndolos y sin escribir en ellos, y
+  quita la marca. Solo cambia la hora si sale de la misma fuente que la fecha
+  guardada; una fecha del Takeout se queda con la hora de reserva.
   Respeta la fecha a mano: solo cambia la automática de reserva.
 - La importación y «Guardar como copia» (spec 009) rellenan las columnas
   nuevas; la copia hereda las del original.
@@ -340,9 +343,9 @@ Hora local
        mano y «Guardar como copia».
 2. [x] Consultas de la línea de tiempo, meses, selección por día y búsqueda por
        fecha con `taken_local`; medidas con 10 000 fotos.
-3. [ ] Recuerdos, rangos y panel Detalles (hora local y desfase) con
+3. [x] Recuerdos, rangos y panel Detalles (hora local y desfase) con
        `taken_local`; pruebas con varias `TZ`.
-4. [ ] `mnemos index` recalcula hora local y desfase en bibliotecas ya
+4. [x] `mnemos index` recalcula hora local y desfase en bibliotecas ya
        importadas; prueba de originales intactos.
 
 Copias

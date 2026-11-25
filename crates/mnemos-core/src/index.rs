@@ -12,7 +12,7 @@ use crate::error::Result;
 use crate::files::{hash_file, is_hidden, unix_secs};
 use crate::library::{Library, ORIGINALS_DIR};
 use crate::paths::RelPath;
-use crate::taken::{Taken, set_taken, taken_at_sql, taken_local_sql};
+use crate::taken::{Taken, refine_local, set_taken, taken_at_sql, taken_local_sql};
 
 /// Resultado de indexar la biblioteca.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
@@ -107,12 +107,15 @@ struct Known {
     has_orientation: bool,
     /// Ya se buscó su fecha de captura (spec 004).
     has_taken: bool,
+    /// Su hora local es la de reserva de la migración 0016: falta leer del
+    /// original la hora de la cámara y su desfase (spec 022).
+    local_pending: bool,
 }
 
 fn known_files(conn: &Connection) -> Result<HashMap<String, Known>> {
     let mut stmt = conn.prepare(
         "SELECT rel_path, size_bytes, modified_at, orientation IS NOT NULL,
-                taken_source IS NOT NULL
+                taken_source IS NOT NULL, taken_local_pending
          FROM photos",
     )?;
     let rows = stmt.query_map([], |r| {
@@ -123,6 +126,7 @@ fn known_files(conn: &Connection) -> Result<HashMap<String, Known>> {
                 modified: r.get(2)?,
                 has_orientation: r.get(3)?,
                 has_taken: r.get(4)?,
+                local_pending: r.get(5)?,
             },
         ))
     })?;
@@ -216,6 +220,15 @@ fn index_file(
         if !known.has_taken {
             // Registrada antes de la migración 0006.
             set_taken(conn, rel.as_str(), &Taken::of_file(path))?;
+        } else if known.local_pending {
+            // Registrada antes de la migración 0016 (spec 022).
+            refine_local(conn, rel.as_str(), &Taken::of_file(path))?;
+        }
+        if known.local_pending {
+            conn.execute(
+                "UPDATE photos SET taken_local_pending = 0 WHERE rel_path = ?1",
+                [rel.as_str()],
+            )?;
         }
         return Ok(Outcome::Unchanged);
     }
@@ -242,6 +255,10 @@ fn index_file(
             ],
         )?;
         set_taken(conn, rel.as_str(), &taken)?;
+        conn.execute(
+            "UPDATE photos SET taken_local_pending = 0 WHERE rel_path = ?1",
+            [rel.as_str()],
+        )?;
         Ok(Outcome::Updated)
     } else {
         let photo = NewPhoto {
@@ -626,5 +643,81 @@ pub(crate) mod tests {
             fila,
             ("2001-01-01 12:00".into(), "manual".into(), "nombre".into())
         );
+    }
+
+    #[test]
+    fn afina_la_hora_local_de_las_fotos_de_antes_de_la_migracion() {
+        let (dir, mut lib) = library();
+        let o = dir.path().join("Originales");
+        write_png(&o.join("IMG_20240714_233000.png"), 1, 1, b"a");
+        write_png(&o.join("IMG_20240714_233001.png"), 1, 1, b"b");
+        write_png(&o.join("sin-fecha.png"), 1, 1, b"c");
+        lib.index().unwrap();
+        // Como las deja la migración 0016: hora de reserva y pendientes. La
+        // segunda tiene fecha del Takeout, que no trae hora de la cámara.
+        lib.conn
+            .execute_batch(
+                "UPDATE photos SET taken_local = 1, taken_local_pending = 1;
+                 UPDATE photos SET taken_source = 'takeout'
+                  WHERE rel_path LIKE '%233001%';",
+            )
+            .unwrap();
+        let fila = |lib: &Library, rel: &str| -> (i64, i64) {
+            lib.conn
+                .query_row(
+                    "SELECT taken_local, taken_local_pending FROM photos
+                     WHERE rel_path = 'Originales/' || ?1",
+                    [rel],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .unwrap()
+        };
+
+        let report = lib.index().unwrap();
+        assert_eq!(report.unchanged, 3);
+        // 23:30 del 14 de julio de 2024, leído como UTC.
+        assert_eq!(fila(&lib, "IMG_20240714_233000.png"), (1_720_999_800, 0));
+        assert_eq!(fila(&lib, "IMG_20240714_233001.png"), (1, 0));
+        assert_eq!(fila(&lib, "sin-fecha.png"), (1, 0));
+
+        // Ya no está pendiente: otro indexado no vuelve a leerla.
+        lib.conn
+            .execute("UPDATE photos SET taken_local = 2", [])
+            .unwrap();
+        lib.index().unwrap();
+        assert_eq!(fila(&lib, "IMG_20240714_233000.png"), (2, 0));
+    }
+
+    #[test]
+    fn afina_la_automatica_de_una_foto_con_fecha_a_mano() {
+        let (dir, mut lib) = library();
+        write_png(
+            &dir.path().join("Originales/IMG_20240714_233000.png"),
+            1,
+            1,
+            b"a",
+        );
+        lib.index().unwrap();
+        let id: i64 = lib
+            .conn
+            .query_row("SELECT id FROM photos", [], |r| r.get(0))
+            .unwrap();
+        assert!(lib.set_manual_taken(id, "2020-01-02 10:00").unwrap());
+        lib.conn
+            .execute(
+                "UPDATE photos SET taken_auto_local = 1, taken_local_pending = 1",
+                [],
+            )
+            .unwrap();
+        lib.index().unwrap();
+        let fila: (i64, i64, String) = lib
+            .conn
+            .query_row(
+                "SELECT taken_local, taken_auto_local, taken_source FROM photos",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(fila, (1_577_959_200, 1_720_999_800, "manual".to_owned()));
     }
 }
