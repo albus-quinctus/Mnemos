@@ -145,3 +145,15 @@ Spec 022, tareas 1 y 2: la línea de tiempo ordena y agrupa por `taken_local`
 | Favoritos: meses y primera página | 13 ms | 3,0 ms |
 | Papelera: meses y primera página | 4,7 ms | 3,9 ms |
 
+### Filtros de la búsqueda en el núcleo, 10 000 fotos (2026-11-25)
+Spec 024, tarea 8. 10 000 filas repartidas en 15 años, con 5 cámaras y 8 objetivos, vídeos, RAW, estrellas, favoritas, 30 álbumes y 100 etiquetas. Contenedor de desarrollo, en modo release: `cargo test --release -p mnemos-core --test rendimiento_filtros -- --ignored --nocapture`. El objetivo es menos de 100 ms; no ha hecho falta ningún índice más que los de la migración 0019.
+
+| Consulta (meses y primera página de 500) | Tiempo |
+|---|---|
+| Opciones del panel (`filter_options`) | 9–10 ms |
+| Sin filtros ni texto (las 10 000) | 3,5 ms |
+| Tipo RAW (por la extensión, como la colección de Explorar) | 14 ms |
+| Tipo vídeos, cámara, cámara y objetivo, favoritas | 1–2 ms |
+| Rango de un año, valoración mínima, álbum, etiqueta | 0,5–2,5 ms |
+| Texto «img» con fotos de 3 estrellas o más | 6 ms |
+| Todos los filtros a la vez con texto | 7 ms |
