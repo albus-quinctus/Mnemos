@@ -5,6 +5,7 @@
 
 pub mod albums;
 pub mod auto_stack;
+pub mod backups;
 pub mod collections;
 mod copies;
 pub mod day_titles;
@@ -19,6 +20,7 @@ mod files;
 pub mod import;
 pub mod index;
 pub mod library;
+mod metadata;
 mod organize;
 pub mod paths;
 pub mod search;
@@ -44,6 +46,7 @@ pub use export::ExportSize;
 pub use import::{ImportReport, Progreso};
 pub use index::{FileError, IndexReport};
 pub use library::{Library, LibraryInfo, MediaEdit, PhotoDetails, PhotoMedia};
+pub use metadata::PreviousRating;
 pub use paths::RelPath;
 pub use search::{DateFilter, SearchQuery};
 pub use selection::Scope;

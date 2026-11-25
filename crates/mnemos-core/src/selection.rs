@@ -11,7 +11,7 @@ use rusqlite::types::Value;
 use crate::error::Result;
 use crate::library::Library;
 use crate::search::SearchQuery;
-use crate::timeline::{Filter, TimelineCursor, View};
+use crate::timeline::{Filter, TimelineCursor, View, wall_sql};
 
 /// Dónde se está seleccionando: una vista o los resultados de una búsqueda.
 #[derive(Debug, Clone, Copy)]
@@ -26,12 +26,17 @@ impl Library {
         self.select_where(scope, |_| String::new(), Vec::new())
     }
 
-    /// Las fotos de `scope` de un día en hora local, `"2024-10-12"`, como
-    /// agrupa la cuadrícula. Un día mal escrito no da ninguna.
+    /// Las fotos de `scope` de un día, `"2024-10-12"`, como agrupa la
+    /// cuadrícula (`GridPhoto::day`). Un día mal escrito no da ninguna.
     pub fn select_day(&self, scope: Scope<'_>, day: &str) -> Result<Vec<i64>> {
         self.select_where(
             scope,
-            |order| format!(" AND strftime('%Y-%m-%d', {order}, 'unixepoch', 'localtime') = ?"),
+            |order| {
+                format!(
+                    " AND strftime('%Y-%m-%d', {}, 'unixepoch') = ?",
+                    wall_sql(order)
+                )
+            },
             vec![Value::from(day.to_owned())],
         )
     }
