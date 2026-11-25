@@ -84,6 +84,18 @@ pub enum Error {
     #[error("ya existe una etiqueta llamada «{name}»")]
     TagNameTaken { name: String, existing: i64 },
 
+    #[error("hacen falta al menos 2 fotos para apilar")]
+    StackTooSmall,
+
+    #[error("no se pueden apilar fotos archivadas con fotos sin archivar, ni fotos de la Papelera")]
+    StackMixedPlaces,
+
+    #[error("no hay ninguna pila con el id {0}")]
+    StackNotFound(i64),
+
+    #[error("la foto {0} no está en ninguna pila")]
+    NotInStack(i64),
+
     #[error("receta de edición: {0}")]
     Recipe(#[from] mnemos_imaging::recipe::RecipeError),
 }

@@ -33,6 +33,8 @@ const MIGRATIONS: &[&str] = &[
     // Valoración, cámara y objetivo (spec 024). Va después de la 0016, que se
     // fusionó antes.
     include_str!("migrations/0019_valoracion_y_camara.sql"),
+    // Pilas (spec 023). Va después de la 0019, que se fusionó antes.
+    include_str!("migrations/0018_pilas.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
@@ -100,6 +102,7 @@ mod tests {
             "photo_tags",
             "photo_search",
             "day_titles",
+            "stacks",
         ] {
             let n: i64 = conn
                 .query_row(
