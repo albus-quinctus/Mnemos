@@ -64,6 +64,10 @@ fn abrir_biblioteca(
         ));
     }
     let lib = Library::open(&ruta).map_err(|e| e.to_string())?;
+    // Copia diaria de la base (spec 022). Si falla, la biblioteca se abre igual.
+    if let Err(err) = lib.daily_backup() {
+        eprintln!("No se pudo guardar la copia diaria de la base: {err}");
+    }
     adoptar(lib, &app, &estado, &miniaturas)
 }
 

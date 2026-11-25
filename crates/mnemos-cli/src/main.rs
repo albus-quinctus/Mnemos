@@ -27,21 +27,21 @@ fn main() -> ExitCode {
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     let result = match args.as_slice() {
         ["init", lib] => Library::create(Path::new(lib)).and_then(|lib| print_info(&lib.info()?)),
-        ["info", lib] => Library::open(Path::new(lib)).and_then(|lib| print_info(&lib.info()?)),
-        ["index", lib] => Library::open(Path::new(lib))
+        ["info", lib] => abrir(lib).and_then(|lib| print_info(&lib.info()?)),
+        ["index", lib] => abrir(lib)
             .and_then(|mut lib| lib.index())
             .map(|r| print_index(&r)),
-        ["import", lib, source] => Library::open(Path::new(lib))
+        ["import", lib, source] => abrir(lib)
             .and_then(|mut lib| lib.import_from(Path::new(source)))
             .map(|r| print_import(&r)),
-        ["miniaturas", lib] => Library::open(Path::new(lib))
+        ["miniaturas", lib] => abrir(lib)
             .and_then(|lib| lib.generate_thumbnails())
             .map(|r| print_thumbnails(&r)),
-        ["duplicados", lib] => Library::open(Path::new(lib)).and_then(|lib| print_duplicates(&lib)),
-        ["etiquetas", lib] => Library::open(Path::new(lib)).and_then(|lib| print_tags(&lib)),
+        ["duplicados", lib] => abrir(lib).and_then(|lib| print_duplicates(&lib)),
+        ["etiquetas", lib] => abrir(lib).and_then(|lib| print_tags(&lib)),
         ["papelera", "vaciar", lib] => empty_trash(Path::new(lib), false),
         ["papelera", "vaciar", lib, "--confirmar"] => empty_trash(Path::new(lib), true),
-        ["papelera", lib] => Library::open(Path::new(lib)).and_then(|lib| print_trash(&lib)),
+        ["papelera", lib] => abrir(lib).and_then(|lib| print_trash(&lib)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -56,6 +56,16 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Abre la biblioteca y hace la copia diaria de la base si aún no hay copia
+/// de hoy (spec 022). Si la copia falla, avisa y sigue.
+fn abrir(ruta: impl AsRef<Path>) -> Result<Library> {
+    let lib = Library::open(ruta.as_ref())?;
+    if let Err(err) = lib.daily_backup() {
+        eprintln!("Aviso: no se pudo guardar la copia diaria de la base: {err}");
+    }
+    Ok(lib)
 }
 
 fn print_info(info: &LibraryInfo) -> Result<bool> {
@@ -171,7 +181,7 @@ fn print_trash(lib: &Library) -> Result<bool> {
 /// Vacía la Papelera: borra del disco sus fotos. Pide escribir «sí» salvo
 /// con `--confirmar`.
 fn empty_trash(root: &Path, confirmed: bool) -> Result<bool> {
-    let mut lib = Library::open(root)?;
+    let mut lib = abrir(root)?;
     let ids = lib.trash_ids()?;
     if ids.is_empty() {
         println!("La papelera está vacía.");

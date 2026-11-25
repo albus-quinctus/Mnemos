@@ -131,8 +131,9 @@ donde se migra.
 - En `.mnemos/copias/` (la carpeta ya se crea con la biblioteca y hoy está
   vacía):
   - Diarias: `mnemos-AAAA-MM-DD.db`.
-  - De antes de migrar: `mnemos-AAAA-MM-DD-antes-v14.db` (el número es la
-    versión del esquema copiada).
+  - De antes de migrar: `mnemos-AAAA-MM-DD-hhmmss-antes-v14.db` (el número
+    es la versión del esquema copiada; la hora evita pisar otra del mismo
+    día).
   - De antes de restaurar: `mnemos-AAAA-MM-DD-hhmmss-antes-de-restaurar.db`.
 - Se escribe en `.mnemos/tmp/` y solo al terminar se renombra a su sitio:
   nunca queda una copia a medias con nombre de copia buena.
@@ -345,7 +346,7 @@ Hora local
        importadas; prueba de originales intactos.
 
 Copias
-5. [ ] Núcleo: copia diaria al abrir y copia antes de migrar (escritura en
+5. [x] Núcleo: copia diaria al abrir y copia antes de migrar (escritura en
        `tmp/`, `quick_check` de la copia, nombres).
 6. [ ] Núcleo: `quick_check` al abrir y error claro de base dañada; pantalla de
        base dañada en la app.

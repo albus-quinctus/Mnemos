@@ -9,6 +9,14 @@ pub enum Error {
     #[error("error de base de datos: {0}")]
     Db(#[from] rusqlite::Error),
 
+    #[error("la copia de la base {0} no pasa la comprobación; se ha descartado")]
+    BackupDamaged(PathBuf),
+
+    #[error(
+        "no se pudo guardar la copia de la base antes de actualizarla, así que no se ha actualizado: {0}"
+    )]
+    BackupBeforeMigration(Box<Error>),
+
     #[error("no hay ninguna biblioteca de MNEMOS en {0}")]
     NotALibrary(PathBuf),
 
