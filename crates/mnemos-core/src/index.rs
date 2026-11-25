@@ -93,6 +93,8 @@ impl Library {
         // Valoración, palabras clave y cámara de las fotos que aún no se han
         // leído, también las importadas antes de la spec 024.
         self.read_pending_metadata()?;
+        // Pilas automáticas (spec 023), después de leer los metadatos.
+        self.auto_stack_pending()?;
 
         report.missing = known.keys().filter(|k| !seen.contains(*k)).count() as u64;
         Ok(report)
