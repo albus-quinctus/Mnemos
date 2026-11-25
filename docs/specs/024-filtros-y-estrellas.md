@@ -162,8 +162,8 @@ fusionarla.
   - El indexado y la importación rellenan `rating`, `rating_source`, `camera`,
     `lens`, `metadata_at`, la descripción vacía y las etiquetas, en la misma
     transacción que el resto de la foto.
-  - `set_rating(scope, n) -> Vec<(id, anterior)>` y `restore_ratings(..)` para
-    deshacer; ponen `rating_source = 'manual'`.
+  - `set_rating(ids, n) -> Vec<PreviousRating>` y `restore_ratings(..)` para
+    deshacer; `set_rating` pone `rating_source = 'manual'`.
   - `SearchFilters { kind, camera, lens, from, to, min_rating, favorites,
     album, tag }` (serializado en español para la interfaz). `search_months` y
     `search_page` reciben consulta y filtros; cada filtro es una condición más
@@ -278,8 +278,12 @@ fusionarla.
        mayúsculas) y `FileMeta::with_sidecar`; el `.xmp` no se copia a la
        biblioteca. Takeout y repetidas ya quedan cubiertas por la tarea 3 (la
        descripción de Takeout se aplica antes y los metadatos se leen una vez).
-5. [ ] `mnemos-core`: `set_rating` por `Scope` y deshacer; `rating` en
-       `GridPhoto` y en la información del visor; pruebas.
+5. [x] `mnemos-core`: `set_rating` por `Scope` y deshacer; `rating` en
+       `GridPhoto` y en la información del visor; pruebas. Como el resto de
+       acciones por lotes, `set_rating(ids, n)` recibe ids (la interfaz
+       resuelve «Seleccionar todo» con `select_all`) y devuelve
+       `Vec<PreviousRating>` para `restore_ratings`. Ignora la Papelera.
+       `rating` en `GridPhoto` y `PhotoDetails`; `Error::InvalidRating`.
 6. [ ] Tauri y visor: `read_pending_metadata` en segundo plano al abrir la
        biblioteca; comandos `valorar` y `deshacer_valoracion`, estrellas en
        la barra del visor y en Detalles, teclas `0` a `5`, aviso con

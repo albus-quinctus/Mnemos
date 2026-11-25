@@ -77,6 +77,8 @@ pub struct PhotoDetails {
     pub media_kind: String,
     /// Duración de un vídeo en milisegundos, si se conoce.
     pub duration_ms: Option<u64>,
+    /// Estrellas de 0 a 5 (spec 024).
+    pub rating: u8,
 }
 
 impl Library {
@@ -171,7 +173,7 @@ impl Library {
             .query_row(
                 "SELECT rel_path, width, height, size_bytes, modified_at, coalesce(orientation, 1),
                         taken_at, taken_source, taken_auto_at, taken_auto_source, media_kind,
-                        duration_ms
+                        duration_ms, rating
                  FROM photos WHERE id = ?1",
                 [id],
                 |r| {
@@ -188,6 +190,7 @@ impl Library {
                         r.get::<_, Option<String>>(9)?,
                         r.get::<_, String>(10)?,
                         r.get::<_, Option<u64>>(11)?,
+                        r.get::<_, u8>(12)?,
                     ))
                 },
             )
@@ -206,6 +209,7 @@ impl Library {
                 taken_auto_source,
                 media_kind,
                 duration_ms,
+                rating,
             )| {
                 let (width, height) = if mnemos_imaging::swaps_dimensions(orientation) {
                     (h, w)
@@ -225,6 +229,7 @@ impl Library {
                     taken_auto_source,
                     media_kind,
                     duration_ms,
+                    rating,
                 }
             },
         ))
@@ -380,6 +385,7 @@ mod tests {
                 format: "JPEG".to_owned(),
                 media_kind: "foto".to_owned(),
                 duration_ms: None,
+                rating: 0,
             }
         );
         assert_eq!(lib.photo_details(id + 1).unwrap(), None);
