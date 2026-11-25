@@ -4,6 +4,7 @@
 //! SQLite y las rutas relativas que permiten mover la biblioteca entre equipos.
 
 pub mod albums;
+pub mod backups;
 pub mod collections;
 mod copies;
 pub mod day_titles;
@@ -23,6 +24,7 @@ mod organize;
 pub mod paths;
 pub mod search;
 pub mod selection;
+pub mod stacks;
 pub mod tags;
 mod taken;
 mod takeout;
@@ -47,6 +49,7 @@ pub use metadata::PreviousRating;
 pub use paths::RelPath;
 pub use search::{DateFilter, SearchQuery};
 pub use selection::Scope;
+pub use stacks::{StackKind, StackUndo};
 pub use tags::{MAX_TAG_NAME, Tag, TagUsage};
 pub use thumbnails::{ThumbnailEvent, ThumbnailJob, ThumbnailQueue, ThumbnailReport};
 pub use timeline::{GridPhoto, Month, TimelineCursor, TimelinePage, View};
