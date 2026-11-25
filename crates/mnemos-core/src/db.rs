@@ -45,18 +45,41 @@ pub const SCHEMA_VERSION: u32 = MIGRATIONS.len() as u32;
 pub(crate) const FIRST_MIGRATION: &str = MIGRATIONS[0];
 
 /// Abre (o crea) la base de datos y la lleva a la última versión del esquema.
-/// Antes de migrar una base que ya tenía datos guarda una copia en
-/// `.mnemos/copias/` (spec 022); si no puede, no migra.
+///
+/// Antes de nada comprueba la base con `PRAGMA quick_check` (spec 022): si
+/// está dañada, o SQLite no la reconoce como base de datos, devuelve
+/// [`Error::DatabaseDamaged`] sin migrar ni escribir en ella. Antes de migrar
+/// una base que ya tenía datos guarda una copia en `.mnemos/copias/`; si no
+/// puede, no migra.
 pub fn open(path: &Path) -> Result<Connection> {
-    let mut conn = Connection::open(path)?;
-    configure(&conn)?;
+    let damaged = |e: Error| {
+        if is_damage(&e) {
+            Error::DatabaseDamaged(path.to_owned())
+        } else {
+            e
+        }
+    };
+    let mut conn = Connection::open(path).map_err(|e| damaged(e.into()))?;
+    configure(&conn).map_err(damaged)?;
+    if !crate::backups::quick_check(&conn).map_err(damaged)? {
+        return Err(Error::DatabaseDamaged(path.to_owned()));
+    }
     let current = schema_version(&conn)?;
     if current > 0 && current < SCHEMA_VERSION {
         crate::backups::backup_before_migration(&conn, path, current)
             .map_err(|e| Error::BackupBeforeMigration(Box::new(e)))?;
     }
-    migrate(&mut conn)?;
+    migrate(&mut conn).map_err(damaged)?;
     Ok(conn)
+}
+
+/// Errores de SQLite que significan que el archivo no es una base válida.
+fn is_damage(e: &Error) -> bool {
+    matches!(
+        e,
+        Error::Db(rusqlite::Error::SqliteFailure(f, _))
+            if matches!(f.code, rusqlite::ErrorCode::NotADatabase | rusqlite::ErrorCode::DatabaseCorrupt)
+    )
 }
 
 fn configure(conn: &Connection) -> Result<()> {
@@ -545,6 +568,51 @@ mod tests {
             conn.execute("UPDATE photos SET media_kind = 'audio'", [])
                 .is_err()
         );
+    }
+
+    /// Biblioteca con datos para dañarla a propósito.
+    fn base_con_datos(path: &Path) {
+        let conn = open(path).unwrap();
+        for i in 0..2000 {
+            conn.execute(
+                "INSERT INTO albums (name, created_at) VALUES (?1, 0)",
+                [format!("Álbum con un nombre largo para llenar páginas {i}")],
+            )
+            .unwrap();
+        }
+    }
+
+    fn es_danada(r: Result<Connection>) -> bool {
+        matches!(r, Err(Error::DatabaseDamaged(_)))
+    }
+
+    #[test]
+    fn un_archivo_que_no_es_una_base_se_detecta_sin_tocarlo() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        base_con_datos(&path);
+        let basura = vec![0x5a_u8; std::fs::metadata(&path).unwrap().len() as usize];
+        std::fs::write(&path, &basura).unwrap();
+
+        assert!(es_danada(open(&path)));
+        assert_eq!(std::fs::read(&path).unwrap(), basura);
+    }
+
+    #[test]
+    fn una_base_con_paginas_rotas_se_detecta_sin_tocarla() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mnemos.db");
+        base_con_datos(&path);
+        // La cabecera queda bien; se rompe el final, donde están los álbumes.
+        let mut bytes = std::fs::read(&path).unwrap();
+        let n = bytes.len();
+        for b in &mut bytes[n - 40_000..n - 4096] {
+            *b = 0xa5;
+        }
+        std::fs::write(&path, &bytes).unwrap();
+
+        assert!(es_danada(open(&path)));
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
     }
 
     #[test]

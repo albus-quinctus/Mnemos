@@ -9,6 +9,11 @@ pub enum Error {
     #[error("error de base de datos: {0}")]
     Db(#[from] rusqlite::Error),
 
+    #[error(
+        "la base de datos de esta biblioteca está dañada ({0}). Tus fotos están bien: lo dañado son los álbumes, etiquetas y demás datos de MNEMOS"
+    )]
+    DatabaseDamaged(PathBuf),
+
     #[error("la copia de la base {0} no pasa la comprobación; se ha descartado")]
     BackupDamaged(PathBuf),
 

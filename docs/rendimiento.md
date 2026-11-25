@@ -83,6 +83,16 @@ Spec 021, tarea 4. `explore` con 10 000 fotos repartidas en 15 años (capturas, 
 
 Las capturas eran lo más lento (89 ms): sacar el nombre del archivo en SQL es caro, así que antes se descartan las rutas que no contienen ningún patrón.
 
+### Comprobación al abrir, 10 000 fotos (2026-11-24)
+Spec 022, tarea 6. `Library::open` hace `PRAGMA quick_check` antes de migrar. Base de 4,4 MB con 10 000 fotos, 50 etiquetas y 20 álbumes. Contenedor de desarrollo, en modo release y con la base en la caché del sistema: `cargo test --release -p mnemos-core --test rendimiento_apertura -- --ignored --nocapture`. El objetivo es menos de 200 ms en el disco externo.
+
+| Paso | Tiempo |
+|---|---|
+| `quick_check` | 7 ms |
+| Abrir la biblioteca (con `quick_check`) | 8 ms |
+
+Falta medirlo en el HDD con la caché fría: `quick_check` lee la base entera, unos 4,4 MB.
+
 ### Interfaz, 10 000 fotos
 | Medida | Resultado | Objetivo |
 |---|---|---|
