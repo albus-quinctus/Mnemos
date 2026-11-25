@@ -340,10 +340,10 @@ CREATE INDEX photos_stack ON photos (stack_id) WHERE stack_id IS NOT NULL;
        las apruebe.
 2. [x] `mnemos-core`: migración 0018, `stacks.rs` con `stack`, `unstack`,
        `set_cover`, `stack_members`, deshacer y las invariantes; pruebas.
-3. [ ] `mnemos-core`: reglas 1 y 2 (RAW + JPEG y editada) en
+3. [x] `mnemos-core`: reglas 1 y 2 (RAW + JPEG y editada) en
        `auto_stack_pending`, llamado desde la importación e `index()`;
        pruebas con nombres repetidos, mayúsculas y fechas lejanas.
-4. [ ] `mnemos-core`: reglas 3 y 4 (ráfagas por nombre y por cámara y
+4. [x] `mnemos-core`: reglas 3 y 4 (ráfagas por nombre y por cámara y
        segundo); pruebas con nombres de Pixel, Samsung, iPhone y cámaras.
 5. [ ] `mnemos-core`: `Filter` con la regla de pilas en todas las vistas y la
        búsqueda, `View::Stack`, `GridPhoto.stack`, meses y recuentos por
