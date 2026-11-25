@@ -1,6 +1,6 @@
 # 024 · Filtros de búsqueda y estrellas
 
-- Estado: borrador
+- Estado: en curso
 - Fase: F2 (0.5 beta)
 
 ## Qué y por qué
@@ -162,8 +162,8 @@ fusionarla.
   - El indexado y la importación rellenan `rating`, `rating_source`, `camera`,
     `lens`, `metadata_at`, la descripción vacía y las etiquetas, en la misma
     transacción que el resto de la foto.
-  - `set_rating(scope, n) -> Vec<(id, anterior)>` y `restore_ratings(..)` para
-    deshacer; ponen `rating_source = 'manual'`.
+  - `set_rating(ids, n) -> Vec<PreviousRating>` y `restore_ratings(..)` para
+    deshacer; `set_rating` pone `rating_source = 'manual'`.
   - `SearchFilters { kind, camera, lens, from, to, min_rating, favorites,
     album, tag }` (serializado en español para la interfaz). `search_months` y
     `search_page` reciben consulta y filtros; cada filtro es una condición más
@@ -257,18 +257,35 @@ fusionarla.
 1. [ ] Capturas del diseño (estrellas en el visor y en Detalles, menú «Valorar»
        de la barra de selección, panel de filtros, pastillas, sin resultados),
        en claro y oscuro (`capturas/024-*.png`), para que Paulo las apruebe.
-2. [ ] `mnemos-imaging`: `xmp.rs` con `quick-xml` (JPEG, PNG, WebP, TIFF/RAW y
+2. [x] `mnemos-imaging`: `xmp.rs` con `quick-xml` (JPEG, PNG, WebP, TIFF/RAW y
        `.xmp` suelto), valoración EXIF; pruebas con muestras reales y con XMP
-       mal formado, enorme y con entidades; `cargo deny`.
-3. [ ] `mnemos-core`: migración 0019; el indexado lee una vez XMP incrustado,
+       mal formado, enorme y con entidades; `cargo deny`. `read_xmp`,
+       `read_xmp_sidecar`, `parse_xmp` y `exif_rating`; `quick-xml` 0.42 sin
+       funciones opcionales (ya estaba en el árbol por Tauri). Las pruebas
+       usan paquetes como los de Lightroom y darktable dentro de archivos
+       mínimos generados en la prueba.
+3. [x] `mnemos-core`: migración 0019; el indexado lee una vez XMP incrustado,
        valoración EXIF y cámara (`metadata_at`), crea las etiquetas y rellena la
-       descripción vacía; pruebas de reindexado y de valor manual.
-4. [ ] `mnemos-core`: la importación busca `foto.ext.xmp` y `foto.xmp` en la
+       descripción vacía; pruebas de reindexado y de valor manual. En
+       `crates/mnemos-core/src/metadata.rs`: `FileMeta::of_file`, `apply` y
+       `Library::read_pending_metadata`, que `index` llama al final y que la
+       app llamará en segundo plano al abrir una biblioteca antigua (tarea 6).
+       La importación ya lee el XMP incrustado, después de aplicar Takeout.
+       Índice parcial `photos_metadata_pending` para encontrar las pendientes.
+4. [x] `mnemos-core`: la importación busca `foto.ext.xmp` y `foto.xmp` en la
        carpeta de origen y le da prioridad; pruebas con Takeout a la vez,
-       RAW+JPEG y fotos repetidas.
-5. [ ] `mnemos-core`: `set_rating` por `Scope` y deshacer; `rating` en
-       `GridPhoto` y en la información del visor; pruebas.
-6. [ ] Tauri y visor: comandos `valorar` y `deshacer_valoracion`, estrellas en
+       RAW+JPEG y fotos repetidas. `metadata::sidecar_of` (también `.XMP` en
+       mayúsculas) y `FileMeta::with_sidecar`; el `.xmp` no se copia a la
+       biblioteca. Takeout y repetidas ya quedan cubiertas por la tarea 3 (la
+       descripción de Takeout se aplica antes y los metadatos se leen una vez).
+5. [x] `mnemos-core`: `set_rating` por `Scope` y deshacer; `rating` en
+       `GridPhoto` y en la información del visor; pruebas. Como el resto de
+       acciones por lotes, `set_rating(ids, n)` recibe ids (la interfaz
+       resuelve «Seleccionar todo» con `select_all`) y devuelve
+       `Vec<PreviousRating>` para `restore_ratings`. Ignora la Papelera.
+       `rating` en `GridPhoto` y `PhotoDetails`; `Error::InvalidRating`.
+6. [ ] Tauri y visor: `read_pending_metadata` en segundo plano al abrir la
+       biblioteca; comandos `valorar` y `deshacer_valoracion`, estrellas en
        la barra del visor y en Detalles, teclas `0` a `5`, aviso con
        «Deshacer»; pruebas de la interfaz.
 7. [ ] Barra de selección y cuadrícula: «Valorar», teclas con selección,

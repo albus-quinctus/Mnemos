@@ -13,6 +13,21 @@ use std::path::Path;
 /// (archivo, llamada) permitidas fuera de `trash.rs`, con su motivo.
 const PERMITIDAS: &[(&str, &str, &str)] = &[
     (
+        "backups.rs",
+        "fs::remove_file(&tmp)",
+        "copia temporal de la base en .mnemos/tmp/",
+    ),
+    (
+        "backups.rs",
+        "fs::rename(&tmp, &dest)",
+        "copia temporal de la base a .mnemos/copias/",
+    ),
+    (
+        "backups.rs",
+        "fs::remove_file(entry.path())",
+        "copias a medias .mnemos/tmp/copia-*",
+    ),
+    (
         "copies.rs",
         "fs::remove_file(&part)",
         "temporal de la copia editada",
