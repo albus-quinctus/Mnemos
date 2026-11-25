@@ -9,9 +9,10 @@
 use std::path::Path;
 
 use mnemos_imaging::XmpData;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
+use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::library::Library;
 use crate::paths::RelPath;
 use crate::tags::{find_by_name, normalize_tag_name, refresh_search};
@@ -139,7 +140,74 @@ pub(crate) fn pending(conn: &Connection) -> Result<Vec<(i64, String)>> {
     Ok(rows)
 }
 
+/// Estrellas que tenía una foto antes de cambiarlas, para deshacer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreviousRating {
+    pub id: i64,
+    pub rating: u8,
+    /// `archivo`, `manual` o `None`, como estaba.
+    pub source: Option<String>,
+}
+
 impl Library {
+    /// Pone `rating` estrellas (0 las quita) a las fotos `ids`, a mano: ya no
+    /// se pisan al reindexar. Las de la Papelera y los ids que no existen se
+    /// ignoran. Devuelve cómo estaban las que cambiaron, para deshacer con
+    /// [`Library::restore_ratings`].
+    pub fn set_rating(&mut self, ids: &[i64], rating: u8) -> Result<Vec<PreviousRating>> {
+        if rating > 5 {
+            return Err(Error::InvalidRating(rating));
+        }
+        let tx = self.conn.transaction()?;
+        let mut previous = Vec::new();
+        {
+            let mut read = tx.prepare(
+                "SELECT rating, rating_source FROM photos WHERE id = ?1 AND trashed_at IS NULL",
+            )?;
+            let mut write = tx
+                .prepare("UPDATE photos SET rating = ?2, rating_source = 'manual' WHERE id = ?1")?;
+            for &id in ids {
+                let Some((old, source)) = read
+                    .query_row([id], |r| {
+                        Ok((r.get::<_, u8>(0)?, r.get::<_, Option<String>>(1)?))
+                    })
+                    .optional()?
+                else {
+                    continue;
+                };
+                if old == rating && source.as_deref() == Some("manual") {
+                    continue;
+                }
+                write.execute(params![id, rating])?;
+                previous.push(PreviousRating {
+                    id,
+                    rating: old,
+                    source,
+                });
+            }
+        }
+        tx.commit()?;
+        Ok(previous)
+    }
+
+    /// Deshace [`Library::set_rating`]: devuelve a cada foto las estrellas y
+    /// el origen que tenía.
+    pub fn restore_ratings(&mut self, previous: &[PreviousRating]) -> Result<()> {
+        if let Some(bad) = previous.iter().find(|p| p.rating > 5) {
+            return Err(Error::InvalidRating(bad.rating));
+        }
+        let tx = self.conn.transaction()?;
+        {
+            let mut stmt =
+                tx.prepare("UPDATE photos SET rating = ?2, rating_source = ?3 WHERE id = ?1")?;
+            for p in previous {
+                stmt.execute(params![p.id, p.rating, p.source])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Lee el XMP, la valoración EXIF y la cámara de las fotos que todavía no
     /// los tienen, por ejemplo las importadas antes de la spec 024. Las fotos
     /// que no están en el disco se dejan para otra vez. Devuelve cuántas se
@@ -468,5 +536,60 @@ pub(crate) mod tests {
             })
             .collect();
         assert!(copied.is_empty());
+    }
+
+    fn estrellas(lib: &Library) -> Vec<(i64, Option<String>)> {
+        let mut stmt = lib
+            .conn
+            .prepare("SELECT rating, rating_source FROM photos ORDER BY id")
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn valorar_y_deshacer() {
+        let (_dir, mut lib) = crate::tags::tests::library(4);
+        lib.conn
+            .execute_batch(
+                "UPDATE photos SET rating = 4, rating_source = 'archivo' WHERE id = 1;
+                 UPDATE photos SET rating = 3, rating_source = 'manual' WHERE id = 2;
+                 UPDATE photos SET trashed_at = 1 WHERE id = 4;",
+            )
+            .unwrap();
+        let antes = estrellas(&lib);
+        let prev = lib.set_rating(&[1, 2, 3, 4, 99], 3).unwrap();
+        // La 2 ya tenía 3 a mano; la 4 está en la Papelera; la 99 no existe.
+        assert_eq!(prev.iter().map(|p| p.id).collect::<Vec<_>>(), [1, 3]);
+        assert_eq!(
+            estrellas(&lib)[..3],
+            [
+                (3, Some("manual".into())),
+                (3, Some("manual".into())),
+                (3, Some("manual".into()))
+            ]
+        );
+        lib.restore_ratings(&prev).unwrap();
+        assert_eq!(estrellas(&lib), antes);
+
+        // 0 quita las estrellas, y sigue siendo manual: reindexar no las pone.
+        lib.set_rating(&[1], 0).unwrap();
+        assert_eq!(estrellas(&lib)[0], (0, Some("manual".into())));
+        assert!(matches!(
+            lib.set_rating(&[1], 6),
+            Err(Error::InvalidRating(6))
+        ));
+    }
+
+    #[test]
+    fn la_cuadricula_y_el_visor_ven_las_estrellas() {
+        let (_dir, mut lib) = crate::tags::tests::library(2);
+        lib.set_rating(&[2], 5).unwrap();
+        let page = lib.timeline_page(None, 10).unwrap();
+        let r: Vec<(i64, u8)> = page.photos.iter().map(|p| (p.id, p.rating)).collect();
+        assert_eq!(r, [(2, 5), (1, 0)]);
+        assert_eq!(lib.photo_details(2).unwrap().unwrap().rating, 5);
     }
 }

@@ -14,6 +14,14 @@ pub enum Error {
     )]
     DatabaseDamaged(PathBuf),
 
+    #[error("la copia de la base {0} no pasa la comprobación; se ha descartado")]
+    BackupDamaged(PathBuf),
+
+    #[error(
+        "no se pudo guardar la copia de la base antes de actualizarla, así que no se ha actualizado: {0}"
+    )]
+    BackupBeforeMigration(Box<Error>),
+
     #[error("no hay ninguna biblioteca de MNEMOS en {0}")]
     NotALibrary(PathBuf),
 
@@ -83,8 +91,23 @@ pub enum Error {
     #[error("no hay ninguna etiqueta con el id {0}")]
     TagNotFound(i64),
 
+    #[error("{0} no vale como valoración: debe ir de 0 a 5 estrellas")]
+    InvalidRating(u8),
+
     #[error("ya existe una etiqueta llamada «{name}»")]
     TagNameTaken { name: String, existing: i64 },
+
+    #[error("hacen falta al menos 2 fotos para apilar")]
+    StackTooSmall,
+
+    #[error("no se pueden apilar fotos archivadas con fotos sin archivar, ni fotos de la Papelera")]
+    StackMixedPlaces,
+
+    #[error("no hay ninguna pila con el id {0}")]
+    StackNotFound(i64),
+
+    #[error("la foto {0} no está en ninguna pila")]
+    NotInStack(i64),
 
     #[error("receta de edición: {0}")]
     Recipe(#[from] mnemos_imaging::recipe::RecipeError),

@@ -33,16 +33,24 @@ const MIGRATIONS: &[&str] = &[
     // Valoración, cámara y objetivo (spec 024). Va después de la 0016, que se
     // fusionó antes.
     include_str!("migrations/0019_valoracion_y_camara.sql"),
+    // Pilas (spec 023). Va después de la 0019, que se fusionó antes.
+    include_str!("migrations/0018_pilas.sql"),
 ];
 
 /// Versión de esquema que entiende esta versión de MNEMOS.
 pub const SCHEMA_VERSION: u32 = MIGRATIONS.len() as u32;
 
+/// Primera migración, para las pruebas que montan bases antiguas.
+#[cfg(test)]
+pub(crate) const FIRST_MIGRATION: &str = MIGRATIONS[0];
+
 /// Abre (o crea) la base de datos y la lleva a la última versión del esquema.
 ///
 /// Antes de nada comprueba la base con `PRAGMA quick_check` (spec 022): si
 /// está dañada, o SQLite no la reconoce como base de datos, devuelve
-/// [`Error::DatabaseDamaged`] sin migrar ni escribir en ella.
+/// [`Error::DatabaseDamaged`] sin migrar ni escribir en ella. Antes de migrar
+/// una base que ya tenía datos guarda una copia en `.mnemos/copias/`; si no
+/// puede, no migra.
 pub fn open(path: &Path) -> Result<Connection> {
     let damaged = |e: Error| {
         if is_damage(&e) {
@@ -53,17 +61,16 @@ pub fn open(path: &Path) -> Result<Connection> {
     };
     let mut conn = Connection::open(path).map_err(|e| damaged(e.into()))?;
     configure(&conn).map_err(damaged)?;
-    if !quick_check(&conn).map_err(damaged)? {
+    if !crate::backups::quick_check(&conn).map_err(damaged)? {
         return Err(Error::DatabaseDamaged(path.to_owned()));
+    }
+    let current = schema_version(&conn)?;
+    if current > 0 && current < SCHEMA_VERSION {
+        crate::backups::backup_before_migration(&conn, path, current)
+            .map_err(|e| Error::BackupBeforeMigration(Box::new(e)))?;
     }
     migrate(&mut conn).map_err(damaged)?;
     Ok(conn)
-}
-
-/// `true` si `PRAGMA quick_check` no encuentra ningún problema.
-pub(crate) fn quick_check(conn: &Connection) -> Result<bool> {
-    let first: String = conn.query_row("PRAGMA quick_check", [], |r| r.get(0))?;
-    Ok(first == "ok")
 }
 
 /// Errores de SQLite que significan que el archivo no es una base válida.
@@ -129,6 +136,7 @@ mod tests {
             "photo_tags",
             "photo_search",
             "day_titles",
+            "stacks",
         ] {
             let n: i64 = conn
                 .query_row(
